@@ -1486,54 +1486,9 @@ public partial class SteamAppId : Form
     /// </summary>
     private bool AreFilesIdentical(string file1, string file2)
     {
-        try
-        {
-            if (!File.Exists(file1) || !File.Exists(file2))
-            {
-                return false;
-            }
-
-            var fileInfo1 = new FileInfo(file1);
-            var fileInfo2 = new FileInfo(file2);
-
-            // Quick check: if sizes differ, files are different
-            if (fileInfo1.Length != fileInfo2.Length)
-            {
-                return false;
-            }
-
-            // Byte-by-byte comparison
-            using (var fs1 = new FileStream(file1, FileMode.Open, FileAccess.Read))
-            using (var fs2 = new FileStream(file2, FileMode.Open, FileAccess.Read))
-            {
-                byte[] buffer1 = new byte[4096];
-                byte[] buffer2 = new byte[4096];
-                int read1, read2;
-
-                while ((read1 = fs1.Read(buffer1, 0, buffer1.Length)) > 0)
-                {
-                    read2 = fs2.Read(buffer2, 0, buffer2.Length);
-                    if (read1 != read2)
-                    {
-                        return false;
-                    }
-
-                    for (int i = 0; i < read1; i++)
-                    {
-                        if (buffer1[i] != buffer2[i])
-                        {
-                            return false;
-                        }
-                    }
-                }
-            }
-
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
+        // Delegate to cracking service for file comparison
+        var crackingService = new CrackingService(BinPath);
+        return crackingService.AreFilesIdentical(file1, file2);
     }
 
     /// <summary>
@@ -4460,50 +4415,6 @@ oLink3.Save";
             return count;
         }
         catch { return 0; }
-    }
-
-    /// <summary>
-    ///     Finds steam_api.dll or steam_api64.dll within a folder (with depth limit)
-    ///     Returns the folder containing the DLL, or null if not found
-    /// </summary>
-    private string FindSteamApiFolder(string path, int maxDepth = 3)
-    {
-        if (!Directory.Exists(path) || maxDepth < 0)
-        {
-            return null;
-        }
-
-        try
-        {
-            // Check current folder for steam_api DLLs
-            if (File.Exists(Path.Combine(path, "steam_api.dll")) ||
-                File.Exists(Path.Combine(path, "steam_api64.dll")))
-            {
-                return path;
-            }
-
-            // Check subfolders
-            foreach (var subfolder in Directory.GetDirectories(path))
-            {
-                // Skip common non-game folders
-                string folderName = Path.GetFileName(subfolder);
-                if (folderName.StartsWith("_CommonRedist", StringComparison.OrdinalIgnoreCase) ||
-                    folderName.Equals("Redistributables", StringComparison.OrdinalIgnoreCase) ||
-                    folderName.Equals("Redist", StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var result = FindSteamApiFolder(subfolder, maxDepth - 1);
-                if (result != null)
-                {
-                    return result;
-                }
-            }
-        }
-        catch { }
-
-        return null;
     }
 
     /// <summary>
