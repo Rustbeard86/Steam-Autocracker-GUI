@@ -1,73 +1,115 @@
-using System;
-using System.IO;
+namespace APPID;
 
-namespace APPID
+/// <summary>
+/// Provides thread-safe logging functionality for the application.
+/// Logs are written to %AppData%\SACGUI\debug.log with automatic rotation.
+/// </summary>
+public static class LogHelper
 {
-    public static class LogHelper
+    private static readonly object LockObject = new();
+    private static bool _initialized;
+    private const long MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB
+
+    /// <summary>
+    /// Writes a message to the debug log file.
+    /// </summary>
+    /// <param name="message">The message to log.</param>
+    public static void Log(string message)
     {
-        private static readonly object _lockObject = new object();
-        private static bool _initialized = false;
-
-        public static void Log(string message)
+        try
         {
-            try
+            lock (LockObject)
             {
-                lock (_lockObject)
+                string appDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "SACGUI");
+                
+                Directory.CreateDirectory(appDataPath);
+                string logFile = Path.Combine(appDataPath, "debug.log");
+
+                // On first log of session, add separator and handle rotation
+                if (!_initialized)
                 {
-                    string appDataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SACGUI");
-                    if (!Directory.Exists(appDataPath))
-                        Directory.CreateDirectory(appDataPath);
-                    string logFile = Path.Combine(appDataPath, "debug.log");
-
-                    // On first log of session, add separator if not already initialized
-                    if (!_initialized)
-                    {
-                        _initialized = true;
-
-                        // Wipe log if it's over 10MB
-                        if (File.Exists(logFile))
-                        {
-                            FileInfo fi = new FileInfo(logFile);
-                            if (fi.Length > 10 * 1024 * 1024) // 10MB
-                            {
-                                File.Delete(logFile);
-                            }
-                        }
-
-                        string separator = $"{Environment.NewLine}{Environment.NewLine}================================={Environment.NewLine}SACGUI LAUNCHED{Environment.NewLine}{DateTime.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}================================={Environment.NewLine}";
-                        File.AppendAllText(logFile, separator);
-                    }
-
-                    string logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}";
-                    File.AppendAllText(logFile, logEntry);
-                    System.Diagnostics.Debug.WriteLine(logEntry);
+                    _initialized = true;
+                    RotateLogFileIfNeeded(logFile);
+                    WriteSessionHeader(logFile);
                 }
-            }
-            catch { }
-        }
 
-        public static void LogError(string context, Exception ex)
-        {
-            Log($"[ERROR] {context}: {ex.Message}");
-            if (ex.InnerException != null)
-            {
-                Log($"[ERROR] Inner: {ex.InnerException.Message}");
+                string logEntry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}";
+                File.AppendAllText(logFile, logEntry);
+                Debug.WriteLine(logEntry.TrimEnd());
             }
         }
-
-        public static void LogUpdate(string component, string version)
+        catch (Exception ex)
         {
-            Log($"[UPDATE] {component} updated to version {version}");
+            // Fail silently but write to debug output
+            Debug.WriteLine($"[LogHelper] Failed to write log: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Logs an error with exception details.
+    /// </summary>
+    /// <param name="context">The context in which the error occurred.</param>
+    /// <param name="ex">The exception that was thrown.</param>
+    public static void LogError(string context, Exception ex)
+    {
+        Log($"[ERROR] {context}: {ex.Message}");
+        
+        if (ex.StackTrace is not null)
+        {
+            Log($"[ERROR] Stack: {ex.StackTrace}");
+        }
+        
+        if (ex.InnerException is not null)
+        {
+            Log($"[ERROR] Inner: {ex.InnerException.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Logs a component update.
+    /// </summary>
+    public static void LogUpdate(string component, string version)
+        => Log($"[UPDATE] {component} updated to version {version}");
+
+    /// <summary>
+    /// Logs a network operation.
+    /// </summary>
+    public static void LogNetwork(string message)
+        => Log($"[NETWORK] {message}");
+
+    /// <summary>
+    /// Logs an API call result.
+    /// </summary>
+    public static void LogAPI(string api, string status)
+        => Log($"[API] {api}: {status}");
+
+    private static void RotateLogFileIfNeeded(string logFile)
+    {
+        if (!File.Exists(logFile))
+        {
+            return;
         }
 
-        public static void LogNetwork(string message)
+        var fileInfo = new FileInfo(logFile);
+        if (fileInfo.Length > MaxLogSizeBytes)
         {
-            Log($"[NETWORK] {message}");
+            File.Delete(logFile);
         }
+    }
 
-        public static void LogAPI(string api, string status)
-        {
-            Log($"[API] {api}: {status}");
-        }
+    private static void WriteSessionHeader(string logFile)
+    {
+        string separator = $"""
+            
+            
+            =================================
+            SACGUI LAUNCHED
+            {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+            =================================
+            
+            """;
+        File.AppendAllText(logFile, separator);
     }
 }

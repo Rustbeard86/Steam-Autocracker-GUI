@@ -1,73 +1,99 @@
-using System;
-using System.IO;
 using Newtonsoft.Json;
 
-namespace APPID
+namespace APPID;
+
+/// <summary>
+/// Application settings stored in JSON format at %AppData%\SACGUI\settings.json
+/// </summary>
+public sealed class AppSettings
 {
-    public class AppSettings
+    private static AppSettings? _instance;
+    private static readonly string SettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SACGUI",
+        "settings.json");
+
+    // Settings properties with XML documentation
+    
+    /// <summary>Gets or sets the last selected directory.</summary>
+    public string LastDir { get; set; } = string.Empty;
+    
+    /// <summary>Gets or sets whether to use Goldberg emulator.</summary>
+    public bool Goldy { get; set; } = true;
+    
+    /// <summary>Gets or sets whether the window is pinned on top.</summary>
+    public bool Pinned { get; set; } = true;
+    
+    /// <summary>Gets or sets whether auto-crack is enabled.</summary>
+    public bool AutoCrack { get; set; }
+    
+    /// <summary>Gets or sets whether LAN multiplayer is enabled.</summary>
+    public bool LANMultiplayer { get; set; }
+    
+    /// <summary>Gets or sets whether to use RIN password for archives.</summary>
+    public bool UseRinPassword { get; set; }
+    
+    /// <summary>Gets or sets shared games data.</summary>
+    public string SharedGamesData { get; set; } = string.Empty;
+    
+    /// <summary>Gets or sets the compression format (zip or 7z).</summary>
+    public string ZipFormat { get; set; } = "zip";
+    
+    /// <summary>Gets or sets the compression level.</summary>
+    public string ZipLevel { get; set; } = "Normal";
+    
+    /// <summary>Gets or sets whether to skip compression confirmation dialog.</summary>
+    public bool ZipDontAsk { get; set; }
+
+    /// <summary>
+    /// Gets the singleton instance of AppSettings.
+    /// </summary>
+    public static AppSettings Default
     {
-        private static AppSettings _instance;
-        private static readonly string SettingsPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "SACGUI",
-            "settings.json");
-
-        // Settings properties
-        public string lastDir { get; set; } = "";
-        public bool Goldy { get; set; } = true;
-        public bool Pinned { get; set; } = true;
-        public bool AutoCrack { get; set; } = false;
-        public bool LANMultiplayer { get; set; } = false;
-        public bool UseRinPassword { get; set; } = false;
-        public string SharedGamesData { get; set; } = "";
-        public string ZipFormat { get; set; } = "zip";
-        public string ZipLevel { get; set; } = "Normal";
-        public bool ZipDontAsk { get; set; } = false;
-
-        public static AppSettings Default
+        get
         {
-            get
+            _instance ??= Load();
+            return _instance;
+        }
+    }
+
+    private static AppSettings Load()
+    {
+        try
+        {
+            if (File.Exists(SettingsPath))
             {
-                if (_instance == null)
-                {
-                    Load();
-                }
-                return _instance;
+                string json = File.ReadAllText(SettingsPath);
+                return JsonConvert.DeserializeObject<AppSettings>(json) ?? new AppSettings();
             }
         }
-
-        private static void Load()
+        catch (Exception ex)
         {
-            try
-            {
-                if (File.Exists(SettingsPath))
-                {
-                    string json = File.ReadAllText(SettingsPath);
-                    _instance = JsonConvert.DeserializeObject<AppSettings>(json);
-                }
-                else
-                {
-                    _instance = new AppSettings();
-                }
-            }
-            catch
-            {
-                _instance = new AppSettings();
-            }
+            LogHelper.LogError("Failed to load settings", ex);
         }
 
-        public void Save()
-        {
-            try
-            {
-                string dir = Path.GetDirectoryName(SettingsPath);
-                if (!Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
+        return new AppSettings();
+    }
 
-                string json = JsonConvert.SerializeObject(this, Formatting.Indented);
-                File.WriteAllText(SettingsPath, json);
+    /// <summary>
+    /// Saves the current settings to disk.
+    /// </summary>
+    public void Save()
+    {
+        try
+        {
+            string? dir = Path.GetDirectoryName(SettingsPath);
+            if (dir is not null)
+            {
+                Directory.CreateDirectory(dir);
             }
-            catch { }
+
+            string json = JsonConvert.SerializeObject(this, Formatting.Indented);
+            File.WriteAllText(SettingsPath, json);
+        }
+        catch (Exception ex)
+        {
+            LogHelper.LogError("Failed to save settings", ex);
         }
     }
 }
