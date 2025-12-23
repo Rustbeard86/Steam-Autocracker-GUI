@@ -470,49 +470,55 @@ namespace APPID
         public static void Tit(string Message, Color color)
         {
             // Skip if suppressing status updates (cracking from share window)
-            if (SteamAppIdIdentifier.Program.form.suppressStatusUpdates)
+            if (SteamAppIdIdentifier.Program.Form?.suppressStatusUpdates ?? false)
                 return;
 
             // Handle cross-thread calls
-            if (SteamAppIdIdentifier.Program.form.InvokeRequired)
+            if (SteamAppIdIdentifier.Program.Form?.InvokeRequired ?? false)
             {
-                SteamAppIdIdentifier.Program.form.BeginInvoke(new Action(() => Tit(Message, color)));
+                SteamAppIdIdentifier.Program.Form?.BeginInvoke(new Action(() => Tit(Message, color)));
                 return;
             }
+
+            if (SteamAppIdIdentifier.Program.Form == null) return;
 
             string MessageLow = Message.ToLower();
             if (MessageLow.Contains("READY TO CRACK!".ToLower()))
             {
-                SteamAppIdIdentifier.Program.form.StatusLabel.ForeColor = Color.HotPink;
+                SteamAppIdIdentifier.Program.Form.StatusLabel.ForeColor = Color.HotPink;
             }
             else if (MessageLow.Contains("Complete".ToLower()))
             {
-                SteamAppIdIdentifier.Program.form.StatusLabel.ForeColor = Color.MediumSpringGreen;
+                SteamAppIdIdentifier.Program.Form.StatusLabel.ForeColor = Color.MediumSpringGreen;
             }
             else if (MessageLow.Contains("no steam".ToLower()))
             {
-                SteamAppIdIdentifier.Program.form.StatusLabel.ForeColor = Color.Crimson;
+                SteamAppIdIdentifier.Program.Form.StatusLabel.ForeColor = Color.Crimson;
             }
             else
             {
-                SteamAppIdIdentifier.Program.form.StatusLabel.ForeColor = color;
+                SteamAppIdIdentifier.Program.Form.StatusLabel.ForeColor = color;
             }
-            SteamAppIdIdentifier.Program.form.StatusLabel.Text = Message;
-            SteamAppIdIdentifier.Program.form.Text = Message.Replace("&&", "&");
+            SteamAppIdIdentifier.Program.Form.StatusLabel.Text = Message;
+            SteamAppIdIdentifier.Program.Form.Text = Message.Replace("&&", "&");
         }
         public static void Tat(string Message)
         {
             // Skip if suppressing status updates (cracking from share window)
-            if (SteamAppIdIdentifier.Program.form.suppressStatusUpdates)
+            if (SteamAppIdIdentifier.Program.Form?.suppressStatusUpdates ?? false)
                 return;
 
             // Handle cross-thread calls
-            if (SteamAppIdIdentifier.Program.form.InvokeRequired)
+            if (SteamAppIdIdentifier.Program.Form?.InvokeRequired ?? false)
             {
-                SteamAppIdIdentifier.Program.form.BeginInvoke(new Action(() => Tat(Message)));
+                SteamAppIdIdentifier.Program.Form?.BeginInvoke(new Action(() => Tat(Message)));
                 return;
             }
-            SteamAppIdIdentifier.Program.form.currDIrText.Text = $"{Message}";
+
+            if (SteamAppIdIdentifier.Program.Form != null)
+            {
+                SteamAppIdIdentifier.Program.Form.currDIrText.Text = $"{Message}";
+            }
         }
         public static bool VRLExists = false;
 
@@ -745,7 +751,7 @@ namespace APPID
 
             if (args2 != null)
             {
-                foreach (string args1 in SteamAppIdIdentifier.Program.args2)
+                foreach (string args1 in SteamAppIdIdentifier.Program.CommandLineArgs ?? [])
                 {
                     args3 = RemoveSpecialCharacters(args1);
                     args2 += args3 + " ";
