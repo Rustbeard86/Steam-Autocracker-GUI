@@ -12,86 +12,31 @@ using Timer = System.Windows.Forms.Timer;
 
 namespace SteamAutocrackGUI;
 
-/// <summary>
-///     Custom progress bar with neon blue gradient styling
-/// </summary>
-public class NeonProgressBar : ProgressBar
-{
-    public NeonProgressBar()
-    {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer,
-            true);
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var rect = ClientRectangle;
-
-        // Dark background
-        using (var bgBrush = new SolidBrush(Color.FromArgb(10, 12, 20)))
-        {
-            e.Graphics.FillRectangle(bgBrush, rect);
-        }
-
-        // Border
-        using (var borderPen = new Pen(Color.FromArgb(40, 50, 70)))
-        {
-            e.Graphics.DrawRectangle(borderPen, 0, 0, rect.Width - 1, rect.Height - 1);
-        }
-
-        // Progress fill with neon blue gradient
-        if (Value > 0)
-        {
-            int fillWidth = (int)((rect.Width - 4) * ((double)Value / Maximum));
-            if (fillWidth > 0)
-            {
-                using (var brush = new LinearGradientBrush(
-                           new Rectangle(2, 2, fillWidth, rect.Height - 4),
-                           Color.FromArgb(0, 150, 255), // Bright neon blue
-                           Color.FromArgb(0, 100, 200), // Darker blue
-                           LinearGradientMode.Vertical))
-                {
-                    e.Graphics.FillRectangle(brush, 2, 2, fillWidth, rect.Height - 4);
-                }
-
-                // Add glow effect on top
-                using (var glowBrush = new SolidBrush(Color.FromArgb(40, 150, 220, 255)))
-                {
-                    e.Graphics.FillRectangle(glowBrush, 2, 2, fillWidth, (rect.Height - 4) / 3);
-                }
-            }
-        }
-    }
-}
-
 public class BatchGameSelectionForm : Form
 {
     private const int WM_NCLBUTTONDOWN = 0xA1;
     private const int HTCAPTION = 0x2;
-
-    // Upload slots (3 concurrent uploads max)
     private const int MAX_UPLOAD_SLOTS = 3;
-    private string allLinksMarkdown = "";
 
-    private string allLinksPhpBB = "";
-    private string allLinksPlaintext;
+    private string allLinksMarkdown = string.Empty;
+    private string allLinksPhpBB = string.Empty;
+    private string? allLinksPlaintext;
 
-    // Tooltip for batch form
-    private ToolTip batchToolTip;
-    private Button btnCancelAll;
+    private ToolTip? batchToolTip;
+    private Button? btnCancelAll;
     private bool cancelAllRemaining;
-    private readonly Dictionary<string, string> convertingUrls = new(); // gamePath -> 1fichier URL during conversion
-    private Button copyDiscordBtn;
-    private Button copyPlaintextBtn;
-    private Button copyRinBtn;
-    private readonly Dictionary<string, SteamAppId.CrackDetails> crackDetailsMap = new(); // gamePath -> crack details
-    private readonly Dictionary<int, string> detectedAppIds = new();
-    private readonly Dictionary<string, string> finalUrls = new(); // gamePath -> final URL (pydrive or 1fichier)
+    private readonly Dictionary<string, string> convertingUrls = []; // gamePath -> 1fichier URL during conversion
+    private Button? copyDiscordBtn;
+    private Button? copyPlaintextBtn;
+    private Button? copyRinBtn;
+    private readonly Dictionary<string, SteamAppId.CrackDetails> crackDetailsMap = []; // gamePath -> crack details
+    private readonly Dictionary<int, string> detectedAppIds = [];
+    private readonly Dictionary<string, string> finalUrls = []; // gamePath -> final URL (pydrive or 1fichier)
 
-    private DataGridView gameGrid;
+    private DataGridView? gameGrid;
     private readonly List<string> gamePaths;
     private readonly UploadSlot[] uploadSlots = new UploadSlot[MAX_UPLOAD_SLOTS];
-    private Panel uploadSlotsContainer;
+    private Panel? uploadSlotsContainer;
 
     public BatchGameSelectionForm(List<string> paths)
     {
@@ -123,9 +68,24 @@ public class BatchGameSelectionForm : Form
         };
     }
 
-    public List<APPID.Services.Interfaces.BatchGameItem> SelectedGames { get; } = new();
+    /// <summary>
+    ///     Gets the list of games selected for batch processing.
+    /// </summary>
+    public List<APPID.Services.Interfaces.BatchGameItem> SelectedGames { get; } = [];
+
+    /// <summary>
+    ///     Gets or sets the compression format to use (ZIP or 7Z).
+    /// </summary>
     public string CompressionFormat { get; private set; } = "ZIP";
+
+    /// <summary>
+    ///     Gets or sets the compression level.
+    /// </summary>
     public string CompressionLevel { get; private set; } = "0";
+
+    /// <summary>
+    ///     Gets or sets whether to use Rin password for compression.
+    /// </summary>
     public bool UseRinPassword { get; private set; }
 
     /// <summary>
@@ -323,12 +283,16 @@ public class BatchGameSelectionForm : Form
         gameGrid.Columns.Add(detailsCol);
 
         // Track header checkbox states
-        var headerCheckStates =
-            new Dictionary<string, bool> { { "Crack", true }, { "Zip", false }, { "Upload", false } };
+        Dictionary<string, bool> headerCheckStates = new()
+        {
+            ["Crack"] = true,
+            ["Zip"] = false,
+            ["Upload"] = false
+        };
 
         // Custom paint for cells and headers
-        Image infoIcon = null;
-        Image zipperIcon = null;
+        Image? infoIcon = null;
+        Image? zipperIcon = null;
         try { infoIcon = Resources.info_icon; }
         catch { }
 
@@ -973,7 +937,7 @@ public class BatchGameSelectionForm : Form
         processBtn.Click += (s, e) =>
         {
             // Check for missing AppIDs on games that need cracking
-            var missingAppIds = new List<string>();
+            List<string> missingAppIds = [];
             for (int i = 0; i < gameGrid.Rows.Count; i++)
             {
                 var row = gameGrid.Rows[i];
@@ -1218,7 +1182,7 @@ public class BatchGameSelectionForm : Form
                 slot.Cancellation = new CancellationTokenSource();
 
                 slot.LblGame.Text = gameName;
-                slot.LblSize.Text = $"0 / {FormatBytes(totalBytes)}";
+                slot.LblSize.Text = $"0 / {FormatFileSize(totalBytes)}";
                 slot.LblSpeed.Text = "";
                 slot.LblEta.Text = "";
                 slot.ProgressBar.Value = 0;
@@ -1283,11 +1247,11 @@ public class BatchGameSelectionForm : Form
 
         slot.ProgressBar.Value = Math.Min(percent, 100);
         slot.ProgressBar.Invalidate();
-        slot.LblSize.Text = $"{FormatBytes(uploadedBytes)} / {FormatBytes(totalBytes)}";
+        slot.LblSize.Text = $"{FormatFileSize(uploadedBytes)} / {FormatFileSize(totalBytes)}";
 
         if (bytesPerSecond > 0)
         {
-            slot.LblSpeed.Text = $"{FormatBytes((long)bytesPerSecond)}/s";
+            slot.LblSpeed.Text = $"{FormatFileSize((long)bytesPerSecond)}/s";
             long remainingBytes = totalBytes - uploadedBytes;
             if (remainingBytes > 0)
             {
@@ -1444,26 +1408,6 @@ public class BatchGameSelectionForm : Form
         }
     }
 
-    private string FormatBytes(long bytes)
-    {
-        if (bytes >= 1024L * 1024 * 1024)
-        {
-            return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
-        }
-
-        if (bytes >= 1024L * 1024)
-        {
-            return $"{bytes / (1024.0 * 1024):F1} MB";
-        }
-
-        if (bytes >= 1024)
-        {
-            return $"{bytes / 1024.0:F0} KB";
-        }
-
-        return $"{bytes} B";
-    }
-
     private string FormatEta(double seconds)
     {
         if (seconds < 60)
@@ -1500,8 +1444,8 @@ public class BatchGameSelectionForm : Form
         allLinksPhpBB = phpBBLinks;
 
         // Build markdown version from finalUrls
-        var mdLinks = new List<string>();
-        var plainLinks = new List<string>();
+        List<string> mdLinks = [];
+        List<string> plainLinks = [];
         foreach (var kvp in finalUrls)
         {
             string gameName = Path.GetFileName(kvp.Key);
@@ -1845,7 +1789,7 @@ public class BatchGameSelectionForm : Form
         // Prepare game info in background
         var validGames = await Task.Run(() =>
         {
-            var results = new List<(string path, string name, string appId, string size, int steamApiCount)>();
+            List<(string path, string name, string appId, string size, int steamApiCount)> results = [];
 
             foreach (string path in gamePaths)
             {
@@ -2685,373 +2629,4 @@ public class BatchGameSelectionForm : Form
         }
     }
 
-    // Upload slot helper class
-    private class UploadSlot
-    {
-        public Button BtnSkip;
-        public CancellationTokenSource Cancellation;
-        public string GamePath;
-        public bool InUse;
-        public Label LblEta;
-        public Label LblGame;
-        public Label LblSize;
-        public Label LblSpeed;
-        public Panel Panel;
-        public NeonProgressBar ProgressBar;
-    }
-
-    // Classes for Steam Store API response
-    private class SteamStoreSearchResponse
-    {
-        public int total { get; set; }
-        public List<SteamStoreSearchItem> items { get; set; }
-    }
-
-    private class SteamStoreSearchItem
-    {
-        public string type { get; set; }
-        public string name { get; set; }
-        public int id { get; set; }
-    }
-}
-
-/// <summary>
-///     Dialog for searching and selecting an AppID
-/// </summary>
-public class AppIdSearchDialog : Form
-{
-    private const int WM_NCLBUTTONDOWN = 0xA1;
-    private const int HTCAPTION = 0x2;
-    private DataGridView resultsGrid;
-
-    private TextBox searchBox;
-    private DataTable steamGamesTable;
-
-    public AppIdSearchDialog(string gameName, string currentAppId)
-    {
-        InitializeForm(gameName, currentAppId);
-        Load += (s, e) =>
-        {
-            ApplyAcrylicEffect();
-            LoadSteamGamesData();
-            if (!string.IsNullOrEmpty(gameName))
-            {
-                searchBox.Text = gameName;
-                PerformSearch(gameName);
-            }
-        };
-        MouseDown += Form_MouseDown;
-    }
-
-    public string SelectedAppId { get; private set; }
-
-    [DllImport("user32.dll")]
-    private static extern bool ReleaseCapture();
-
-    [DllImport("user32.dll")]
-    private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
-
-    private void InitializeForm(string gameName, string currentAppId)
-    {
-        Text = "Search AppID";
-        Size = new Size(450, 400);
-        StartPosition = FormStartPosition.CenterParent;
-        BackColor = Color.FromArgb(5, 8, 20);
-        ForeColor = Color.White;
-        FormBorderStyle = FormBorderStyle.None;
-        MaximizeBox = false;
-        MinimizeBox = false;
-
-        // Title
-        var titleLabel = new Label
-        {
-            Text = "Search AppID",
-            Font = new Font("Segoe UI", 12, FontStyle.Bold),
-            ForeColor = Color.FromArgb(100, 200, 255),
-            Location = new Point(15, 12),
-            Size = new Size(200, 25),
-            BackColor = Color.Transparent
-        };
-        Controls.Add(titleLabel);
-
-        // Game name label
-        var gameLabel = new Label
-        {
-            Text = $"Game: {gameName}",
-            Font = new Font("Segoe UI", 9),
-            ForeColor = Color.FromArgb(180, 180, 185),
-            Location = new Point(15, 40),
-            Size = new Size(400, 20),
-            BackColor = Color.Transparent
-        };
-        Controls.Add(gameLabel);
-
-        // Search box
-        searchBox = new TextBox
-        {
-            Location = new Point(15, 65),
-            Size = new Size(330, 25),
-            BackColor = Color.FromArgb(25, 28, 40),
-            ForeColor = Color.FromArgb(220, 255, 255),
-            BorderStyle = BorderStyle.FixedSingle,
-            Font = new Font("Segoe UI", 10)
-        };
-        searchBox.KeyDown += (s, e) =>
-        {
-            if (e.KeyCode == Keys.Enter)
-            {
-                e.SuppressKeyPress = true;
-                PerformSearch(searchBox.Text);
-            }
-        };
-        Controls.Add(searchBox);
-
-        // Search button
-        var searchBtn = new Button
-        {
-            Text = "Search",
-            Location = new Point(355, 65),
-            Size = new Size(75, 25),
-            BackColor = Color.FromArgb(38, 38, 42),
-            ForeColor = Color.FromArgb(220, 220, 225),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9),
-            Cursor = Cursors.Hand
-        };
-        searchBtn.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-        searchBtn.Click += (s, e) => PerformSearch(searchBox.Text);
-        Controls.Add(searchBtn);
-
-        // Results grid
-        resultsGrid = new DataGridView
-        {
-            Location = new Point(15, 100),
-            Size = new Size(415, 210),
-            BackgroundColor = Color.FromArgb(5, 8, 20),
-            ForeColor = Color.FromArgb(220, 255, 255),
-            GridColor = Color.FromArgb(40, 40, 45),
-            BorderStyle = BorderStyle.None,
-            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
-            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None,
-            EnableHeadersVisualStyles = false,
-            RowHeadersVisible = false,
-            AllowUserToAddRows = false,
-            AllowUserToDeleteRows = false,
-            ReadOnly = true,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            MultiSelect = false,
-            Font = new Font("Segoe UI", 9)
-        };
-
-        resultsGrid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 28, 40);
-        resultsGrid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(150, 200, 255);
-        resultsGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-        resultsGrid.ColumnHeadersHeight = 28;
-        resultsGrid.DefaultCellStyle.BackColor = Color.FromArgb(15, 18, 30);
-        resultsGrid.DefaultCellStyle.ForeColor = Color.FromArgb(220, 255, 255);
-        resultsGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 80, 120);
-        resultsGrid.RowTemplate.Height = 24;
-
-        resultsGrid.CellDoubleClick += (s, e) =>
-        {
-            if (e.RowIndex >= 0)
-            {
-                SelectCurrentRow();
-            }
-        };
-        Controls.Add(resultsGrid);
-
-        // Manual AppID entry
-        var manualLabel = new Label
-        {
-            Text = "Or enter AppID manually:",
-            Font = new Font("Segoe UI", 9),
-            ForeColor = Color.FromArgb(140, 140, 145),
-            Location = new Point(15, 320),
-            Size = new Size(160, 20),
-            BackColor = Color.Transparent
-        };
-        Controls.Add(manualLabel);
-
-        var manualBox = new TextBox
-        {
-            Location = new Point(175, 318),
-            Size = new Size(100, 25),
-            BackColor = Color.FromArgb(25, 28, 40),
-            ForeColor = Color.FromArgb(220, 255, 255),
-            BorderStyle = BorderStyle.FixedSingle,
-            Font = new Font("Segoe UI", 10),
-            Text = currentAppId
-        };
-        Controls.Add(manualBox);
-
-        // OK button
-        var okBtn = new Button
-        {
-            Text = "OK",
-            Location = new Point(290, 315),
-            Size = new Size(65, 30),
-            BackColor = Color.FromArgb(0, 100, 70),
-            ForeColor = Color.FromArgb(220, 220, 225),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9),
-            Cursor = Cursors.Hand
-        };
-        okBtn.FlatAppearance.BorderColor = Color.FromArgb(0, 80, 60);
-        okBtn.Click += (s, e) =>
-        {
-            // Use manual entry if provided, otherwise use selected row
-            if (!string.IsNullOrWhiteSpace(manualBox.Text) && manualBox.Text.All(char.IsDigit))
-            {
-                SelectedAppId = manualBox.Text.Trim();
-                DialogResult = DialogResult.OK;
-                Close();
-            }
-            else if (resultsGrid.SelectedRows.Count > 0)
-            {
-                SelectCurrentRow();
-            }
-            else
-            {
-                MessageBox.Show("Please select a game from the results or enter an AppID manually.",
-                    "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        };
-        Controls.Add(okBtn);
-
-        // Cancel button
-        var cancelBtn = new Button
-        {
-            Text = "Cancel",
-            Location = new Point(365, 315),
-            Size = new Size(65, 30),
-            BackColor = Color.FromArgb(38, 38, 42),
-            ForeColor = Color.FromArgb(220, 220, 225),
-            FlatStyle = FlatStyle.Flat,
-            Font = new Font("Segoe UI", 9),
-            Cursor = Cursors.Hand
-        };
-        cancelBtn.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-        cancelBtn.Click += (s, e) =>
-        {
-            DialogResult = DialogResult.Cancel;
-            Close();
-        };
-        Controls.Add(cancelBtn);
-    }
-
-    private void LoadSteamGamesData()
-    {
-        try
-        {
-            // Try to load the Steam games table from the main form's data
-            var dataGen = new DataTableGeneration();
-            steamGamesTable = dataGen.DataTableToGenerate;
-            resultsGrid.DataSource = steamGamesTable;
-
-            // Configure columns
-            if (resultsGrid.Columns.Count >= 2)
-            {
-                resultsGrid.Columns[0].HeaderText = "Name";
-                resultsGrid.Columns[0].Width = 300;
-                resultsGrid.Columns[1].HeaderText = "AppID";
-                resultsGrid.Columns[1].Width = 80;
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Failed to load Steam games data: {ex.Message}");
-        }
-    }
-
-    private void PerformSearch(string searchTerm)
-    {
-        if (steamGamesTable == null)
-        {
-            return;
-        }
-
-        try
-        {
-            string clean = searchTerm.Trim()
-                .Replace("'", "''") // Escape single quotes
-                .Replace("[", "")
-                .Replace("]", "")
-                .Replace("*", "")
-                .Replace("%", "");
-
-            if (string.IsNullOrEmpty(clean))
-            {
-                return;
-            }
-
-            // Try exact match first
-            steamGamesTable.DefaultView.RowFilter = $"Name LIKE '{clean}'";
-            if (steamGamesTable.DefaultView.Count > 0)
-            {
-                return;
-            }
-
-            // Try contains search
-            string[] words = clean.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length > 1)
-            {
-                string filter = string.Join("%' AND Name LIKE '%", words);
-                steamGamesTable.DefaultView.RowFilter = $"Name LIKE '%{filter}%'";
-                if (steamGamesTable.DefaultView.Count > 0)
-                {
-                    return;
-                }
-            }
-
-            // Simple contains
-            steamGamesTable.DefaultView.RowFilter = $"Name LIKE '%{clean}%'";
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"Search error: {ex.Message}");
-            steamGamesTable.DefaultView.RowFilter = "";
-        }
-    }
-
-    private void SelectCurrentRow()
-    {
-        if (resultsGrid.SelectedRows.Count > 0)
-        {
-            var row = resultsGrid.SelectedRows[0];
-            if (row.Cells.Count >= 2)
-            {
-                SelectedAppId = row.Cells[1].Value?.ToString();
-                DialogResult = DialogResult.OK;
-                Close();
-            }
-        }
-    }
-
-    private void ApplyAcrylicEffect()
-    {
-        try
-        {
-            AcrylicHelper.ApplyAcrylic(this, disableShadow: true);
-        }
-        catch { }
-    }
-
-    private void Form_MouseDown(object sender, MouseEventArgs e)
-    {
-        if (e.Button == MouseButtons.Left)
-        {
-            ReleaseCapture();
-            SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-        }
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        base.OnPaint(e);
-        using (var pen = new Pen(Color.FromArgb(60, 60, 65), 1))
-        {
-            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
-        }
-    }
 }
