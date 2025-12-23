@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using Newtonsoft.Json;
@@ -142,7 +142,7 @@ internal static class Updater
                 // Download the new version
                 using var httpClient = new HttpClient();
                 HttpResponseMessage response = await httpClient.GetAsync(downloadUrl);
-                await using (FileStream fs = new("SLS.zip", FileMode.CreateNew))
+                await using (FileStream fs = new("SLS.zip", System.IO.FileMode.CreateNew))
                 {
                     await response.Content.CopyToAsync(fs);
                 }
@@ -214,7 +214,7 @@ internal static class Updater
             using var httpClient = new HttpClient();
             string tempFile = "gbe_fork.7z";
             HttpResponseMessage response = await httpClient.GetAsync(downloadUrl);
-            await using (FileStream fs = new(tempFile, FileMode.CreateNew))
+            await using (FileStream fs = new(tempFile, System.IO.FileMode.CreateNew))
             {
                 await response.Content.CopyToAsync(fs);
             }

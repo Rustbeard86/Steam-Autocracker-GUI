@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
@@ -2344,8 +2344,8 @@ oLink3.Save";
             FolderSelectDialog folderSelectDialog = new FolderSelectDialog();
             folderSelectDialog.Title = "Select the game's main folder.";
 
-            if (AppSettings.Default.lastDir.Length > 0)
-                folderSelectDialog.InitialDirectory = AppSettings.Default.lastDir;
+            if (AppSettings.Default.LastDir.Length > 0)
+                folderSelectDialog.InitialDirectory = AppSettings.Default.LastDir;
 
             if (folderSelectDialog.Show(Handle))
             {
@@ -2360,7 +2360,7 @@ oLink3.Save";
                     var parent = Directory.GetParent(gameDir);
                     if (parent != null)
                     {
-                        AppSettings.Default.lastDir = parent.FullName;
+                        AppSettings.Default.LastDir = parent.FullName;
                         AppSettings.Default.Save();
                     }
                 }
@@ -2371,7 +2371,7 @@ oLink3.Save";
                 if (gamesInFolder.Count > 1)
                 {
                     // Multiple games detected - batch folder
-                    AppSettings.Default.lastDir = gameDir;
+                    AppSettings.Default.LastDir = gameDir;
                     AppSettings.Default.Save();
                     ShowBatchGameSelection(gamesInFolder);
                     return;
@@ -2480,7 +2480,7 @@ oLink3.Save";
                 // Stop label5 timer when game dir is selected
                 label5Timer.Stop();
                 label5.Visible = false;
-                AppSettings.Default.lastDir = parentOfSelection;
+                AppSettings.Default.LastDir = parentOfSelection;
                 AppSettings.Default.Save();
             }
             else
@@ -2701,7 +2701,7 @@ oLink3.Save";
                     isInitialFolderSearch = true;  // This is the initial search
                     searchTextBox.Text = gameDirName;
                     isFirstClickAfterSelection = true;  // Set AFTER changing text to avoid race condition
-                    AppSettings.Default.lastDir = parentOfSelection;
+                    AppSettings.Default.LastDir = parentOfSelection;
                     AppSettings.Default.Save();
                 }
                 else

@@ -620,7 +620,7 @@ namespace SteamAutocrackGUI
                             gameGrid.Rows[e.RowIndex].Cells["Status"].Value = "Copied! ✓";
                             gameGrid.Rows[e.RowIndex].Cells["Status"].Style.ForeColor = Color.Cyan;
 
-                            var timer = new Timer { Interval = 3000 };
+                            var timer = new System.Windows.Forms.Timer { Interval = 3000 };
                             int rowIdx = e.RowIndex;
                             timer.Tick += (ts, te) =>
                             {
@@ -1423,7 +1423,7 @@ namespace SteamAutocrackGUI
                     {
                         Clipboard.SetText(allLinksPhpBB);
                         copyRinBtn.Text = "Copied! ✓";
-                        var timer = new Timer { Interval = 2000 };
+                        var timer = new System.Windows.Forms.Timer { Interval = 2000 };
                         timer.Tick += (ts, te) => { timer.Stop(); timer.Dispose(); copyRinBtn.Text = "Copy for Rin"; };
                         timer.Start();
                     }
@@ -1443,7 +1443,7 @@ namespace SteamAutocrackGUI
                     {
                         Clipboard.SetText(allLinksMarkdown);
                         copyDiscordBtn.Text = "Copied! ✓";
-                        var timer = new Timer { Interval = 2000 };
+                        var timer = new System.Windows.Forms.Timer { Interval = 2000 };
                         timer.Tick += (ts, te) => { timer.Stop(); timer.Dispose(); copyDiscordBtn.Text = "Copy for Discord"; };
                         timer.Start();
                     }
@@ -1463,7 +1463,7 @@ namespace SteamAutocrackGUI
                     {
                         Clipboard.SetText(allLinksPlaintext);
                         copyPlaintextBtn.Text = "Copied! ✓";
-                        var timer = new Timer { Interval = 2000 };
+                        var timer = new System.Windows.Forms.Timer { Interval = 2000 };
                         timer.Tick += (ts, te) => { timer.Stop(); timer.Dispose(); copyPlaintextBtn.Text = "Copy Plaintext"; };
                         timer.Start();
                     }

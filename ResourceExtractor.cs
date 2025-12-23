@@ -1,4 +1,5 @@
 using System.Reflection;
+using APPID;
 
 namespace SteamAppIdIdentifier;
 
