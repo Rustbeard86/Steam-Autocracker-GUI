@@ -10,6 +10,11 @@ public sealed class UploadService : IUploadService
 {
     private const string UploadEndpoint = "https://share.harryeffingpotter.com/upload";
     private const int MaxFileSizeMB = 500;
+    private const double BytesToMB = 1024.0 * 1024.0;
+    private const string AppVersion = "SACGUI-2.3";
+
+    // Reuse HttpClient to avoid socket exhaustion
+    private static readonly HttpClient SharedClient = new() { Timeout = TimeSpan.FromHours(2) };
 
     public async Task<string?> UploadFileAsync(string filePath, string gameName, Action<int>? progressCallback = null)
     {
@@ -22,7 +27,7 @@ public sealed class UploadService : IUploadService
         try
         {
             var fileInfo = new FileInfo(filePath);
-            var fileSizeMB = fileInfo.Length / (1024.0 * 1024.0);
+            var fileSizeMB = fileInfo.Length / BytesToMB;
             
             LogHelper.Log($"[UPLOAD] Starting upload: {Path.GetFileName(filePath)} ({fileSizeMB:F2} MB)");
 
@@ -31,7 +36,6 @@ public sealed class UploadService : IUploadService
                 LogHelper.Log($"[UPLOAD] WARNING: File is {fileSizeMB:F0}MB (exceeds {MaxFileSizeMB}MB limit)");
             }
 
-            using var client = new HttpClient { Timeout = TimeSpan.FromHours(2) };
             using var content = new MultipartFormDataContent();
             
             // Add file content
@@ -42,7 +46,7 @@ public sealed class UploadService : IUploadService
 
             // Add metadata
             content.Add(new StringContent("anonymous"), "hwid");
-            content.Add(new StringContent("SACGUI-2.3"), "version");
+            content.Add(new StringContent(AppVersion), "version");
             content.Add(new StringContent(gameName), "game_name");
             
             // Get client IP
@@ -52,7 +56,7 @@ public sealed class UploadService : IUploadService
             LogHelper.Log($"[UPLOAD] Uploading to backend... Game: {gameName}");
             
             // Upload with progress tracking
-            var response = await client.PostAsync(UploadEndpoint, content);
+            var response = await SharedClient.PostAsync(UploadEndpoint, content);
             
             if (response.IsSuccessStatusCode)
             {

@@ -23,7 +23,7 @@ public sealed class CompressionService : ICompressionService
             // Try to find 7-Zip
             string sevenZipPath = FindSevenZip();
             
-            if (sevenZipPath == null)
+            if (sevenZipPath is null)
             {
                 // Fall back to built-in .NET compression for basic zip without password
                 if (format.Equals("zip", StringComparison.OrdinalIgnoreCase) && !usePassword)
