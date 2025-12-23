@@ -4,7 +4,7 @@ using APPID;
 namespace SteamAppIdIdentifier;
 
 /// <summary>
-/// Handles extraction of embedded _bin resources at runtime.
+///     Handles extraction of embedded _bin resources at runtime.
 /// </summary>
 public static class ResourceExtractor
 {
@@ -19,7 +19,7 @@ public static class ResourceExtractor
     ];
 
     /// <summary>
-    /// Extracts embedded _bin resources to the file system if not already present.
+    ///     Extracts embedded _bin resources to the file system if not already present.
     /// </summary>
     public static void ExtractBinFiles()
     {
@@ -54,7 +54,7 @@ public static class ResourceExtractor
     }
 
     /// <summary>
-    /// Gets the full path to a file in the _bin directory.
+    ///     Gets the full path to a file in the _bin directory.
     /// </summary>
     /// <param name="relativePath">Relative path within the _bin directory.</param>
     /// <returns>Full path to the file.</returns>

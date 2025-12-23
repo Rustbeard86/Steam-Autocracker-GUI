@@ -1,11 +1,10 @@
 using System.ComponentModel;
-using System.Drawing;
 using System.Drawing.Drawing2D;
 
 namespace APPID;
 
 /// <summary>
-/// Custom ComboBox control with transparent background and modern dark theme styling.
+///     Custom ComboBox control with transparent background and modern dark theme styling.
 /// </summary>
 public class TransparentComboBox : ComboBox
 {
@@ -14,10 +13,39 @@ public class TransparentComboBox : ComboBox
 
     public TransparentComboBox()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer,
+            true);
         DrawMode = DrawMode.OwnerDrawFixed;
         DropDownStyle = ComboBoxStyle.DropDownList;
         FlatStyle = FlatStyle.Flat;
+    }
+
+    /// <summary>
+    ///     Gets or sets the background color of the control.
+    /// </summary>
+    [DefaultValue(typeof(Color), "8, 8, 12")]
+    public new Color BackColor
+    {
+        get => _backColor;
+        set
+        {
+            _backColor = value;
+            Invalidate();
+        }
+    }
+
+    /// <summary>
+    ///     Gets or sets the border color of the control.
+    /// </summary>
+    [DefaultValue(typeof(Color), "30, 35, 45")]
+    public Color BorderColor
+    {
+        get => _borderColor;
+        set
+        {
+            _borderColor = value;
+            Invalidate();
+        }
     }
 
     protected override void OnPaint(PaintEventArgs e)
@@ -36,11 +64,7 @@ public class TransparentComboBox : ComboBox
         if (SelectedIndex >= 0)
         {
             using var textBrush = new SolidBrush(ForeColor);
-            var sf = new StringFormat
-            {
-                LineAlignment = StringAlignment.Center,
-                Alignment = StringAlignment.Near
-            };
+            var sf = new StringFormat { LineAlignment = StringAlignment.Center, Alignment = StringAlignment.Near };
             e.Graphics.DrawString(Text, Font, textBrush, new Rectangle(5, 0, Width - 20, Height), sf);
         }
 
@@ -57,7 +81,10 @@ public class TransparentComboBox : ComboBox
 
     protected override void OnDrawItem(DrawItemEventArgs e)
     {
-        if (e.Index < 0) return;
+        if (e.Index < 0)
+        {
+            return;
+        }
 
         e.DrawBackground();
 
@@ -78,25 +105,4 @@ public class TransparentComboBox : ComboBox
 
         e.DrawFocusRectangle();
     }
-
-    /// <summary>
-    /// Gets or sets the background color of the control.
-    /// </summary>
-    [DefaultValue(typeof(Color), "8, 8, 12")]
-    public new Color BackColor
-    {
-        get => _backColor;
-        set { _backColor = value; Invalidate(); }
-    }
-
-    /// <summary>
-    /// Gets or sets the border color of the control.
-    /// </summary>
-    [DefaultValue(typeof(Color), "30, 35, 45")]
-    public Color BorderColor
-    {
-        get => _borderColor;
-        set { _borderColor = value; Invalidate(); }
-    }
 }
-

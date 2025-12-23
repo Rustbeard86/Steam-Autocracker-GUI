@@ -1,12 +1,12 @@
 namespace APPID.Services.Interfaces;
 
 /// <summary>
-/// Service for handling file upload operations.
+///     Service for handling file upload operations.
 /// </summary>
 public interface IUploadService
 {
     /// <summary>
-    /// Uploads a file to the backend sharing service.
+    ///     Uploads a file to the backend sharing service.
     /// </summary>
     /// <param name="filePath">Path to the file to upload.</param>
     /// <param name="gameName">Name of the game being uploaded.</param>

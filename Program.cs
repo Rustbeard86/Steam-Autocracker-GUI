@@ -1,12 +1,13 @@
-using APPID;
 using System.IO.Compression;
 using System.Net;
-using System.Net.Http;
+using APPID;
+using APPID.Properties;
+using SteamAutocrackGUI;
 
 namespace SteamAppIdIdentifier;
 
 /// <summary>
-/// Entry point for the SACGUI application.
+///     Entry point for the SACGUI application.
 /// </summary>
 internal static class Program
 {
@@ -15,7 +16,7 @@ internal static class Program
     public static string[]? CommandLineArgs { get; private set; }
 
     /// <summary>
-    /// The main entry point for the application.
+    ///     The main entry point for the application.
     /// </summary>
     [STAThread]
     public static void Main(string[] args)
@@ -52,14 +53,17 @@ internal static class Program
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            
+
             // Initialize bandwidth limit from settings
             try
             {
-                string bwLimit = APPID.Properties.Settings.Default.UploadBandwidthLimit ?? "";
-                SteamAutocrackGUI.CompressionSettingsForm.ParseBandwidthLimit(bwLimit);
+                string bwLimit = Settings.Default.UploadBandwidthLimit ?? "";
+                CompressionSettingsForm.ParseBandwidthLimit(bwLimit);
             }
-            catch { /* Ignore bandwidth limit initialization errors */ }
+            catch
+            {
+                /* Ignore bandwidth limit initialization errors */
+            }
 
             Form = new SteamAppId();
             CommandLineArgs = args;
@@ -81,7 +85,9 @@ internal static class Program
 
         // If 7za.exe exists, _bin folder is good
         if (File.Exists(sevenZipPath))
+        {
             return;
+        }
 
         try
         {
@@ -98,7 +104,7 @@ internal static class Program
             }
 
             // Extract using built-in .NET ZipFile
-            ZipFile.ExtractToDirectory(tempZip, basePath, overwriteFiles: true);
+            ZipFile.ExtractToDirectory(tempZip, basePath, true);
 
             // Clean up
             File.Delete(tempZip);
@@ -111,7 +117,10 @@ internal static class Program
                 string logPath = Path.Combine(basePath, "bootstrap_error.log");
                 File.WriteAllText(logPath, $"Bootstrap failed: {ex}");
             }
-            catch { /* Ignore logging errors */ }
+            catch
+            {
+                /* Ignore logging errors */
+            }
         }
     }
 
@@ -126,17 +135,17 @@ internal static class Program
         try
         {
             string crashInfo = $"""
-                =================================
-                SACGUI CRASH REPORT
-                {DateTime.Now:yyyy-MM-dd HH:mm:ss}
-                =================================
-                Version: {Application.ProductVersion}
-                OS: {Environment.OSVersion}
-                .NET: {Environment.Version}
+                                =================================
+                                SACGUI CRASH REPORT
+                                {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                                =================================
+                                Version: {Application.ProductVersion}
+                                OS: {Environment.OSVersion}
+                                .NET: {Environment.Version}
 
-                Exception:
-                {ex?.ToString() ?? "Unknown exception"}
-                """;
+                                Exception:
+                                {ex?.ToString() ?? "Unknown exception"}
+                                """;
 
             // Write crash.log next to exe for easy access
             string crashFile = Path.Combine(AppContext.BaseDirectory, "crash.log");
@@ -147,7 +156,10 @@ internal static class Program
             {
                 LogHelper.Log($"[FATAL CRASH] {ex?.Message ?? "Unknown exception"}");
             }
-            catch { /* Ignore logging errors */ }
+            catch
+            {
+                /* Ignore logging errors */
+            }
 
             MessageBox.Show(
                 $"SACGUI has crashed!{Environment.NewLine}{Environment.NewLine}" +
@@ -169,7 +181,7 @@ internal static class Program
     }
 
     /// <summary>
-    /// Terminates all processes matching the specified name using WMIC.
+    ///     Terminates all processes matching the specified name using WMIC.
     /// </summary>
     public static void CmdKILL(string appname)
     {

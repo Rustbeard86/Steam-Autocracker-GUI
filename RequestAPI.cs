@@ -1,21 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Net.Http;
+using System.Management;
 using System.Security.Cryptography;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows.Forms;
+using APPID;
 using Newtonsoft.Json;
-using System.Drawing;
+using Timer = System.Windows.Forms.Timer;
 
 namespace SteamAppIdIdentifier
 {
-    public static partial class RequestAPI
+    public static class RequestAPI
     {
         internal const string API_BASE = "https://pydrive.harryeffingpotter.com/sacgui/api";
-        internal static readonly HttpClient client = new HttpClient();
+        internal static readonly HttpClient client = new();
         private static string _hwid;
 
         // Get unique HWID for this machine
@@ -35,6 +29,7 @@ namespace SteamAppIdIdentifier
                     _hwid = Convert.ToBase64String(hash).Substring(0, 16);
                 }
             }
+
             return _hwid;
         }
 
@@ -42,7 +37,7 @@ namespace SteamAppIdIdentifier
         {
             try
             {
-                using (var searcher = new System.Management.ManagementObjectSearcher($"SELECT {property} FROM {wmiClass}"))
+                using (var searcher = new ManagementObjectSearcher($"SELECT {property} FROM {wmiClass}"))
                 {
                     foreach (var obj in searcher.Get())
                     {
@@ -52,8 +47,9 @@ namespace SteamAppIdIdentifier
             }
             catch (Exception ex)
             {
-                APPID.LogHelper.LogError("GetWMIProperty failed", ex);
+                LogHelper.LogError("GetWMIProperty failed", ex);
             }
+
             return "Unknown";
         }
 
@@ -62,13 +58,7 @@ namespace SteamAppIdIdentifier
         {
             try
             {
-                var request = new
-                {
-                    appId = appId,
-                    gameName = gameName,
-                    userId = userId,
-                    hwid = hwid
-                };
+                var request = new { appId, gameName, userId, hwid };
 
                 var json = JsonConvert.SerializeObject(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -101,9 +91,9 @@ namespace SteamAppIdIdentifier
             {
                 var request = new
                 {
-                    appId = appId,
-                    gameName = gameName,
-                    requestType = requestType,
+                    appId,
+                    gameName,
+                    requestType,
                     requesterId = GetHWID(),
                     timestamp = DateTime.UtcNow
                 };
@@ -125,11 +115,7 @@ namespace SteamAppIdIdentifier
         {
             try
             {
-                var data = new
-                {
-                    hwid = GetHWID(),
-                    appIds = userAppIds
-                };
+                var data = new { hwid = GetHWID(), appIds = userAppIds };
 
                 var json = JsonConvert.SerializeObject(data);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -154,8 +140,8 @@ namespace SteamAppIdIdentifier
             {
                 var data = new
                 {
-                    appId = appId,
-                    uploadType = uploadType,  // Clean or Cracked
+                    appId,
+                    uploadType, // Clean or Cracked
                     honorerId = GetHWID(),
                     timestamp = DateTime.UtcNow
                 };
@@ -202,6 +188,7 @@ namespace SteamAppIdIdentifier
                 }
             }
             catch { }
+
             return new List<RequestedGame>();
         }
 
@@ -210,12 +197,7 @@ namespace SteamAppIdIdentifier
         {
             try
             {
-                var request = new
-                {
-                    appId = appId,
-                    userId = userId,
-                    hwid = hwid
-                };
+                var request = new { appId, userId, hwid };
 
                 var json = JsonConvert.SerializeObject(request);
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -225,7 +207,7 @@ namespace SteamAppIdIdentifier
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to remove request: {ex.Message}");
+                Debug.WriteLine($"Failed to remove request: {ex.Message}");
                 throw;
             }
         }
@@ -267,12 +249,37 @@ namespace SteamAppIdIdentifier
                 }
             }
             catch { }
+
             return new DetailedUserStats();
+        }
+
+        // Get user activity history
+        public static async Task<UserActivity> GetUserActivity(string userId)
+        {
+            try
+            {
+                var response = await client.GetAsync($"{API_BASE}/activity/{userId}");
+                if (response.IsSuccessStatusCode)
+                {
+                    var json = await response.Content.ReadAsStringAsync();
+                    return JsonConvert.DeserializeObject<UserActivity>(json);
+                }
+            }
+            catch { }
+
+            return new UserActivity
+            {
+                RecentRequests = new List<RequestedGame>(),
+                RecentHonors = new List<HonorRecord>(),
+                ActiveRequests = new List<RequestedGame>(),
+                FulfilledRequests = new List<RequestedGame>(),
+                Contributions = new List<HonorRecord>()
+            };
         }
 
         public class UserStatus
         {
-            public List<RequestedGame> NeededGames { get; set; } = new List<RequestedGame>();
+            public List<RequestedGame> NeededGames { get; set; } = new();
             public int TotalRequests { get; set; }
             public int UserHonored { get; set; }
             public int UserRequested { get; set; }
@@ -282,7 +289,7 @@ namespace SteamAppIdIdentifier
         {
             public string AppId { get; set; }
             public string GameName { get; set; }
-            public string RequestType { get; set; }  // Clean, Cracked, Both
+            public string RequestType { get; set; } // Clean, Cracked, Both
             public int RequestCount { get; set; }
             public int CleanRequests { get; set; }
             public int CrackedRequests { get; set; }
@@ -311,52 +318,52 @@ namespace SteamAppIdIdentifier
 
         public class DetailedUserStats
         {
-            public int Fulfilled { get; set; }     // Games they provided that were requested
-            public int Requested { get; set; }     // Games they asked for
-            public int Filled { get; set; }        // Games they asked for and received
+            public int Fulfilled { get; set; } // Games they provided that were requested
+            public int Requested { get; set; } // Games they asked for
+            public int Filled { get; set; } // Games they asked for and received
             public int HonorScore { get; set; }
             public DateTime LastActivity { get; set; }
 
             public double GetGiveToTakeRatio()
             {
-                if (Requested == 0) return Fulfilled > 0 ? double.MaxValue : 0;
+                if (Requested == 0)
+                {
+                    return Fulfilled > 0 ? double.MaxValue : 0;
+                }
+
                 return (double)Fulfilled / Requested;
             }
 
             public string GetUserType()
             {
                 var ratio = GetGiveToTakeRatio();
-                if (ratio >= 3.0) return "🏆 Legend";
-                if (ratio >= 2.0) return "🌟 Hero";
-                if (ratio >= 1.5) return "💚 Contributor";
-                if (ratio >= 1.0) return "⚖️ Balanced";
-                if (ratio >= 0.5) return "📥 Receiver";
+                if (ratio >= 3.0)
+                {
+                    return "🏆 Legend";
+                }
+
+                if (ratio >= 2.0)
+                {
+                    return "🌟 Hero";
+                }
+
+                if (ratio >= 1.5)
+                {
+                    return "💚 Contributor";
+                }
+
+                if (ratio >= 1.0)
+                {
+                    return "⚖️ Balanced";
+                }
+
+                if (ratio >= 0.5)
+                {
+                    return "📥 Receiver";
+                }
+
                 return "🆕 New User";
             }
-        }
-
-        // Get user activity history
-        public static async Task<UserActivity> GetUserActivity(string userId)
-        {
-            try
-            {
-                var response = await client.GetAsync($"{API_BASE}/activity/{userId}");
-                if (response.IsSuccessStatusCode)
-                {
-                    var json = await response.Content.ReadAsStringAsync();
-                    return JsonConvert.DeserializeObject<UserActivity>(json);
-                }
-            }
-            catch { }
-
-            return new UserActivity
-            {
-                RecentRequests = new List<RequestedGame>(),
-                RecentHonors = new List<HonorRecord>(),
-                ActiveRequests = new List<RequestedGame>(),
-                FulfilledRequests = new List<RequestedGame>(),
-                Contributions = new List<HonorRecord>()
-            };
         }
 
         public class UserActivity
@@ -380,18 +387,18 @@ namespace SteamAppIdIdentifier
     // Add to main form
     public class RequestStatusDisplay : Label
     {
-        private System.Windows.Forms.Timer updateTimer;
+        private readonly Timer updateTimer;
 
         public RequestStatusDisplay()
         {
-            this.Font = new System.Drawing.Font("Consolas", 9);
-            this.ForeColor = System.Drawing.Color.FromArgb(100, 200, 100);
-            this.BackColor = System.Drawing.Color.Transparent;
-            this.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
-            this.AutoSize = false;
-            this.Size = new System.Drawing.Size(300, 20);
+            Font = new Font("Consolas", 9);
+            ForeColor = Color.FromArgb(100, 200, 100);
+            BackColor = Color.Transparent;
+            TextAlign = ContentAlignment.MiddleRight;
+            AutoSize = false;
+            Size = new Size(300, 20);
 
-            updateTimer = new System.Windows.Forms.Timer();
+            updateTimer = new Timer();
             updateTimer.Interval = 60000; // Update every minute
             updateTimer.Tick += async (s, e) => await UpdateStats();
             updateTimer.Start();
@@ -406,26 +413,27 @@ namespace SteamAppIdIdentifier
             {
                 var stats = await RequestAPI.GetGlobalStats();
 
-                this.Invoke(new Action(() =>
+                Invoke(() =>
                 {
-                    this.Text = $"Requests: {stats.TotalRequests} | Honored: {stats.TotalHonored} | Filled: {stats.TotalFilled}";
+                    Text =
+                        $"Requests: {stats.TotalRequests} | Honored: {stats.TotalHonored} | Filled: {stats.TotalFilled}";
 
                     // Subtle color changes based on activity
                     if (stats.TotalRequests > stats.TotalFilled + 10)
                     {
                         // Many pending requests - yellowish
-                        this.ForeColor = System.Drawing.Color.FromArgb(200, 200, 100);
+                        ForeColor = Color.FromArgb(200, 200, 100);
                     }
                     else
                     {
                         // Most requests filled - greenish
-                        this.ForeColor = System.Drawing.Color.FromArgb(100, 200, 100);
+                        ForeColor = Color.FromArgb(100, 200, 100);
                     }
-                }));
+                });
             }
             catch
             {
-                this.Text = "Requests: -- | Honored: -- | Filled: --";
+                Text = "Requests: -- | Honored: -- | Filled: --";
             }
         }
     }
@@ -433,8 +441,8 @@ namespace SteamAppIdIdentifier
     // Check on app startup
     public static class StartupRequestChecker
     {
-        private static readonly HttpClient client = RequestAPI.client;
         private const string API_BASE = RequestAPI.API_BASE;
+        private static readonly HttpClient client = RequestAPI.client;
 
         public static async Task CheckAndNotify(Form mainForm, List<string> userAppIds)
         {
@@ -466,14 +474,14 @@ namespace SteamAppIdIdentifier
                     var notificationForm = new Form
                     {
                         Text = "Games Needed",
-                        Size = new System.Drawing.Size(400, 300),
+                        Size = new Size(400, 300),
                         StartPosition = FormStartPosition.Manual,
-                        Location = new System.Drawing.Point(
+                        Location = new Point(
                             Screen.PrimaryScreen.WorkingArea.Width - 420,
                             Screen.PrimaryScreen.WorkingArea.Height - 320
                         ),
                         FormBorderStyle = FormBorderStyle.FixedToolWindow,
-                        BackColor = System.Drawing.Color.FromArgb(30, 30, 30),
+                        BackColor = Color.FromArgb(30, 30, 30),
                         TopMost = true
                     };
 
@@ -481,16 +489,16 @@ namespace SteamAppIdIdentifier
                     {
                         Text = message.ToString(),
                         Dock = DockStyle.Fill,
-                        ForeColor = System.Drawing.Color.White,
-                        Font = new System.Drawing.Font("Segoe UI", 10),
-                        Padding = new System.Windows.Forms.Padding(20)
+                        ForeColor = Color.White,
+                        Font = new Font("Segoe UI", 10),
+                        Padding = new Padding(20)
                     };
 
                     notificationForm.Controls.Add(label);
                     notificationForm.Show();
 
                     // Auto-close after 10 seconds
-                    var closeTimer = new System.Windows.Forms.Timer();
+                    var closeTimer = new Timer();
                     closeTimer.Interval = 10000;
                     closeTimer.Tick += (s, e) =>
                     {
@@ -507,20 +515,19 @@ namespace SteamAppIdIdentifier
         {
             try
             {
-                var content = new StringContent(JsonConvert.SerializeObject(new
-                {
-                    userId = userId,
-                    appId = appId,
-                    voteType = upvote ? "upvote" : "downvote",
-                    timestamp = DateTime.UtcNow
-                }), Encoding.UTF8, "application/json");
+                var content =
+                    new StringContent(
+                        JsonConvert.SerializeObject(new
+                        {
+                            userId, appId, voteType = upvote ? "upvote" : "downvote", timestamp = DateTime.UtcNow
+                        }), Encoding.UTF8, "application/json");
 
                 var response = await client.PostAsync($"{API_BASE}/vote-request", content);
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to vote on request: {ex.Message}");
+                Debug.WriteLine($"Failed to vote on request: {ex.Message}");
                 throw;
             }
         }
@@ -529,19 +536,16 @@ namespace SteamAppIdIdentifier
         {
             try
             {
-                var content = new StringContent(JsonConvert.SerializeObject(new
-                {
-                    userId = userId,
-                    appId = appId,
-                    timestamp = DateTime.UtcNow
-                }), Encoding.UTF8, "application/json");
+                var content =
+                    new StringContent(JsonConvert.SerializeObject(new { userId, appId, timestamp = DateTime.UtcNow }),
+                        Encoding.UTF8, "application/json");
 
                 var response = await client.PostAsync($"{API_BASE}/vote-uncrackable", content);
                 response.EnsureSuccessStatusCode();
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to vote uncrackable: {ex.Message}");
+                Debug.WriteLine($"Failed to vote uncrackable: {ex.Message}");
                 throw;
             }
         }
@@ -559,23 +563,12 @@ namespace SteamAppIdIdentifier
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Failed to get game stats: {ex.Message}");
-                return new GameRequestStats
-                {
-                    AppId = appId,
-                    ActiveRequests = 0,
-                    UncrackableVotes = 0
-                };
+                Debug.WriteLine($"Failed to get game stats: {ex.Message}");
+                return new GameRequestStats { AppId = appId, ActiveRequests = 0, UncrackableVotes = 0 };
             }
 
-            return new GameRequestStats
-            {
-                AppId = appId,
-                ActiveRequests = 0,
-                UncrackableVotes = 0
-            };
+            return new GameRequestStats { AppId = appId, ActiveRequests = 0, UncrackableVotes = 0 };
         }
-
     }
 }
 

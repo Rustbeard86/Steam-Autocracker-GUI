@@ -1,9 +1,7 @@
-using System.Drawing;
-
 namespace APPID;
 
 /// <summary>
-/// ★★★ CHANGE YOUR THEME COLORS HERE ★★★
+///     ★★★ CHANGE YOUR THEME COLORS HERE ★★★
 /// </summary>
 public static class ThemeConfig
 {
@@ -23,16 +21,16 @@ public static class ThemeConfig
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Main acrylic blur color for all windows
-    /// Change this to adjust the frosted glass effect!
+    ///     Main acrylic blur color for all windows
+    ///     Change this to adjust the frosted glass effect!
     /// </summary>
     public static int AcrylicBlurColor = unchecked((int)0xFE050814); // 99% opacity - just under max
 
     /// <summary>
-    /// Blur intensity (0-2)
-    /// 0 = Minimal blur
-    /// 1 = Medium blur
-    /// 2 = Maximum blur
+    ///     Blur intensity (0-2)
+    ///     0 = Minimal blur
+    ///     1 = Medium blur
+    ///     2 = Maximum blur
     /// </summary>
     public static int BlurIntensity = 0;
 

@@ -1499,47 +1499,37 @@ namespace SteamAppIdIdentifier
         }
 
         /// <summary>
-        /// Recursively copies a directory and all its contents using long paths
+        /// Recursively copies a directory and all its contents
         /// </summary>
         private void CopyDirectory(string sourceDir, string destDir)
         {
-            // Convert to long paths to bypass 260 character limit
-            string longSourceDir = ToLongPath(sourceDir);
-            string longDestDir = ToLongPath(destDir);
-
             // Ensure destination directory exists
-            if (!Directory.Exists(longDestDir))
+            if (!Directory.Exists(destDir))
             {
-                Directory.CreateDirectory(longDestDir);
+                Directory.CreateDirectory(destDir);
             }
 
             // Copy files
-            foreach (string file in Directory.GetFiles(longSourceDir))
+            foreach (string file in Directory.EnumerateFiles(sourceDir))
             {
                 try
                 {
-                    string destFile = Path.Combine(longDestDir, Path.GetFileName(file));
-
-                    // Ensure parent directory exists
-                    string destFileDir = Path.GetDirectoryName(destFile);
-                    if (!Directory.Exists(destFileDir))
-                    {
-                        Directory.CreateDirectory(destFileDir);
-                    }
-
+                    string fileName = Path.GetFileName(file);
+                    string destFile = Path.Combine(destDir, fileName);
                     File.Copy(file, destFile, true);
                 }
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"[COPY] Error copying file {file}: {ex.Message}");
-                    throw; // Re-throw to fail the operation
+                    throw;
                 }
             }
 
             // Copy subdirectories
-            foreach (string subDir in Directory.GetDirectories(longSourceDir))
+            foreach (string subDir in Directory.EnumerateDirectories(sourceDir))
             {
-                string destSubDir = Path.Combine(longDestDir, Path.GetFileName(subDir));
+                string dirName = Path.GetFileName(subDir);
+                string destSubDir = Path.Combine(destDir, dirName);
                 CopyDirectory(subDir, destSubDir);
             }
         }
@@ -4566,6 +4556,7 @@ namespace SteamAppIdIdentifier
         private DateTime countdownStartTime;
         private int totalCountdownMinutes = 0;
         private long currentFileSize = 0;
+        [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public string OneFichierUrl { get; set; }
         public string GameName { get; private set; }
 

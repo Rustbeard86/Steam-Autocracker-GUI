@@ -1,10 +1,10 @@
-using System.Net.Http;
+using System.Net.Http.Headers;
 using APPID.Services.Interfaces;
 
 namespace APPID.Services;
 
 /// <summary>
-/// Implementation of file upload service for SACGUI backend.
+///     Implementation of file upload service for SACGUI backend.
 /// </summary>
 public sealed class UploadService : IUploadService
 {
@@ -29,7 +29,7 @@ public sealed class UploadService : IUploadService
         {
             var fileInfo = new FileInfo(filePath);
             var fileSizeMB = fileInfo.Length / BytesToMB;
-            
+
             LogHelper.Log($"[UPLOAD] Starting upload: {Path.GetFileName(filePath)} ({fileSizeMB:F2} MB)");
 
             if (fileSizeMB > MaxFileSizeMB)
@@ -38,27 +38,27 @@ public sealed class UploadService : IUploadService
             }
 
             using var content = new MultipartFormDataContent();
-            
+
             // Add file content
             await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
             var fileContent = new StreamContent(fileStream);
-            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             content.Add(fileContent, "file", Path.GetFileName(filePath));
 
             // Add metadata
             content.Add(new StringContent("anonymous"), "hwid");
             content.Add(new StringContent(AppVersion), "version");
             content.Add(new StringContent(gameName), "game_name");
-            
+
             // Get client IP
             string clientIp = await GetPublicIpAsync() ?? "127.0.0.1";
             content.Add(new StringContent(clientIp), "client_ip");
-            
+
             LogHelper.Log($"[UPLOAD] Uploading to backend... Game: {gameName}");
-            
+
             // Upload with progress tracking
             var response = await SharedClient.PostAsync(UploadEndpoint, content);
-            
+
             if (response.IsSuccessStatusCode)
             {
                 string result = await response.Content.ReadAsStringAsync();
@@ -66,11 +66,9 @@ public sealed class UploadService : IUploadService
                 progressCallback?.Invoke(100);
                 return result;
             }
-            else
-            {
-                LogHelper.Log($"[UPLOAD] FAILED - Status: {response.StatusCode}");
-                return null;
-            }
+
+            LogHelper.Log($"[UPLOAD] FAILED - Status: {response.StatusCode}");
+            return null;
         }
         catch (Exception ex)
         {

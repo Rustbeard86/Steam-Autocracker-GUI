@@ -1,17 +1,17 @@
 namespace APPID;
 
 /// <summary>
-/// Provides thread-safe logging functionality for the application.
-/// Logs are written to %AppData%\SACGUI\debug.log with automatic rotation.
+///     Provides thread-safe logging functionality for the application.
+///     Logs are written to %AppData%\SACGUI\debug.log with automatic rotation.
 /// </summary>
 public static class LogHelper
 {
+    private const long MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB
     private static readonly object LockObject = new();
     private static bool _initialized;
-    private const long MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB
 
     /// <summary>
-    /// Writes a message to the debug log file.
+    ///     Writes a message to the debug log file.
     /// </summary>
     /// <param name="message">The message to log.</param>
     public static void Log(string message)
@@ -23,7 +23,7 @@ public static class LogHelper
                 string appDataPath = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                     "SACGUI");
-                
+
                 Directory.CreateDirectory(appDataPath);
                 string logFile = Path.Combine(appDataPath, "debug.log");
 
@@ -48,19 +48,19 @@ public static class LogHelper
     }
 
     /// <summary>
-    /// Logs an error with exception details.
+    ///     Logs an error with exception details.
     /// </summary>
     /// <param name="context">The context in which the error occurred.</param>
     /// <param name="ex">The exception that was thrown.</param>
     public static void LogError(string context, Exception ex)
     {
         Log($"[ERROR] {context}: {ex.Message}");
-        
+
         if (ex.StackTrace is not null)
         {
             Log($"[ERROR] Stack: {ex.StackTrace}");
         }
-        
+
         if (ex.InnerException is not null)
         {
             Log($"[ERROR] Inner: {ex.InnerException.Message}");
@@ -68,19 +68,19 @@ public static class LogHelper
     }
 
     /// <summary>
-    /// Logs a component update.
+    ///     Logs a component update.
     /// </summary>
     public static void LogUpdate(string component, string version)
         => Log($"[UPDATE] {component} updated to version {version}");
 
     /// <summary>
-    /// Logs a network operation.
+    ///     Logs a network operation.
     /// </summary>
     public static void LogNetwork(string message)
         => Log($"[NETWORK] {message}");
 
     /// <summary>
-    /// Logs an API call result.
+    ///     Logs an API call result.
     /// </summary>
     public static void LogAPI(string api, string status)
         => Log($"[API] {api}: {status}");
@@ -102,14 +102,14 @@ public static class LogHelper
     private static void WriteSessionHeader(string logFile)
     {
         string separator = $"""
-            
-            
-            =================================
-            SACGUI LAUNCHED
-            {DateTime.Now:yyyy-MM-dd HH:mm:ss}
-            =================================
-            
-            """;
+
+
+                            =================================
+                            SACGUI LAUNCHED
+                            {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                            =================================
+
+                            """;
         File.AppendAllText(logFile, separator);
     }
 }

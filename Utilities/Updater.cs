@@ -1,18 +1,19 @@
 using System.Net;
-using System.Net.Http;
 using System.Net.NetworkInformation;
 using Newtonsoft.Json;
 using Octokit;
 using RestSharp;
+using FileMode = System.IO.FileMode;
 
 namespace APPID;
 
 /// <summary>
-/// Handles checking for and downloading updates for external dependencies like Steamless and GoldBerg emulator.
+///     Handles checking for and downloading updates for external dependencies like Steamless and GoldBerg emulator.
 /// </summary>
 internal static class Updater
 {
     private static readonly string[] DnsServers = ["1.1.1.1", "8.8.8.8", "208.67.222.222"];
+
     private static readonly string BinPath = Path.Combine(
         Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory,
         "_bin");
@@ -21,12 +22,12 @@ internal static class Updater
     public static bool IsOffline { get; private set; }
 
     /// <summary>
-    /// Fetches JSON data from GitHub API.
+    ///     Fetches JSON data from GitHub API.
     /// </summary>
     private static dynamic? GetJson(string requestURL)
     {
         ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-        
+
         try
         {
             string baseURL = "https://api.github.com/repos/";
@@ -34,15 +35,15 @@ internal static class Updater
             {
                 RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
             };
-            
+
             var client = new RestClient(options);
             Debug.WriteLine($"Requesting: {baseURL}{requestURL}");
-            
-            var request = new RestRequest(requestURL, Method.Get);
+
+            var request = new RestRequest(requestURL);
             RestResponse queryResult = client.Execute(request);
-            
-            return queryResult.Content is not null 
-                ? JsonConvert.DeserializeObject<dynamic>(queryResult.Content) 
+
+            return queryResult.Content is not null
+                ? JsonConvert.DeserializeObject<dynamic>(queryResult.Content)
                 : null;
         }
         catch (Exception ex)
@@ -53,12 +54,12 @@ internal static class Updater
     }
 
     /// <summary>
-    /// Checks for internet connectivity by pinging multiple DNS servers.
+    ///     Checks for internet connectivity by pinging multiple DNS servers.
     /// </summary>
     public static async Task<bool> CheckForNetAsync()
     {
         ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-        
+
         if (IsOffline)
         {
             return HasInternet;
@@ -82,14 +83,14 @@ internal static class Updater
     }
 
     /// <summary>
-    /// Checks for newer version of Steamless on GitHub and updates if available.
+    ///     Checks for newer version of Steamless on GitHub and updates if available.
     /// </summary>
     public static async Task CheckGitHubNewerVersion(string user, string repo, string apiBase)
     {
         try
         {
             ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-            
+
             dynamic? obj = GetJson($"{user}/{repo}/releases");
             if (obj is null)
             {
@@ -98,7 +99,7 @@ internal static class Updater
 
             var client = new GitHubClient(new ProductHeaderValue(repo));
             IReadOnlyList<Release> releases = await client.Repository.Release.GetAll(user, repo);
-            
+
             if (releases.Count == 0)
             {
                 return;
@@ -106,9 +107,9 @@ internal static class Updater
 
             string latestGitHubVersion = releases[0].TagName.Replace("v", "");
             string versionFilePath = Path.Combine(BinPath, $"{repo}.ver");
-            
-            string localVersion = File.Exists(versionFilePath) 
-                ? File.ReadAllText(versionFilePath).Trim() 
+
+            string localVersion = File.Exists(versionFilePath)
+                ? File.ReadAllText(versionFilePath).Trim()
                 : string.Empty;
 
             if (localVersion == latestGitHubVersion)
@@ -135,14 +136,14 @@ internal static class Updater
                 }
 
                 string downloadUrl = StringTools.RemoveEverythingBeforeFirstRemoveString(
-                    item.Value.ToString(), 
+                    item.Value.ToString(),
                     "browser_download_url\": \"");
                 downloadUrl = StringTools.RemoveEverythingAfterFirstRemoveString(downloadUrl, "\"");
 
                 // Download the new version
                 using var httpClient = new HttpClient();
                 HttpResponseMessage response = await httpClient.GetAsync(downloadUrl);
-                await using (FileStream fs = new("SLS.zip", System.IO.FileMode.CreateNew))
+                await using (FileStream fs = new("SLS.zip", FileMode.CreateNew))
                 {
                     await response.Content.CopyToAsync(fs);
                 }
@@ -163,7 +164,7 @@ internal static class Updater
     }
 
     /// <summary>
-    /// Checks for and downloads updates for GoldBerg Steam emulator.
+    ///     Checks for and downloads updates for GoldBerg Steam emulator.
     /// </summary>
     public static async Task UpdateGoldBergAsync()
     {
@@ -181,9 +182,9 @@ internal static class Updater
 
             string latestVersion = obj.tag_name.ToString().Replace("release-", "");
             string versionFile = Path.Combine(BinPath, "Goldberg", "version.txt");
-            
-            string localVersion = File.Exists(versionFile) 
-                ? File.ReadAllText(versionFile).Trim() 
+
+            string localVersion = File.Exists(versionFile)
+                ? File.ReadAllText(versionFile).Trim()
                 : string.Empty;
 
             if (localVersion == latestVersion)
@@ -214,7 +215,7 @@ internal static class Updater
             using var httpClient = new HttpClient();
             string tempFile = "gbe_fork.7z";
             HttpResponseMessage response = await httpClient.GetAsync(downloadUrl);
-            await using (FileStream fs = new(tempFile, System.IO.FileMode.CreateNew))
+            await using (FileStream fs = new(tempFile, FileMode.CreateNew))
             {
                 await response.Content.CopyToAsync(fs);
             }
@@ -256,7 +257,7 @@ internal static class Updater
             {
                 string fileName = Path.GetFileName(toolPath);
                 string destPath = Path.Combine(goldbergDir, fileName);
-                File.Copy(toolPath, destPath, overwrite: true);
+                File.Copy(toolPath, destPath, true);
                 Debug.WriteLine($"Copied tool: {fileName}");
             }
 
@@ -273,13 +274,13 @@ internal static class Updater
             {
                 string fileName = Path.GetFileName(lobbyPath);
                 string destPath = Path.Combine(BinPath, fileName);
-                File.Copy(lobbyPath, destPath, overwrite: true);
+                File.Copy(lobbyPath, destPath, true);
                 Debug.WriteLine($"Copied lobby_connect tool to _bin: {fileName}");
             }
 
             // Clean up
             File.Delete(tempFile);
-            Directory.Delete(tempDir, recursive: true);
+            Directory.Delete(tempDir, true);
 
             // Update version file
             await File.WriteAllTextAsync(versionFile, latestVersion);
@@ -292,7 +293,7 @@ internal static class Updater
     }
 
     /// <summary>
-    /// Extracts an archive using 7-Zip.
+    ///     Extracts an archive using 7-Zip.
     /// </summary>
     private static async Task ExtractFileAsync(string sourceArchive, string destination)
     {
@@ -306,7 +307,7 @@ internal static class Updater
                 Arguments = $"x \"{sourceArchive}\" -y -o\"{destination}\""
             };
 
-            using Process? process = Process.Start(startInfo);
+            using var process = Process.Start(startInfo);
             if (process is not null && !process.HasExited)
             {
                 await Task.Run(() => process.WaitForExit());
@@ -324,7 +325,7 @@ internal static class Updater
     }
 
     /// <summary>
-    /// Checks for internet connectivity by pinging a single host.
+    ///     Checks for internet connectivity by pinging a single host.
     /// </summary>
     private static async Task<bool> CheckForInternetAsync(string host)
     {
@@ -332,7 +333,7 @@ internal static class Updater
         byte[] buffer = new byte[32];
         const int timeout = 20000; // 20 seconds - async so no UI blocking
         var pingOptions = new PingOptions();
-        
+
         try
         {
             PingReply reply = await myPing.SendPingAsync(host, timeout, buffer, pingOptions);
@@ -347,18 +348,18 @@ internal static class Updater
         {
             LogHelper.LogNetwork($"Internet check failed for {host}: {ex.Message}");
         }
-        
+
         return false;
     }
 
     /// <summary>
-    /// Copies a file if the source exists.
+    ///     Copies a file if the source exists.
     /// </summary>
     private static void CopyIfExists(string source, string destination)
     {
         if (File.Exists(source))
         {
-            File.Copy(source, destination, overwrite: true);
+            File.Copy(source, destination, true);
         }
     }
 }

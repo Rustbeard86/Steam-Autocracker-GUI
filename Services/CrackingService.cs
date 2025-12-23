@@ -3,21 +3,21 @@ using APPID.Services.Interfaces;
 namespace APPID.Services;
 
 /// <summary>
-/// Implementation of Steam game cracking service using emulator DLLs.
+///     Implementation of Steam game cracking service using emulator DLLs.
 /// </summary>
 public sealed class CrackingService(string binPath) : ICrackingService
 {
     private readonly string _binPath = binPath ?? throw new ArgumentNullException(nameof(binPath));
 
-    public async Task<CrackResult> CrackGameAsync(string gameDir, string appId, bool useGoldberg, 
+    public async Task<CrackResult> CrackGameAsync(string gameDir, string appId, bool useGoldberg,
         Action<string>? statusCallback = null)
     {
         var result = new CrackResult();
-        
+
         try
         {
             LogHelper.Log($"[CRACK] Starting crack for game in: {gameDir} (AppID: {appId})");
-            statusCallback?.Invoke($"Scanning game directory...");
+            statusCallback?.Invoke("Scanning game directory...");
 
             var files = Directory.GetFiles(gameDir, "*.*", SearchOption.AllDirectories);
             LogHelper.Log($"[CRACK] Found {files.Length} files, scanning for Steam DLLs...");
@@ -37,7 +37,7 @@ public sealed class CrackingService(string binPath) : ICrackingService
             }
 
             result = result with { Success = result.DllsReplaced.Count > 0 };
-            
+
             if (result.Success)
             {
                 LogHelper.Log($"[CRACK] SUCCESS - Replaced {result.DllsReplaced.Count} DLL(s)");
@@ -56,7 +56,52 @@ public sealed class CrackingService(string binPath) : ICrackingService
         }
     }
 
-    private async Task ProcessSteamDllAsync(string dllPath, string dllName, string appId, 
+    public bool AreFilesIdentical(string file1, string file2)
+    {
+        try
+        {
+            if (!File.Exists(file1) || !File.Exists(file2))
+            {
+                return false;
+            }
+
+            var info1 = new FileInfo(file1);
+            var info2 = new FileInfo(file2);
+
+            // Quick check: if sizes differ, files are different
+            if (info1.Length != info2.Length)
+            {
+                return false;
+            }
+
+            // For small files (< 10KB), do full comparison
+            // For larger files, compare first 8KB as a reasonable heuristic for DLL headers
+            const int comparisonSize = 8192; // 8KB
+            int bytesToCompare = (int)Math.Min(info1.Length, comparisonSize);
+
+            using var fs1 = new FileStream(file1, FileMode.Open, FileAccess.Read);
+            using var fs2 = new FileStream(file2, FileMode.Open, FileAccess.Read);
+
+            byte[] buffer1 = new byte[bytesToCompare];
+            byte[] buffer2 = new byte[bytesToCompare];
+
+            int read1 = fs1.Read(buffer1, 0, bytesToCompare);
+            int read2 = fs2.Read(buffer2, 0, bytesToCompare);
+
+            if (read1 != read2)
+            {
+                return false;
+            }
+
+            return buffer1.SequenceEqual(buffer2);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task ProcessSteamDllAsync(string dllPath, string dllName, string appId,
         bool useGoldberg, Action<string>? statusCallback, CrackResult result)
     {
         try
@@ -99,13 +144,14 @@ public sealed class CrackingService(string binPath) : ICrackingService
             {
                 string parentDir = Path.GetDirectoryName(dllPath)!;
                 string steamSettings = Path.Combine(parentDir, "steam_settings");
-                
+
                 if (Directory.Exists(steamSettings))
                 {
                     Directory.Delete(steamSettings, true);
                 }
+
                 Directory.CreateDirectory(steamSettings);
-                
+
                 // Copy steam_appid.txt
                 string steamAppIdFile = Path.Combine(steamSettings, "steam_appid.txt");
                 await File.WriteAllTextAsync(steamAppIdFile, appId);
@@ -115,12 +161,12 @@ public sealed class CrackingService(string binPath) : ICrackingService
             {
                 string parentDir = Path.GetDirectoryName(dllPath)!;
                 string configPath = Path.Combine(parentDir, "SteamConfig.ini");
-                
+
                 if (File.Exists(configPath))
                 {
                     File.Delete(configPath);
                 }
-                
+
                 // Copy and configure ALI213 ini
                 string sourceIni = Path.Combine(_binPath, "ALI213", "SteamConfig.ini");
                 if (File.Exists(sourceIni))
@@ -138,42 +184,6 @@ public sealed class CrackingService(string binPath) : ICrackingService
         catch (Exception ex)
         {
             LogHelper.LogError($"Failed to process {dllName}", ex);
-        }
-    }
-
-    public bool AreFilesIdentical(string file1, string file2)
-    {
-        try
-        {
-            if (!File.Exists(file1) || !File.Exists(file2)) return false;
-
-            var info1 = new FileInfo(file1);
-            var info2 = new FileInfo(file2);
-
-            // Quick check: if sizes differ, files are different
-            if (info1.Length != info2.Length) return false;
-
-            // For small files (< 10KB), do full comparison
-            // For larger files, compare first 8KB as a reasonable heuristic for DLL headers
-            const int comparisonSize = 8192; // 8KB
-            int bytesToCompare = (int)Math.Min(info1.Length, comparisonSize);
-
-            using var fs1 = new FileStream(file1, FileMode.Open, FileAccess.Read);
-            using var fs2 = new FileStream(file2, FileMode.Open, FileAccess.Read);
-            
-            byte[] buffer1 = new byte[bytesToCompare];
-            byte[] buffer2 = new byte[bytesToCompare];
-            
-            int read1 = fs1.Read(buffer1, 0, bytesToCompare);
-            int read2 = fs2.Read(buffer2, 0, bytesToCompare);
-            
-            if (read1 != read2) return false;
-            
-            return buffer1.SequenceEqual(buffer2);
-        }
-        catch
-        {
-            return false;
         }
     }
 }
