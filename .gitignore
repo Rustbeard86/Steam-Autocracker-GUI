@@ -98,6 +98,20 @@ StyleCopReport.xml
 *.svclog
 *.scc
 
+# Application-specific
+bootstrap_error.log
+crash.log
+debug.log
+
+# Temporary files
+/tmp/
+*.tmp
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
 # Chutzpah Test files
 _Chutzpah*
 

@@ -8,7 +8,6 @@
 		<AssemblyName>SACGUI</AssemblyName>
 		<StartupObject>SteamAppIdIdentifier.Program</StartupObject>
 		<ApplicationIcon>sac.ico</ApplicationIcon>
-		<Deterministic>true</Deterministic>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
 		<BaseOutputPath>bin\</BaseOutputPath>
@@ -16,7 +15,7 @@
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
 		<!-- Suppress platform compatibility warnings (this is Windows-only) -->
-		<NoWarn>$(NoWarn);CA1416</NoWarn>
+		<NoWarn>$(NoWarn);CA1416;CS1591</NoWarn>
 
 		<!-- Force designer to use DPI unaware mode (fixes scaling issues in VS designer) -->
 		<ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
