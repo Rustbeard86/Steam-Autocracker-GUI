@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 
@@ -81,6 +82,7 @@ public class TransparentComboBox : ComboBox
     /// <summary>
     /// Gets or sets the background color of the control.
     /// </summary>
+    [DefaultValue(typeof(Color), "8, 8, 12")]
     public new Color BackColor
     {
         get => _backColor;
@@ -90,6 +92,7 @@ public class TransparentComboBox : ComboBox
     /// <summary>
     /// Gets or sets the border color of the control.
     /// </summary>
+    [DefaultValue(typeof(Color), "30, 35, 45")]
     public Color BorderColor
     {
         get => _borderColor;

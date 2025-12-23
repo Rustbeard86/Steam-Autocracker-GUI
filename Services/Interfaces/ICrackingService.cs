@@ -24,7 +24,7 @@ public interface ICrackingService
 /// <summary>
 /// Result of a cracking operation.
 /// </summary>
-public sealed class CrackResult
+public sealed record CrackResult
 {
     public bool Success { get; init; }
     public List<string> DllsReplaced { get; init; } = [];
