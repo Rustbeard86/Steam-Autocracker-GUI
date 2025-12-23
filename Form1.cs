@@ -9,6 +9,8 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using APPID.Properties;
+using APPID.Services;
+using APPID.Services.Interfaces;
 using CliWrap;
 using CliWrap.Buffered;
 using Newtonsoft.Json.Linq;
@@ -41,6 +43,13 @@ public partial class SteamAppId : Form
     public bool autoCrackEnabled = true; // Default to ON
     public bool cracking;
 
+    // Services for SOLID architecture
+    private readonly IFileSystemService _fileSystem;
+    private readonly ISettingsService _settings;
+    private readonly IGameDetectionService _gameDetection;
+    private readonly IManifestParsingService _manifestParsing;
+    private readonly IUrlConversionService _urlConversion;
+
     protected DataTableGeneration dataTableGeneration;
     public bool enableLanMultiplayer;
     private string gameDir;
@@ -66,11 +75,18 @@ public partial class SteamAppId : Form
 
     public SteamAppId()
     {
+        // Initialize services for SOLID architecture
+        _fileSystem = new FileSystemService();
+        _settings = new SettingsService();
+        _gameDetection = new GameDetectionService(_fileSystem);
+        _manifestParsing = new ManifestParsingService(_fileSystem);
+        _urlConversion = new UrlConversionService();
+
         ServicePointManager.ServerCertificateValidationCallback =
             (s, certificate, chain, sslPolicyErrors) => true;
 
         // Load auto-crack setting FIRST before anything else - directly assign the value
-        autoCrackEnabled = AppSettings.Default.AutoCrack;
+        autoCrackEnabled = _settings.AutoCrack;
         Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {autoCrackEnabled} from Settings");
 
         dataTableGeneration = new DataTableGeneration();
@@ -88,7 +104,7 @@ public partial class SteamAppId : Form
         }
 
         // Apply saved pin state
-        if (AppSettings.Default.Pinned)
+        if (_settings.Pinned)
         {
             TopMost = true;
             unPin.BringToFront();
@@ -593,10 +609,10 @@ public partial class SteamAppId : Form
         }
 
         // Load LAN multiplayer setting
-        enableLanMultiplayer = AppSettings.Default.LANMultiplayer;
+        enableLanMultiplayer = _settings.LANMultiplayer;
         lanMultiplayerCheckBox.Checked = enableLanMultiplayer;
 
-        if (AppSettings.Default.Pinned)
+        if (_settings.Pinned)
         {
             TopMost = true;
             unPin.BringToFront();
@@ -620,7 +636,7 @@ public partial class SteamAppId : Form
             autoCrackOff.BringToFront(); // Show red button when disabled
         }
 
-        if (AppSettings.Default.Goldy)
+        if (_settings.Goldy)
         {
             dllSelect.SelectedIndex = 0;
             lanMultiplayerCheckBox.Visible = true;
@@ -2341,9 +2357,9 @@ oLink3.Save";
         var folderSelectDialog = new FolderSelectDialog();
         folderSelectDialog.Title = "Select the game's main folder.";
 
-        if (AppSettings.Default.LastDir.Length > 0)
+        if (_settings.LastDir.Length > 0)
         {
-            folderSelectDialog.InitialDirectory = AppSettings.Default.LastDir;
+            folderSelectDialog.InitialDirectory = _settings.LastDir;
         }
 
         if (folderSelectDialog.Show(Handle))
@@ -2359,7 +2375,7 @@ oLink3.Save";
                 var parent = Directory.GetParent(gameDir);
                 if (parent != null)
                 {
-                    AppSettings.Default.LastDir = parent.FullName;
+                    _settings.LastDir = parent.FullName;
                     AppSettings.Default.Save();
                 }
             }
@@ -2370,7 +2386,7 @@ oLink3.Save";
             if (gamesInFolder.Count > 1)
             {
                 // Multiple games detected - batch folder
-                AppSettings.Default.LastDir = gameDir;
+                _settings.LastDir = gameDir;
                 AppSettings.Default.Save();
                 ShowBatchGameSelection(gamesInFolder);
                 return;
@@ -2483,7 +2499,7 @@ oLink3.Save";
             // Stop label5 timer when game dir is selected
             label5Timer.Stop();
             label5.Visible = false;
-            AppSettings.Default.LastDir = parentOfSelection;
+            _settings.LastDir = parentOfSelection;
             AppSettings.Default.Save();
         }
         else
@@ -2542,14 +2558,14 @@ oLink3.Save";
         if (dllSelect.SelectedIndex == 0)
         {
             goldy = true;
-            AppSettings.Default.Goldy = true;
+            _settings.Goldy = true;
             // Show LAN checkbox for Goldberg
             lanMultiplayerCheckBox.Visible = true;
         }
         else if (dllSelect.SelectedIndex == 1)
         {
             goldy = false;
-            AppSettings.Default.Goldy = false;
+            _settings.Goldy = false;
             // Hide LAN checkbox for Ali213 (not supported)
             lanMultiplayerCheckBox.Visible = false;
             lanMultiplayerCheckBox.Checked = false;
@@ -2708,7 +2724,7 @@ oLink3.Save";
                 isInitialFolderSearch = true; // This is the initial search
                 searchTextBox.Text = gameDirName;
                 isFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
-                AppSettings.Default.LastDir = parentOfSelection;
+                _settings.LastDir = parentOfSelection;
                 AppSettings.Default.Save();
             }
             else
@@ -4495,22 +4511,8 @@ oLink3.Save";
     /// </summary>
     private bool IsGameFolder(string path)
     {
-        if (!Directory.Exists(path))
-        {
-            return false;
-        }
-
-        try
-        {
-            // Only consider it a crackable game if it has steam_api.dll or steam_api64.dll
-            // This is the ONLY reliable indicator for Steam games that can be cracked
-            var steamApiFolder = FindSteamApiFolder(path, 2);
-            return steamApiFolder != null;
-        }
-        catch
-        {
-            return false;
-        }
+        // Delegate to game detection service
+        return _gameDetection.IsGameFolder(path);
     }
 
     /// <summary>
@@ -4518,61 +4520,8 @@ oLink3.Save";
     /// </summary>
     private List<string> DetectGamesInFolder(string path)
     {
-        var games = new List<string>();
-        if (!Directory.Exists(path))
-        {
-            return games;
-        }
-
-        try
-        {
-            // First, search for all steam_api DLLs to find actual game folders
-            // Ignore .bak files (those are backups from previous cracks)
-            var steamApiFiles = new List<string>();
-            try
-            {
-                steamApiFiles.AddRange(Directory.GetFiles(path, "steam_api.dll", SearchOption.AllDirectories)
-                    .Where(f => !f.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)));
-                steamApiFiles.AddRange(Directory.GetFiles(path, "steam_api64.dll", SearchOption.AllDirectories)
-                    .Where(f => !f.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)));
-            }
-            catch { }
-
-            // Get unique game folders from steam_api locations
-            var gameFoldersFromDlls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var dllPath in steamApiFiles)
-            {
-                // The game folder is typically the parent or grandparent of the DLL
-                var dllFolder = Path.GetDirectoryName(dllPath);
-
-                // Check if this DLL folder is a direct child of the search path
-                var relativePath = dllFolder.Substring(path.Length).TrimStart(Path.DirectorySeparatorChar);
-                var topLevelFolder = relativePath.Split(Path.DirectorySeparatorChar)[0];
-                var gameFolder = Path.Combine(path, topLevelFolder);
-
-                if (Directory.Exists(gameFolder) && !gameFoldersFromDlls.Contains(gameFolder))
-                {
-                    gameFoldersFromDlls.Add(gameFolder);
-                }
-            }
-
-            // Add all folders that have steam_api DLLs
-            games.AddRange(gameFoldersFromDlls);
-
-            // Also check direct children that might be games without steam_api DLLs (fallback)
-            var subfolders = Directory.GetDirectories(path);
-            foreach (var subfolder in subfolders)
-            {
-                if (!gameFoldersFromDlls.Contains(subfolder) && IsGameFolder(subfolder))
-                {
-                    // Only add if it looks like a game but wasn't found via steam_api
-                    games.Add(subfolder);
-                }
-            }
-        }
-        catch { }
-
-        return games.Distinct().ToList();
+        // Delegate to game detection service
+        return _gameDetection.DetectGamesInFolder(path);
     }
 
     #region Batch Progress Indicator Methods
