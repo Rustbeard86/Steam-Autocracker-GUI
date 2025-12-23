@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Data;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
@@ -21,7 +22,6 @@ using Clipboard = System.Windows.Forms.Clipboard;
 using DataFormats = System.Windows.Forms.DataFormats;
 using DragDropEffects = System.Windows.Forms.DragDropEffects;
 using Timer = System.Windows.Forms.Timer;
-using System.ComponentModel;
 
 namespace APPID;
 
@@ -40,15 +40,15 @@ public partial class SteamAppId : Form
     public static bool SearchPause;
     public static bool BackPressed;
     public static Timer t1;
-    public bool autoCrackEnabled = true; // Default to ON
-    public bool cracking;
 
     // Services for SOLID architecture
     private readonly IFileSystemService _fileSystem;
-    private readonly ISettingsService _settings;
     private readonly IGameDetectionService _gameDetection;
     private readonly IManifestParsingService _manifestParsing;
+    private readonly ISettingsService _settings;
     private readonly IUrlConversionService _urlConversion;
+    public bool autoCrackEnabled = true; // Default to ON
+    public bool cracking;
 
     protected DataTableGeneration dataTableGeneration;
     public bool enableLanMultiplayer;
@@ -4933,12 +4933,12 @@ oLink3.Save";
                 long size = Directory.GetFiles(game.Path, "*", SearchOption.AllDirectories)
                     .Sum(f => new FileInfo(f).Length);
                 folderSizes[game.Path] = size;
-                if (game.Zip)
+                if (game.ShouldZip)
                 {
                     totalBytesToZip += size;
                 }
 
-                if (game.Upload)
+                if (game.ShouldUpload)
                 {
                     totalBytesToUpload += size;
                 }
@@ -4947,10 +4947,10 @@ oLink3.Save";
         }
 
         // Initial time estimates
-        double estCrackTime = games.Count(g => g.Crack) * 3.0;
+        double estCrackTime = games.Count(g => g.ShouldCrack) * 3.0;
         double estZipTime = totalBytesToZip / zipRate;
         double estUploadTime = totalBytesToUpload / uploadRate;
-        double estConversionTime = games.Count(g => g.Upload) * conversionTimePerFile;
+        double estConversionTime = games.Count(g => g.ShouldUpload) * conversionTimePerFile;
         double totalEstimatedSeconds = (estCrackTime + estZipTime + estUploadTime + estConversionTime) * retryBuffer;
         totalEstimatedSeconds = Math.Max(totalEstimatedSeconds, 1.0);
 
@@ -5014,7 +5014,7 @@ oLink3.Save";
         {
             // ========== PHASE 1: CRACK (Sequential due to shared state) ==========
             int crackIndex = 0;
-            foreach (var game in games.Where(g => g.Crack))
+            foreach (var game in games.Where(g => g.ShouldCrack))
             {
                 batchForm.UpdateStatus(game.Path, "Cracking...", Color.Yellow);
 
@@ -5072,7 +5072,7 @@ oLink3.Save";
             }
 
             // Games that didn't need cracking
-            foreach (var game in games.Where(g => !g.Crack))
+            foreach (var game in games.Where(g => !g.ShouldCrack))
             {
                 crackResults[game.Path] = true;
             }
@@ -5084,9 +5084,11 @@ oLink3.Save";
             // Games that only need zip (no upload) are done first
 
             var gamesToZipOnly = games
-                .Where(g => g.Zip && !g.Upload && crackResults.ContainsKey(g.Path) && crackResults[g.Path]).ToList();
+                .Where(g => g.ShouldZip && !g.ShouldUpload && crackResults.ContainsKey(g.Path) && crackResults[g.Path])
+                .ToList();
             var gamesToZipAndUpload =
-                games.Where(g => g.Zip && g.Upload && crackResults.ContainsKey(g.Path) && crackResults[g.Path])
+                games.Where(g =>
+                        g.ShouldZip && g.ShouldUpload && crackResults.ContainsKey(g.Path) && crackResults[g.Path])
                     .ToList();
             var gamesToUpload = gamesToZipAndUpload.ToList(); // Will upload after zipping
 

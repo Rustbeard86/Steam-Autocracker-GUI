@@ -7,19 +7,10 @@ using APPID;
 using APPID.Properties;
 using Newtonsoft.Json;
 using SteamAppIdIdentifier;
+using APPID.Services.Interfaces;
 using Timer = System.Windows.Forms.Timer;
 
 namespace SteamAutocrackGUI;
-
-public class BatchGameItem
-{
-    public string Path { get; set; }
-    public string Name { get; set; }
-    public string AppId { get; set; }
-    public bool Crack { get; set; } = true;
-    public bool Zip { get; set; }
-    public bool Upload { get; set; }
-}
 
 /// <summary>
 ///     Custom progress bar with neon blue gradient styling
@@ -132,7 +123,7 @@ public class BatchGameSelectionForm : Form
         };
     }
 
-    public List<BatchGameItem> SelectedGames { get; } = new();
+    public List<APPID.Services.Interfaces.BatchGameItem> SelectedGames { get; } = new();
     public string CompressionFormat { get; private set; } = "ZIP";
     public string CompressionLevel { get; private set; } = "0";
     public bool UseRinPassword { get; private set; }
@@ -149,7 +140,7 @@ public class BatchGameSelectionForm : Form
     private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
 
     // Event for when Process is clicked
-    public event Action<List<BatchGameItem>, string, string, bool> ProcessRequested;
+    public event Action<List<APPID.Services.Interfaces.BatchGameItem>, string, string, bool> ProcessRequested;
 
     private void CenterToParentWithScreenClamp()
     {
@@ -1031,14 +1022,14 @@ public class BatchGameSelectionForm : Form
 
                 if (crack || zip || upload)
                 {
-                    SelectedGames.Add(new BatchGameItem
+                    SelectedGames.Add(new APPID.Services.Interfaces.BatchGameItem
                     {
-                        Path = gamePaths[i],
                         Name = Path.GetFileName(gamePaths[i]),
+                        Path = gamePaths[i],
                         AppId = appId,
-                        Crack = crack,
-                        Zip = zip,
-                        Upload = upload
+                        ShouldCrack = crack,
+                        ShouldZip = zip,
+                        ShouldUpload = upload
                     });
                 }
             }
