@@ -76,20 +76,8 @@ public sealed class BatchGameDataService : IBatchGameDataService
                 return false;
             }
 
-            // Check if folder has non-zero size using the injected file system service
-            var files = _fileSystem.GetFiles(path, "*", SearchOption.AllDirectories);
-            long size = files.Sum(f =>
-            {
-                try
-                {
-                    return new FileInfo(f).Length;
-                }
-                catch
-                {
-                    return 0;
-                }
-            });
-            
+            // Check if folder has non-zero size using the existing GetFolderSize method
+            long size = GetFolderSize(path);
             if (size == 0)
             {
                 return false;
