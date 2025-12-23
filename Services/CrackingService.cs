@@ -150,17 +150,22 @@ public sealed class CrackingService(string binPath) : ICrackingService
             var info1 = new FileInfo(file1);
             var info2 = new FileInfo(file2);
 
+            // Quick check: if sizes differ, files are different
             if (info1.Length != info2.Length) return false;
 
-            // Compare first 1KB for quick check
+            // For small files (< 10KB), do full comparison
+            // For larger files, compare first 8KB as a reasonable heuristic for DLL headers
+            const int comparisonSize = 8192; // 8KB
+            int bytesToCompare = (int)Math.Min(info1.Length, comparisonSize);
+
             using var fs1 = new FileStream(file1, FileMode.Open, FileAccess.Read);
             using var fs2 = new FileStream(file2, FileMode.Open, FileAccess.Read);
             
-            byte[] buffer1 = new byte[1024];
-            byte[] buffer2 = new byte[1024];
+            byte[] buffer1 = new byte[bytesToCompare];
+            byte[] buffer2 = new byte[bytesToCompare];
             
-            int read1 = fs1.Read(buffer1, 0, buffer1.Length);
-            int read2 = fs2.Read(buffer2, 0, buffer2.Length);
+            int read1 = fs1.Read(buffer1, 0, bytesToCompare);
+            int read2 = fs2.Read(buffer2, 0, bytesToCompare);
             
             if (read1 != read2) return false;
             

@@ -15,6 +15,7 @@ public sealed class UploadService : IUploadService
 
     // Reuse HttpClient to avoid socket exhaustion
     private static readonly HttpClient SharedClient = new() { Timeout = TimeSpan.FromHours(2) };
+    private static readonly HttpClient IpClient = new() { Timeout = TimeSpan.FromSeconds(5) };
 
     public async Task<string?> UploadFileAsync(string filePath, string gameName, Action<int>? progressCallback = null)
     {
@@ -82,8 +83,7 @@ public sealed class UploadService : IUploadService
     {
         try
         {
-            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-            string ip = await client.GetStringAsync("https://api.ipify.org");
+            string ip = await IpClient.GetStringAsync("https://api.ipify.org");
             return ip?.Trim();
         }
         catch
