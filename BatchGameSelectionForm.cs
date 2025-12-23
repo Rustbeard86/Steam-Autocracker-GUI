@@ -16,30 +16,27 @@ public class BatchGameSelectionForm : Form
 {
     private const int WM_NCLBUTTONDOWN = 0xA1;
     private const int HTCAPTION = 0x2;
-
-    // Upload slots (3 concurrent uploads max)
     private const int MAX_UPLOAD_SLOTS = 3;
-    private string allLinksMarkdown = "";
 
-    private string allLinksPhpBB = "";
-    private string allLinksPlaintext;
+    private string allLinksMarkdown = string.Empty;
+    private string allLinksPhpBB = string.Empty;
+    private string? allLinksPlaintext;
 
-    // Tooltip for batch form
-    private ToolTip batchToolTip;
-    private Button btnCancelAll;
+    private ToolTip? batchToolTip;
+    private Button? btnCancelAll;
     private bool cancelAllRemaining;
-    private readonly Dictionary<string, string> convertingUrls = new(); // gamePath -> 1fichier URL during conversion
-    private Button copyDiscordBtn;
-    private Button copyPlaintextBtn;
-    private Button copyRinBtn;
-    private readonly Dictionary<string, SteamAppId.CrackDetails> crackDetailsMap = new(); // gamePath -> crack details
-    private readonly Dictionary<int, string> detectedAppIds = new();
-    private readonly Dictionary<string, string> finalUrls = new(); // gamePath -> final URL (pydrive or 1fichier)
+    private readonly Dictionary<string, string> convertingUrls = []; // gamePath -> 1fichier URL during conversion
+    private Button? copyDiscordBtn;
+    private Button? copyPlaintextBtn;
+    private Button? copyRinBtn;
+    private readonly Dictionary<string, SteamAppId.CrackDetails> crackDetailsMap = []; // gamePath -> crack details
+    private readonly Dictionary<int, string> detectedAppIds = [];
+    private readonly Dictionary<string, string> finalUrls = []; // gamePath -> final URL (pydrive or 1fichier)
 
-    private DataGridView gameGrid;
+    private DataGridView? gameGrid;
     private readonly List<string> gamePaths;
     private readonly UploadSlot[] uploadSlots = new UploadSlot[MAX_UPLOAD_SLOTS];
-    private Panel uploadSlotsContainer;
+    private Panel? uploadSlotsContainer;
 
     public BatchGameSelectionForm(List<string> paths)
     {
@@ -71,9 +68,24 @@ public class BatchGameSelectionForm : Form
         };
     }
 
-    public List<APPID.Services.Interfaces.BatchGameItem> SelectedGames { get; } = new();
+    /// <summary>
+    ///     Gets the list of games selected for batch processing.
+    /// </summary>
+    public List<APPID.Services.Interfaces.BatchGameItem> SelectedGames { get; } = [];
+
+    /// <summary>
+    ///     Gets or sets the compression format to use (ZIP or 7Z).
+    /// </summary>
     public string CompressionFormat { get; private set; } = "ZIP";
+
+    /// <summary>
+    ///     Gets or sets the compression level.
+    /// </summary>
     public string CompressionLevel { get; private set; } = "0";
+
+    /// <summary>
+    ///     Gets or sets whether to use Rin password for compression.
+    /// </summary>
     public bool UseRinPassword { get; private set; }
 
     /// <summary>
@@ -271,12 +283,16 @@ public class BatchGameSelectionForm : Form
         gameGrid.Columns.Add(detailsCol);
 
         // Track header checkbox states
-        var headerCheckStates =
-            new Dictionary<string, bool> { { "Crack", true }, { "Zip", false }, { "Upload", false } };
+        Dictionary<string, bool> headerCheckStates = new()
+        {
+            ["Crack"] = true,
+            ["Zip"] = false,
+            ["Upload"] = false
+        };
 
         // Custom paint for cells and headers
-        Image infoIcon = null;
-        Image zipperIcon = null;
+        Image? infoIcon = null;
+        Image? zipperIcon = null;
         try { infoIcon = Resources.info_icon; }
         catch { }
 
@@ -921,7 +937,7 @@ public class BatchGameSelectionForm : Form
         processBtn.Click += (s, e) =>
         {
             // Check for missing AppIDs on games that need cracking
-            var missingAppIds = new List<string>();
+            List<string> missingAppIds = [];
             for (int i = 0; i < gameGrid.Rows.Count; i++)
             {
                 var row = gameGrid.Rows[i];
@@ -1448,8 +1464,8 @@ public class BatchGameSelectionForm : Form
         allLinksPhpBB = phpBBLinks;
 
         // Build markdown version from finalUrls
-        var mdLinks = new List<string>();
-        var plainLinks = new List<string>();
+        List<string> mdLinks = [];
+        List<string> plainLinks = [];
         foreach (var kvp in finalUrls)
         {
             string gameName = Path.GetFileName(kvp.Key);
@@ -1793,7 +1809,7 @@ public class BatchGameSelectionForm : Form
         // Prepare game info in background
         var validGames = await Task.Run(() =>
         {
-            var results = new List<(string path, string name, string appId, string size, int steamApiCount)>();
+            List<(string path, string name, string appId, string size, int steamApiCount)> results = [];
 
             foreach (string path in gamePaths)
             {
