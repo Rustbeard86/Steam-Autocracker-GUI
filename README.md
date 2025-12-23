@@ -1,6 +1,6 @@
 # SACGUI - Steam Auto Cracker GUI
 
-A Windows Forms application for automating Steam game cracking operations. Built with .NET 8 and modern C# features.
+A Windows Forms application for automating Steam game cracking operations. Built with .NET 10 and modern C# 14 features.
 
 ## Features
 
@@ -14,12 +14,12 @@ A Windows Forms application for automating Steam game cracking operations. Built
 ## Requirements
 
 - Windows 10/11 (64-bit)
-- .NET 8 Desktop Runtime
+- .NET 10 Desktop Runtime
 
 ## Building from Source
 
 ### Prerequisites
-- .NET 8 SDK
+- .NET 10 SDK
 - Visual Studio 2022 or JetBrains Rider (recommended for development)
 
 ### Build Steps
