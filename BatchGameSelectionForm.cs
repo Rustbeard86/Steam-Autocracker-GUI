@@ -1182,7 +1182,7 @@ public class BatchGameSelectionForm : Form
                 slot.Cancellation = new CancellationTokenSource();
 
                 slot.LblGame.Text = gameName;
-                slot.LblSize.Text = $"0 / {FormatBytes(totalBytes)}";
+                slot.LblSize.Text = $"0 / {FormatFileSize(totalBytes)}";
                 slot.LblSpeed.Text = "";
                 slot.LblEta.Text = "";
                 slot.ProgressBar.Value = 0;
@@ -1247,11 +1247,11 @@ public class BatchGameSelectionForm : Form
 
         slot.ProgressBar.Value = Math.Min(percent, 100);
         slot.ProgressBar.Invalidate();
-        slot.LblSize.Text = $"{FormatBytes(uploadedBytes)} / {FormatBytes(totalBytes)}";
+        slot.LblSize.Text = $"{FormatFileSize(uploadedBytes)} / {FormatFileSize(totalBytes)}";
 
         if (bytesPerSecond > 0)
         {
-            slot.LblSpeed.Text = $"{FormatBytes((long)bytesPerSecond)}/s";
+            slot.LblSpeed.Text = $"{FormatFileSize((long)bytesPerSecond)}/s";
             long remainingBytes = totalBytes - uploadedBytes;
             if (remainingBytes > 0)
             {
@@ -1406,26 +1406,6 @@ public class BatchGameSelectionForm : Form
             slot.InUse = false;
             slot.Panel.Visible = false;
         }
-    }
-
-    private string FormatBytes(long bytes)
-    {
-        if (bytes >= 1024L * 1024 * 1024)
-        {
-            return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
-        }
-
-        if (bytes >= 1024L * 1024)
-        {
-            return $"{bytes / (1024.0 * 1024):F1} MB";
-        }
-
-        if (bytes >= 1024)
-        {
-            return $"{bytes / 1024.0:F0} KB";
-        }
-
-        return $"{bytes} B";
     }
 
     private string FormatEta(double seconds)
