@@ -37,8 +37,9 @@ public class BatchGameSelectionForm : Form
     // Service dependencies
     private readonly IAppIdDetectionService _appIdDetection;
     private readonly IBatchGameDataService _gameData;
+    private readonly IFormattingService _formatting;
 
-    public BatchGameSelectionForm(List<string> paths, IAppIdDetectionService? appIdDetection = null, IBatchGameDataService? gameData = null)
+    public BatchGameSelectionForm(List<string> paths, IAppIdDetectionService? appIdDetection = null, IBatchGameDataService? gameData = null, IFormattingService? formatting = null)
     {
         gamePaths = paths;
         
@@ -47,6 +48,7 @@ public class BatchGameSelectionForm : Form
         var manifestParsing = new APPID.Services.ManifestParsingService(fileSystem);
         _appIdDetection = appIdDetection ?? new APPID.Services.AppIdDetectionService(fileSystem, manifestParsing);
         _gameData = gameData ?? new APPID.Services.BatchGameDataService(fileSystem);
+        _formatting = formatting ?? new APPID.Services.FormattingService();
         
         InitializeForm();
 
@@ -1263,7 +1265,7 @@ public class BatchGameSelectionForm : Form
             if (remainingBytes > 0)
             {
                 double secondsRemaining = remainingBytes / bytesPerSecond;
-                slot.LblEta.Text = FormatEta(secondsRemaining);
+                slot.LblEta.Text = _formatting.FormatEta(secondsRemaining);
             }
             else
             {
@@ -1413,21 +1415,6 @@ public class BatchGameSelectionForm : Form
             slot.InUse = false;
             slot.Panel.Visible = false;
         }
-    }
-
-    private string FormatEta(double seconds)
-    {
-        if (seconds < 60)
-        {
-            return $"{seconds:F0}s";
-        }
-
-        if (seconds < 3600)
-        {
-            return $"{(int)(seconds / 60)}:{(int)(seconds % 60):D2}";
-        }
-
-        return $"{(int)(seconds / 3600)}:{(int)(seconds % 3600 / 60):D2}:{(int)(seconds % 60):D2}";
     }
 
     /// <summary>
@@ -1616,7 +1603,7 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        string etaStr = percent >= 99 ? "a few seconds..." : FormatEtaLong(etaSeconds);
+        string etaStr = percent >= 99 ? "a few seconds..." : _formatting.FormatEtaLong(etaSeconds);
         string text = $"{percent}% - ETA {etaStr}";
 
         var titleLabel = Controls["titleLabel"] as Label;
@@ -1634,28 +1621,6 @@ public class BatchGameSelectionForm : Form
             }
         }
         catch { }
-    }
-
-    private string FormatEtaLong(double seconds)
-    {
-        if (seconds <= 0 || double.IsNaN(seconds) || double.IsInfinity(seconds))
-        {
-            return "...";
-        }
-
-        if (seconds < 60)
-        {
-            return $"{(int)seconds}s";
-        }
-
-        if (seconds < 3600)
-        {
-            return $"{(int)(seconds / 60)}m {(int)(seconds % 60)}s";
-        }
-
-        int hours = (int)(seconds / 3600);
-        int mins = (int)(seconds % 3600 / 60);
-        return $"{hours}h {mins}m";
     }
 
     /// <summary>
