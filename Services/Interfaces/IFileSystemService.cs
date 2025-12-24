@@ -64,4 +64,18 @@ public interface IFileSystemService
     ///     Gets file information.
     /// </summary>
     FileInfo GetFileInfo(string path);
+
+    /// <summary>
+    ///     Recursively copies a directory and all its contents.
+    /// </summary>
+    /// <param name="sourceDir">The source directory to copy from.</param>
+    /// <param name="targetDir">The target directory to copy to.</param>
+    void CopyDirectory(string sourceDir, string targetDir);
+
+    /// <summary>
+    ///     Counts the number of steam_api*.dll files in a directory.
+    /// </summary>
+    /// <param name="gamePath">The path to search for Steam API DLLs.</param>
+    /// <returns>The count of steam_api.dll or steam_api64.dll files found (excluding .bak files).</returns>
+    int CountSteamApiDlls(string gamePath);
 }
