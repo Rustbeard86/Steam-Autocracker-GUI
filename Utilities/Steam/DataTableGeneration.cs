@@ -1,21 +1,21 @@
 using System.Data;
 using System.Text.RegularExpressions;
-using APPID.Utilities;
+using APPID.Utilities.Network;
 using Newtonsoft.Json;
 
-namespace APPID;
+namespace APPID.Utilities.Steam;
 
 public class DataTableGeneration
 {
-    public static DataTable dataTable;
-    public static DataTable dt;
+    public static DataTable DataTable;
+    public static DataTable Dt;
 
     #region Get and Set
 
     public DataTable DataTableToGenerate
     {
-        get { return dataTable; } // get method
-        set { dataTable = value; } // set method
+        get { return DataTable; } // get method
+        set { DataTable = value; } // set method
     }
 
     #endregion
@@ -62,8 +62,8 @@ public class DataTableGeneration
                             continue;
                         }
 
-                        string ItemWithoutTroubles = RemoveSpecialCharacters(item.Name);
-                        dt.Rows.Add(ItemWithoutTroubles, item.Appid);
+                        string itemWithoutTroubles = RemoveSpecialCharacters(item.Name);
+                        dt.Rows.Add(itemWithoutTroubles, item.Appid);
                     }
 
                     dataTableGeneration.DataTableToGenerate = dt;
@@ -117,8 +117,8 @@ public class DataTableGeneration
                     continue;
                 }
 
-                string ItemWithoutTroubles = RemoveSpecialCharacters(item.Name);
-                dt.Rows.Add(ItemWithoutTroubles, item.Appid);
+                string itemWithoutTroubles = RemoveSpecialCharacters(item.Name);
+                dt.Rows.Add(itemWithoutTroubles, item.Appid);
             }
         }
         catch (Exception ex)

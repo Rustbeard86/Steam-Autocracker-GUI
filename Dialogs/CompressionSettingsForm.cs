@@ -4,19 +4,19 @@ using System.Drawing.Text;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
-using APPID;
 using APPID.Properties;
+using APPID.Utilities.UI;
 
-namespace SteamAutocrackGUI;
+namespace APPID;
 
 public partial class CompressionSettingsForm : Form
 {
-    private const int WM_NCLBUTTONDOWN = 0xA1;
-    private const int HTCAPTION = 0x2;
-    private readonly TextBox bandwidthTextBox;
-    private readonly ComboBox bandwidthUnitCombo;
-    private Panel sliderPanel;
-    private int sliderValue;
+    private const int WmNclbuttondown = 0xA1;
+    private const int Htcaption = 0x2;
+    private readonly TextBox _bandwidthTextBox;
+    private readonly ComboBox _bandwidthUnitCombo;
+    private Panel _sliderPanel;
+    private int _sliderValue;
 
     public CompressionSettingsForm()
     {
@@ -65,15 +65,15 @@ public partial class CompressionSettingsForm : Form
         levelTrackBar.Visible = false;
 
         // Load saved compression level
-        sliderValue = Settings.Default.CompressionLevel;
-        if (sliderValue < 0)
+        _sliderValue = Settings.Default.CompressionLevel;
+        if (_sliderValue < 0)
         {
-            sliderValue = 0;
+            _sliderValue = 0;
         }
 
-        if (sliderValue > 10)
+        if (_sliderValue > 10)
         {
-            sliderValue = 10;
+            _sliderValue = 10;
         }
 
         CreateCustomSlider();
@@ -91,7 +91,7 @@ public partial class CompressionSettingsForm : Form
         };
         Controls.Add(bandwidthLabel);
 
-        bandwidthTextBox = new TextBox
+        _bandwidthTextBox = new TextBox
         {
             Location = new Point(180, 115),
             Size = new Size(55, 23),
@@ -102,10 +102,10 @@ public partial class CompressionSettingsForm : Form
             Text = ""
         };
         var bwTooltip = new ToolTip();
-        bwTooltip.SetToolTip(bandwidthTextBox, "Enter number or leave empty for unlimited");
-        Controls.Add(bandwidthTextBox);
+        bwTooltip.SetToolTip(_bandwidthTextBox, "Enter number or leave empty for unlimited");
+        Controls.Add(_bandwidthTextBox);
 
-        bandwidthUnitCombo = new ComboBox
+        _bandwidthUnitCombo = new ComboBox
         {
             Location = new Point(240, 114),
             Size = new Size(70, 23),
@@ -115,9 +115,9 @@ public partial class CompressionSettingsForm : Form
             Font = new Font("Segoe UI", 9),
             DropDownStyle = ComboBoxStyle.DropDownList
         };
-        bandwidthUnitCombo.Items.AddRange("Kbps", "Mbps", "Gbps");
-        bandwidthUnitCombo.SelectedIndex = 1; // Default to Mbps
-        Controls.Add(bandwidthUnitCombo);
+        _bandwidthUnitCombo.Items.AddRange("Kbps", "Mbps", "Gbps");
+        _bandwidthUnitCombo.SelectedIndex = 1; // Default to Mbps
+        Controls.Add(_bandwidthUnitCombo);
 
         // Load saved bandwidth setting
         LoadBandwidthSetting();
@@ -177,7 +177,7 @@ public partial class CompressionSettingsForm : Form
     private static extern bool ReleaseCapture();
 
     [DllImport("user32.dll")]
-    private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+    private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
 
     private void ApplyAcrylicEffect()
     {
@@ -270,15 +270,15 @@ public partial class CompressionSettingsForm : Form
 
     private void CreateCustomSlider()
     {
-        sliderPanel = new Panel
+        _sliderPanel = new Panel
         {
             Location = new Point(49, 155), Size = new Size(350, 40), BackColor = Color.Transparent
         };
 
-        sliderPanel.Paint += SliderPanel_Paint;
-        sliderPanel.MouseDown += SliderPanel_MouseDown;
-        sliderPanel.MouseMove += SliderPanel_MouseMove;
-        Controls.Add(sliderPanel);
+        _sliderPanel.Paint += SliderPanel_Paint;
+        _sliderPanel.MouseDown += SliderPanel_MouseDown;
+        _sliderPanel.MouseMove += SliderPanel_MouseMove;
+        Controls.Add(_sliderPanel);
     }
 
     private void SliderPanel_Paint(object sender, PaintEventArgs e)
@@ -317,7 +317,7 @@ public partial class CompressionSettingsForm : Form
         }
 
         // Progress fill with glass effect
-        int fillWidth = (int)(sliderValue / 10.0 * trackWidth);
+        int fillWidth = (int)(_sliderValue / 10.0 * trackWidth);
         if (fillWidth > 0)
         {
             var fillRect = new Rectangle(trackStart, trackY - 2, fillWidth, 4);
@@ -370,7 +370,7 @@ public partial class CompressionSettingsForm : Form
         }
 
         // Glass handle
-        int handleX = trackStart + (int)(sliderValue / 10.0 * trackWidth);
+        int handleX = trackStart + (int)(_sliderValue / 10.0 * trackWidth);
 
         // Soft outer glow
         for (int i = 20; i > 0; i--)
@@ -430,8 +430,8 @@ public partial class CompressionSettingsForm : Form
         int trackStart = 10;
         int trackWidth = 330;
         int value = (int)Math.Round((mouseX - trackStart) / (double)trackWidth * 10);
-        sliderValue = Math.Max(0, Math.Min(10, value));
-        sliderPanel.Invalidate();
+        _sliderValue = Math.Max(0, Math.Min(10, value));
+        _sliderPanel.Invalidate();
         UpdateLevelDescription();
     }
 
@@ -439,7 +439,7 @@ public partial class CompressionSettingsForm : Form
     private void UpdateLevelDescription()
     {
         string description;
-        switch (sliderValue)
+        switch (_sliderValue)
         {
             case 0:
                 description = "0 - No Compression (Instant)";
@@ -451,7 +451,7 @@ public partial class CompressionSettingsForm : Form
                 description = "10 - Ultra Compression";
                 break;
             default:
-                description = sliderValue.ToString();
+                description = _sliderValue.ToString();
                 break;
         }
 
@@ -461,7 +461,7 @@ public partial class CompressionSettingsForm : Form
     private void okButton_Click(object sender, EventArgs e)
     {
         SelectedFormat = zipRadioButton.Checked ? "ZIP" : "7Z";
-        SelectedLevel = sliderValue.ToString();
+        SelectedLevel = _sliderValue.ToString();
         RememberChoice = true;
         UseRinPassword = rinPasswordCheckBox.Checked;
 
@@ -470,7 +470,7 @@ public partial class CompressionSettingsForm : Form
         AppSettings.Default.Save();
 
         // Save compression level and format
-        Settings.Default.CompressionLevel = sliderValue;
+        Settings.Default.CompressionLevel = _sliderValue;
         Settings.Default.CompressionFormat = SelectedFormat;
         Settings.Default.Save();
 
@@ -489,9 +489,9 @@ public partial class CompressionSettingsForm : Form
 
     private void levelTrackBar_Scroll(object sender, EventArgs e)
     {
-        sliderValue = levelTrackBar.Value;
+        _sliderValue = levelTrackBar.Value;
         UpdateLevelDescription();
-        sliderPanel.Invalidate();
+        _sliderPanel.Invalidate();
     }
 
     private void CompressionSettingsForm_MouseDown(object sender, MouseEventArgs e)
@@ -499,7 +499,7 @@ public partial class CompressionSettingsForm : Form
         if (e.Button == MouseButtons.Left)
         {
             ReleaseCapture();
-            SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+            SendMessage(Handle, WmNclbuttondown, Htcaption, 0);
         }
     }
 
@@ -512,8 +512,8 @@ public partial class CompressionSettingsForm : Form
 
             if (string.IsNullOrWhiteSpace(saved))
             {
-                bandwidthTextBox.Text = "";
-                bandwidthUnitCombo.SelectedIndex = 1; // Mbps default
+                _bandwidthTextBox.Text = "";
+                _bandwidthUnitCombo.SelectedIndex = 1; // Mbps default
                 return;
             }
 
@@ -522,26 +522,26 @@ public partial class CompressionSettingsForm : Form
                 @"^(\d+(?:\.\d+)?)\s*(kb|kbit|kbps|mb|mbit|mbps|gb|gbit|gbps)?$");
             if (match.Success)
             {
-                bandwidthTextBox.Text = match.Groups[1].Value;
+                _bandwidthTextBox.Text = match.Groups[1].Value;
                 string unit = match.Groups[2].Value;
                 if (unit.StartsWith("k"))
                 {
-                    bandwidthUnitCombo.SelectedIndex = 0; // Kbps
+                    _bandwidthUnitCombo.SelectedIndex = 0; // Kbps
                 }
                 else if (unit.StartsWith("g"))
                 {
-                    bandwidthUnitCombo.SelectedIndex = 2; // Gbps
+                    _bandwidthUnitCombo.SelectedIndex = 2; // Gbps
                 }
                 else
                 {
-                    bandwidthUnitCombo.SelectedIndex = 1; // Mbps (default)
+                    _bandwidthUnitCombo.SelectedIndex = 1; // Mbps (default)
                 }
             }
         }
         catch
         {
-            bandwidthTextBox.Text = "";
-            bandwidthUnitCombo.SelectedIndex = 1;
+            _bandwidthTextBox.Text = "";
+            _bandwidthUnitCombo.SelectedIndex = 1;
         }
     }
 
@@ -550,10 +550,10 @@ public partial class CompressionSettingsForm : Form
         try
         {
             string value = "";
-            if (!string.IsNullOrWhiteSpace(bandwidthTextBox.Text))
+            if (!string.IsNullOrWhiteSpace(_bandwidthTextBox.Text))
             {
-                string unit = bandwidthUnitCombo.SelectedItem?.ToString() ?? "Mbps";
-                value = bandwidthTextBox.Text.Trim() + unit;
+                string unit = _bandwidthUnitCombo.SelectedItem?.ToString() ?? "Mbps";
+                value = _bandwidthTextBox.Text.Trim() + unit;
             }
 
             Settings.Default.UploadBandwidthLimit = value;

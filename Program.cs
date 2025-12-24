@@ -1,9 +1,7 @@
 using System.IO.Compression;
-using APPID;
 using APPID.Properties;
-using SteamAutocrackGUI;
 
-namespace SteamAppIdIdentifier;
+namespace APPID;
 
 /// <summary>
 ///     Entry point for the SACGUI application.
@@ -183,7 +181,7 @@ internal static class Program
     /// <summary>
     ///     Terminates all processes matching the specified name using WMIC.
     /// </summary>
-    public static void CmdKILL(string appname)
+    public static void CmdKill(string appname)
     {
         Process[] processlist = Process.GetProcesses();
         foreach (Process process in processlist)

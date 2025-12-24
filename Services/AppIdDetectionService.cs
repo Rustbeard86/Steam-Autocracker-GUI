@@ -1,9 +1,10 @@
 using System.Data;
 using System.Text.RegularExpressions;
+using APPID.Models;
 using APPID.Services.Interfaces;
-using APPID.Utilities;
+using APPID.Utilities.Network;
+using APPID.Utilities.Steam;
 using Newtonsoft.Json;
-using SteamAutocrackGUI;
 
 namespace APPID.Services;
 
@@ -138,20 +139,20 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
             // Parse JSON response
             var response = JsonConvert.DeserializeObject<SteamStoreSearchResponse>(json);
 
-            if (response?.items == null || response.items.Count == 0)
+            if (response?.Items == null || response.Items.Count == 0)
             {
                 return null;
             }
 
             // Filter out unwanted results (soundtracks, DLC, demos, etc.)
-            var filteredItems = response.items.Where(item =>
+            var filteredItems = response.Items.Where(item =>
             {
-                if (item.type != "app")
+                if (item.Type != "app")
                 {
                     return false;
                 }
 
-                string nameLower = item.name?.ToLower() ?? "";
+                string nameLower = item.Name?.ToLower() ?? "";
 
                 // Filter out common non-game content
                 if (nameLower.Contains("soundtrack"))
@@ -235,12 +236,12 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
             if (filteredItems.Count == 0)
             {
                 // If all results were filtered, try the first app-type result
-                var firstApp = response.items.FirstOrDefault(i => i.type == "app");
-                return firstApp?.id.ToString();
+                var firstApp = response.Items.FirstOrDefault(i => i.Type == "app");
+                return firstApp?.Id.ToString();
             }
 
             // Return the first (best) match
-            return filteredItems[0].id.ToString();
+            return filteredItems[0].Id.ToString();
         }
         catch (Exception ex)
         {

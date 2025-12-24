@@ -1,7 +1,6 @@
 using System.Reflection;
-using APPID;
 
-namespace SteamAppIdIdentifier;
+namespace APPID;
 
 /// <summary>
 ///     Handles extraction of embedded _bin resources at runtime.

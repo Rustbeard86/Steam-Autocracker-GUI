@@ -6,7 +6,7 @@
 		<UseWindowsForms>true</UseWindowsForms>
 		<RootNamespace>APPID</RootNamespace>
 		<AssemblyName>SACGUI</AssemblyName>
-		<StartupObject>SteamAppIdIdentifier.Program</StartupObject>
+		<StartupObject>APPID.Program</StartupObject>
 		<ApplicationIcon>sac.ico</ApplicationIcon>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 		<EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
@@ -37,7 +37,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Include="CompressionSettingsForm.resx">
+		<EmbeddedResource Include="Dialogs\CompressionSettingsForm.resx">
 			<DependentUpon>CompressionSettingsForm.cs</DependentUpon>
 		</EmbeddedResource>
 		<Content Include="sac.ico" />
@@ -48,6 +48,7 @@
 		</Content>
 		<Compile Remove="releases\**" />
 		<None Remove="releases\**" />
+		<EmbeddedResource Include="Dialogs\RGBProgressWindow.resx" />
 		<EmbeddedResource Include="EnhancedShareWindow.resx">
 			<DependentUpon>EnhancedShareWindow.cs</DependentUpon>
 		</EmbeddedResource>
@@ -69,7 +70,6 @@
 		<PackageReference Include="PuppeteerSharp" Version="20.2.5" />
 		<PackageReference Include="MouseKeyHook" Version="5.7.1" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageReference Include="Octokit" Version="14.0.0" />
 		<PackageReference Include="RestSharp" Version="113.0.0" />
 	</ItemGroup>
 
@@ -82,7 +82,7 @@
 	  <Compile Update="EnhancedShareWindow.Designer.cs">
 	    <DependentUpon>EnhancedShareWindow.cs</DependentUpon>
 	  </Compile>
-	  <Compile Update="CompressionSettingsForm.Designer.cs">
+	  <Compile Update="Dialogs\CompressionSettingsForm.Designer.cs">
 	    <DependentUpon>CompressionSettingsForm.cs</DependentUpon>
 	  </Compile>
 	</ItemGroup>

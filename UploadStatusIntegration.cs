@@ -1,6 +1,6 @@
 using Timer = System.Windows.Forms.Timer;
 
-namespace SteamAppIdIdentifier;
+namespace APPID;
 
 public static class UploadStatusManager
 {

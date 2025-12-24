@@ -1,6 +1,6 @@
 using Timer = System.Windows.Forms.Timer;
 
-namespace SteamAppIdIdentifier;
+namespace APPID;
 
 public class DynamicShareButton : Button
 {
@@ -11,11 +11,11 @@ public class DynamicShareButton : Button
         Urgent // Many people requesting - Bright Red
     }
 
-    private ShareStatus currentStatus = ShareStatus.Normal;
-    private int pulseStep;
-    private Timer pulseTimer;
-    private bool pulsing;
-    private int requestCount;
+    private ShareStatus _currentStatus = ShareStatus.Normal;
+    private int _pulseStep;
+    private Timer _pulseTimer;
+    private bool _pulsing;
+    private int _requestCount;
 
     public DynamicShareButton()
     {
@@ -65,8 +65,8 @@ public class DynamicShareButton : Button
 
     private void SetNormalStyle()
     {
-        currentStatus = ShareStatus.Normal;
-        requestCount = 0;
+        _currentStatus = ShareStatus.Normal;
+        _requestCount = 0;
 
         // Bright Electric Blue
         BackColor = Color.FromArgb(0, 150, 255);
@@ -79,8 +79,8 @@ public class DynamicShareButton : Button
 
     private void SetRequestedStyle(int count)
     {
-        currentStatus = ShareStatus.HasRequested;
-        requestCount = count;
+        _currentStatus = ShareStatus.HasRequested;
+        _requestCount = count;
 
         // HOT PINK - Someone needs your stuff!
         BackColor = Color.FromArgb(255, 20, 147); // Deep Pink
@@ -94,8 +94,8 @@ public class DynamicShareButton : Button
 
     private void SetUrgentStyle(int count)
     {
-        currentStatus = ShareStatus.Urgent;
-        requestCount = count;
+        _currentStatus = ShareStatus.Urgent;
+        _requestCount = count;
 
         // BRIGHT RED - Many people need your games!
         BackColor = Color.FromArgb(255, 0, 50);
@@ -109,28 +109,28 @@ public class DynamicShareButton : Button
 
     private void SetupPulseEffect()
     {
-        pulseTimer = new Timer();
-        pulseTimer.Interval = 100;
-        pulseTimer.Tick += (s, e) =>
+        _pulseTimer = new Timer();
+        _pulseTimer.Interval = 100;
+        _pulseTimer.Tick += (s, e) =>
         {
-            if (!pulsing)
+            if (!_pulsing)
             {
                 return;
             }
 
-            pulseStep = (pulseStep + 1) % 20;
+            _pulseStep = (_pulseStep + 1) % 20;
 
             // Calculate pulse brightness
-            double pulse = Math.Sin(pulseStep * Math.PI / 10) * 0.3 + 0.7;
+            double pulse = Math.Sin(_pulseStep * Math.PI / 10) * 0.3 + 0.7;
 
-            if (currentStatus == ShareStatus.HasRequested)
+            if (_currentStatus == ShareStatus.HasRequested)
             {
                 int r = (int)(255 * pulse);
                 int g = (int)(20 * pulse);
                 int b = (int)(147 * pulse);
                 BackColor = Color.FromArgb(r, g, b);
             }
-            else if (currentStatus == ShareStatus.Urgent)
+            else if (_currentStatus == ShareStatus.Urgent)
             {
                 int r = 255;
                 int g = (int)(50 * pulse);
@@ -142,15 +142,15 @@ public class DynamicShareButton : Button
 
     private void StartPulse(bool aggressive)
     {
-        pulsing = true;
-        pulseTimer.Interval = aggressive ? 50 : 100;
-        pulseTimer.Start();
+        _pulsing = true;
+        _pulseTimer.Interval = aggressive ? 50 : 100;
+        _pulseTimer.Start();
     }
 
     private void StopPulse()
     {
-        pulsing = false;
-        pulseTimer.Stop();
+        _pulsing = false;
+        _pulseTimer.Stop();
     }
 
     private async Task<List<RequestedGameInfo>> CheckRequestedGames(List<string> userAppIds)
@@ -265,21 +265,21 @@ public static class ShareButtonIntegration
 // Status bar with live colors
 public class CommunityStatusBar : StatusStrip
 {
-    private readonly ToolStripLabel filledLabel;
-    private readonly ToolStripLabel honorLabel;
-    private readonly ToolStripLabel requestLabel;
+    private readonly ToolStripLabel _filledLabel;
+    private readonly ToolStripLabel _honorLabel;
+    private readonly ToolStripLabel _requestLabel;
 
     public CommunityStatusBar()
     {
         BackColor = Color.FromArgb(30, 30, 30);
 
-        requestLabel = new ToolStripLabel("Requests: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
+        _requestLabel = new ToolStripLabel("Requests: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
 
-        honorLabel = new ToolStripLabel("Honored: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
+        _honorLabel = new ToolStripLabel("Honored: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
 
-        filledLabel = new ToolStripLabel("Filled: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
+        _filledLabel = new ToolStripLabel("Filled: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
 
-        Items.AddRange(requestLabel, honorLabel, filledLabel);
+        Items.AddRange(_requestLabel, _honorLabel, _filledLabel);
 
         // Auto-update every minute
         var timer = new Timer { Interval = 60000 };
@@ -293,13 +293,13 @@ public class CommunityStatusBar : StatusStrip
     {
         try
         {
-            var stats = await RequestAPI.GetGlobalStats();
+            var stats = await RequestApi.GetGlobalStats();
 
             Invoke(() =>
             {
-                requestLabel.Text = $"Requests: {stats.TotalRequests}";
-                honorLabel.Text = $"Honored: {stats.TotalHonored}";
-                filledLabel.Text = $"Filled: {stats.TotalFilled}";
+                _requestLabel.Text = $"Requests: {stats.TotalRequests}";
+                _honorLabel.Text = $"Honored: {stats.TotalHonored}";
+                _filledLabel.Text = $"Filled: {stats.TotalFilled}";
 
                 // Color code based on fulfillment rate
                 double fillRate = (double)stats.TotalFilled / Math.Max(1, stats.TotalRequests);
@@ -307,20 +307,20 @@ public class CommunityStatusBar : StatusStrip
                 if (fillRate > 0.8)
                 {
                     // Good - greenish
-                    requestLabel.ForeColor = Color.FromArgb(100, 255, 100);
-                    filledLabel.ForeColor = Color.FromArgb(100, 255, 100);
+                    _requestLabel.ForeColor = Color.FromArgb(100, 255, 100);
+                    _filledLabel.ForeColor = Color.FromArgb(100, 255, 100);
                 }
                 else if (fillRate > 0.5)
                 {
                     // OK - yellowish
-                    requestLabel.ForeColor = Color.FromArgb(255, 255, 100);
-                    filledLabel.ForeColor = Color.FromArgb(255, 255, 100);
+                    _requestLabel.ForeColor = Color.FromArgb(255, 255, 100);
+                    _filledLabel.ForeColor = Color.FromArgb(255, 255, 100);
                 }
                 else
                 {
                     // Many unfilled - pinkish
-                    requestLabel.ForeColor = Color.FromArgb(255, 100, 150);
-                    filledLabel.ForeColor = Color.FromArgb(255, 100, 150);
+                    _requestLabel.ForeColor = Color.FromArgb(255, 100, 150);
+                    _filledLabel.ForeColor = Color.FromArgb(255, 100, 150);
                 }
             });
         }

@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace SteamAppIdIdentifier
+namespace APPID
 {
     partial class EnhancedShareWindow
     {

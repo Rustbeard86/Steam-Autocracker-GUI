@@ -27,7 +27,7 @@ public sealed class AppSettings
     public bool AutoCrack { get; set; }
 
     /// <summary>Gets or sets whether LAN multiplayer is enabled.</summary>
-    public bool LANMultiplayer { get; set; }
+    public bool LanMultiplayer { get; set; }
 
     /// <summary>Gets or sets whether to use RIN password for archives.</summary>
     public bool UseRinPassword { get; set; }

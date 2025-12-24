@@ -1,7 +1,7 @@
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 
-namespace APPID.Utilities;
+namespace APPID.Utilities.Network;
 
 /// <summary>
 ///     Provides shared HttpClient instances with proper configuration.
@@ -9,19 +9,19 @@ namespace APPID.Utilities;
 /// </summary>
 public static class HttpClientFactory
 {
-    private static readonly Lazy<HttpClient> _defaultClient = new(() => CreateClient());
-    private static readonly Lazy<HttpClient> _insecureClient = new(() => CreateClient(true));
+    private static readonly Lazy<HttpClient> DefaultClient = new(() => CreateClient());
+    private static readonly Lazy<HttpClient> InsecureClient = new(() => CreateClient(true));
 
     /// <summary>
     ///     Gets a shared HttpClient instance with default settings.
     /// </summary>
-    public static HttpClient Default => _defaultClient.Value;
+    public static HttpClient Default => DefaultClient.Value;
 
     /// <summary>
     ///     Gets a shared HttpClient instance that bypasses SSL certificate validation.
     ///     Use only when connecting to trusted endpoints with self-signed certificates.
     /// </summary>
-    public static HttpClient Insecure => _insecureClient.Value;
+    public static HttpClient Insecure => InsecureClient.Value;
 
     /// <summary>
     ///     Creates a new HttpClient instance with optional certificate bypass.

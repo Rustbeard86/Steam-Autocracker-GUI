@@ -9,15 +9,16 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using APPID.Dialogs;
+using APPID.Models;
 using APPID.Properties;
 using APPID.Services;
 using APPID.Services.Interfaces;
+using APPID.Utilities;
+using APPID.Utilities.Steam;
 using CliWrap;
 using CliWrap.Buffered;
 using Newtonsoft.Json.Linq;
-using SAC_GUI;
-using SteamAppIdIdentifier;
-using SteamAutocrackGUI;
 using Clipboard = System.Windows.Forms.Clipboard;
 using DataFormats = System.Windows.Forms.DataFormats;
 using DragDropEffects = System.Windows.Forms.DragDropEffects;
@@ -33,13 +34,13 @@ public partial class SteamAppId : Form
 
     public static readonly string BinPath = Path.Combine(ExeDir, "_bin");
     public static int CurrentCell;
-    public static string APPNAME = "";
-    public static string APPDATA = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-    public static bool VRLExists;
+    public static string Appname = "";
+    public static string Appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    public static bool VrlExists;
     public static string CurrentAppId;
     public static bool SearchPause;
     public static bool BackPressed;
-    public static Timer t1;
+    public static Timer T1;
 
     // Services for SOLID architecture
     private readonly IFileSystemService _fileSystem;
@@ -47,31 +48,31 @@ public partial class SteamAppId : Form
     private readonly IManifestParsingService _manifestParsing;
     private readonly ISettingsService _settings;
     private readonly IUrlConversionService _urlConversion;
-    public bool autoCrackEnabled = true; // Default to ON
-    public bool cracking;
+    public bool AutoCrackEnabled = true; // Default to ON
+    public bool Cracking;
 
-    protected DataTableGeneration dataTableGeneration;
-    public bool enableLanMultiplayer;
-    private string gameDir;
-    private string gameDirName;
-    public bool goldy;
-    private bool isFirstClickAfterSelection; // Track first click after folder/file selection
-    private bool isInitialFolderSearch; // Track if this is the FIRST search after folder selection
-    public bool isnumeric;
-    private Timer label5Timer;
+    protected DataTableGeneration DataTableGeneration;
+    public bool EnableLanMultiplayer;
+    private string _gameDir;
+    private string _gameDirName;
+    public bool Goldy;
+    private bool _isFirstClickAfterSelection; // Track first click after folder/file selection
+    private bool _isInitialFolderSearch; // Track if this is the FIRST search after folder selection
+    public bool Isnumeric;
+    private Timer _label5Timer;
 
     // Custom title bar drag functionality
-    private Point mouseDownPoint = Point.Empty;
+    private Point _mouseDownPoint = Point.Empty;
 
 
-    private string parentOfSelection;
-    private Timer resinstruccZipTimer;
+    private string _parentOfSelection;
+    private Timer _resinstruccZipTimer;
 
-    private EnhancedShareWindow shareWindow;
-    private bool suppressStatusUpdates; // Flag to suppress Tit/Tat when cracking from share window
-    private bool textChanged;
+    private EnhancedShareWindow _shareWindow;
+    private bool _suppressStatusUpdates; // Flag to suppress Tit/Tat when cracking from share window
+    private bool _textChanged;
 
-    private CancellationTokenSource zipCancellationTokenSource;
+    private CancellationTokenSource _zipCancellationTokenSource;
 
     public SteamAppId()
     {
@@ -86,15 +87,15 @@ public partial class SteamAppId : Form
             (s, certificate, chain, sslPolicyErrors) => true;
 
         // Load auto-crack setting FIRST before anything else - directly assign the value
-        autoCrackEnabled = _settings.AutoCrack;
-        Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {autoCrackEnabled} from Settings");
+        AutoCrackEnabled = _settings.AutoCrack;
+        Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {AutoCrackEnabled} from Settings");
 
-        dataTableGeneration = new DataTableGeneration();
-        Task.Run(async () => await dataTableGeneration.GetDataTableAsync(dataTableGeneration)).Wait();
+        DataTableGeneration = new DataTableGeneration();
+        Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
         InitializeComponent();
 
         // Set auto-crack UI immediately after InitializeComponent so it's ready BEFORE Form_Load
-        if (autoCrackEnabled)
+        if (AutoCrackEnabled)
         {
             autoCrackOn.BringToFront();
         }
@@ -158,14 +159,14 @@ public partial class SteamAppId : Form
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public string GameDirectory
     {
-        get { return gameDir; }
+        get { return _gameDir; }
         set
         {
-            gameDir = value;
+            _gameDir = value;
             // Also set gameDirName when gameDir is set
-            if (!string.IsNullOrEmpty(gameDir))
+            if (!string.IsNullOrEmpty(_gameDir))
             {
-                gameDirName = Path.GetFileName(gameDir);
+                _gameDirName = Path.GetFileName(_gameDir);
             }
         }
     }
@@ -262,8 +263,8 @@ public partial class SteamAppId : Form
         // Apply rounded corners (Windows 11)
         try
         {
-            int preference = DWMWCP_ROUND;
-            DwmSetWindowAttribute(Handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
+            int preference = DwmwcpRound;
+            DwmSetWindowAttribute(Handle, DwmwaWindowCornerPreference, ref preference, sizeof(int));
         }
         catch { }
 
@@ -282,7 +283,7 @@ public partial class SteamAppId : Form
                 return;
             }
 
-            mouseDownPoint = new Point(e.X, e.Y);
+            _mouseDownPoint = new Point(e.X, e.Y);
             Cursor = Cursors.SizeAll;
 
             var titleBarControl = sender as Control;
@@ -293,11 +294,11 @@ public partial class SteamAppId : Form
 
     private void TitleBar_MouseMove(object sender, MouseEventArgs e)
     {
-        if (e.Button == MouseButtons.Left && mouseDownPoint != Point.Empty)
+        if (e.Button == MouseButtons.Left && _mouseDownPoint != Point.Empty)
         {
             Location = new Point(
-                Location.X + e.X - mouseDownPoint.X,
-                Location.Y + e.Y - mouseDownPoint.Y
+                Location.X + e.X - _mouseDownPoint.X,
+                Location.Y + e.Y - _mouseDownPoint.Y
             );
         }
     }
@@ -305,7 +306,7 @@ public partial class SteamAppId : Form
     private void TitleBar_MouseUp(object sender, MouseEventArgs e)
     {
         Cursor = Cursors.Default;
-        mouseDownPoint = Point.Empty;
+        _mouseDownPoint = Point.Empty;
 
         var titleBarControl = sender as Control;
         titleBarControl.MouseMove -= TitleBar_MouseMove;
@@ -327,32 +328,32 @@ public partial class SteamAppId : Form
     private void InitializeTimers()
     {
         // Timer for label5 - visible for 10 seconds
-        label5Timer = new Timer();
-        label5Timer.Interval = 10000; // 10 seconds
-        label5Timer.Tick += (s, e) =>
+        _label5Timer = new Timer();
+        _label5Timer.Interval = 10000; // 10 seconds
+        _label5Timer.Tick += (s, e) =>
         {
             label5.Visible = false;
-            label5Timer.Stop();
+            _label5Timer.Stop();
         };
 
         // Timer for resinstruccZip - disappear after 30 seconds
-        resinstruccZipTimer = new Timer();
-        resinstruccZipTimer.Interval = 30000; // 30 seconds
-        resinstruccZipTimer.Tick += (s, e) =>
+        _resinstruccZipTimer = new Timer();
+        _resinstruccZipTimer.Interval = 30000; // 30 seconds
+        _resinstruccZipTimer.Tick += (s, e) =>
         {
             resinstruccZip.Visible = false;
-            resinstruccZipTimer.Stop();
+            _resinstruccZipTimer.Stop();
         };
 
         // Start label5 timer on form load
         label5.Visible = true;
-        label5Timer.Start();
+        _label5Timer.Start();
     }
 
-    public static void Tit(string Message, Color color)
+    public static void Tit(string message, Color color)
     {
         // Skip if suppressing status updates (cracking from share window)
-        if (Program.Form?.suppressStatusUpdates ?? false)
+        if (Program.Form?._suppressStatusUpdates ?? false)
         {
             return;
         }
@@ -360,7 +361,7 @@ public partial class SteamAppId : Form
         // Handle cross-thread calls
         if (Program.Form?.InvokeRequired ?? false)
         {
-            Program.Form?.BeginInvoke(() => Tit(Message, color));
+            Program.Form?.BeginInvoke(() => Tit(message, color));
             return;
         }
 
@@ -369,16 +370,16 @@ public partial class SteamAppId : Form
             return;
         }
 
-        string MessageLow = Message.ToLower();
-        if (MessageLow.Contains("READY TO CRACK!".ToLower()))
+        string messageLow = message.ToLower();
+        if (messageLow.Contains("READY TO CRACK!".ToLower()))
         {
             Program.Form.StatusLabel.ForeColor = Color.HotPink;
         }
-        else if (MessageLow.Contains("Complete".ToLower()))
+        else if (messageLow.Contains("Complete".ToLower()))
         {
             Program.Form.StatusLabel.ForeColor = Color.MediumSpringGreen;
         }
-        else if (MessageLow.Contains("no steam".ToLower()))
+        else if (messageLow.Contains("no steam".ToLower()))
         {
             Program.Form.StatusLabel.ForeColor = Color.Crimson;
         }
@@ -387,14 +388,14 @@ public partial class SteamAppId : Form
             Program.Form.StatusLabel.ForeColor = color;
         }
 
-        Program.Form.StatusLabel.Text = Message;
-        Program.Form.Text = Message.Replace("&&", "&");
+        Program.Form.StatusLabel.Text = message;
+        Program.Form.Text = message.Replace("&&", "&");
     }
 
-    public static void Tat(string Message)
+    public static void Tat(string message)
     {
         // Skip if suppressing status updates (cracking from share window)
-        if (Program.Form?.suppressStatusUpdates ?? false)
+        if (Program.Form?._suppressStatusUpdates ?? false)
         {
             return;
         }
@@ -402,13 +403,13 @@ public partial class SteamAppId : Form
         // Handle cross-thread calls
         if (Program.Form?.InvokeRequired ?? false)
         {
-            Program.Form?.BeginInvoke(() => Tat(Message));
+            Program.Form?.BeginInvoke(() => Tat(message));
             return;
         }
 
         if (Program.Form != null)
         {
-            Program.Form.currDIrText.Text = $"{Message}";
+            Program.Form.currDIrText.Text = $"{message}";
         }
     }
 
@@ -453,8 +454,8 @@ public partial class SteamAppId : Form
         if (rowIndex >= 0 && rowIndex < dataGridView1.Rows.Count)
         {
             CurrentAppId = dataGridView1[1, rowIndex].Value.ToString();
-            APPNAME = dataGridView1[0, rowIndex].Value.ToString().Trim();
-            Tat($"{APPNAME} ({CurrentAppId})");
+            Appname = dataGridView1[0, rowIndex].Value.ToString().Trim();
+            Tat($"{Appname} ({CurrentAppId})");
             searchTextBox.Clear();
             searchTextBox.Enabled = false;
             btnManualEntry.Visible = false;
@@ -463,8 +464,8 @@ public partial class SteamAppId : Form
             resinstruccZip.Visible = false;
 
             // Auto-crack if enabled
-            Debug.WriteLine($"[AUTO-CRACK CHECK] autoCrackEnabled={autoCrackEnabled}, gameDir='{gameDir ?? "NULL"}'");
-            if (autoCrackEnabled && !string.IsNullOrEmpty(gameDir))
+            Debug.WriteLine($"[AUTO-CRACK CHECK] autoCrackEnabled={AutoCrackEnabled}, gameDir='{_gameDir ?? "NULL"}'");
+            if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
             {
                 Debug.WriteLine("[AUTO-CRACK] Triggering auto-crack NOW!");
                 // Auto-cracking - show different message
@@ -486,19 +487,19 @@ public partial class SteamAppId : Form
     private bool PerformImprovedFuzzySearch(string gameFolderName)
     {
         // Try original search method first
-        string Search = RemoveSpecialCharacters(gameFolderName.ToLower()).Trim();
-        string SplitSearch = SplitCamelCase(RemoveSpecialCharacters(gameFolderName)).Trim();
+        string search = RemoveSpecialCharacters(gameFolderName.ToLower()).Trim();
+        string splitSearch = SplitCamelCase(RemoveSpecialCharacters(gameFolderName)).Trim();
 
         // Level 1: Exact match attempts
         ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-            string.Format("Name like '" + Search.Replace("_", "").Trim() + "'");
+            string.Format("Name like '" + search.Replace("_", "").Trim() + "'");
         if (dataGridView1.Rows.Count > 0)
         {
             return true;
         }
 
         ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-            string.Format("Name like '" + SplitSearch.Replace("_", "").Trim() + "'");
+            string.Format("Name like '" + splitSearch.Replace("_", "").Trim() + "'");
         if (dataGridView1.Rows.Count > 0)
         {
             return true;
@@ -515,14 +516,14 @@ public partial class SteamAppId : Form
 
         // Level 3: Original fallback patterns
         ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-            SplitSearch.ToLower().Replace("_", "").Replace("vr", "").Replace("vrs", "").Trim() + "'");
+            splitSearch.ToLower().Replace("_", "").Replace("vr", "").Replace("vrs", "").Trim() + "'");
         if (dataGridView1.Rows.Count > 0)
         {
             return true;
         }
 
         ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-            SplitSearch.ToLower().Replace("'", "").Replace("-", "").Replace(";", "").Trim() + "'");
+            splitSearch.ToLower().Replace("'", "").Replace("-", "").Replace(";", "").Trim() + "'");
         if (dataGridView1.Rows.Count > 0)
         {
             return true;
@@ -530,7 +531,7 @@ public partial class SteamAppId : Form
 
         // Level 4: Partial word matching
         ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '%" +
-            Search.Replace("_", "").Replace(" ", "%' AND Name LIKE '%").Replace(" and ", " ").Replace(" the ", " ")
+            search.Replace("_", "").Replace(" ", "%' AND Name LIKE '%").Replace(" and ", " ").Replace(" the ", " ")
                 .Replace(":", "") + "%'");
         if (dataGridView1.Rows.Count > 0)
         {
@@ -555,9 +556,9 @@ public partial class SteamAppId : Form
         }
 
         // Level 6: Last resort - refresh data and try again
-        dataTableGeneration = new DataTableGeneration();
-        Task.Run(async () => await dataTableGeneration.GetDataTableAsync(dataTableGeneration)).Wait();
-        dataGridView1.DataSource = dataTableGeneration.DataTableToGenerate;
+        DataTableGeneration = new DataTableGeneration();
+        Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
+        dataGridView1.DataSource = DataTableGeneration.DataTableToGenerate;
 
         ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
             string.Format("Name like '%" + improvedClean.Replace(" ", "%' AND Name LIKE '%") + "%'");
@@ -577,12 +578,12 @@ public partial class SteamAppId : Form
         {
             batchProgressIcon.Click += (s, ev) =>
             {
-                if (activeBatchForm is { IsDisposed: false })
+                if (_activeBatchForm is { IsDisposed: false })
                 {
-                    activeBatchForm.Show();
-                    activeBatchForm.WindowState = FormWindowState.Normal;
-                    activeBatchForm.BringToFront();
-                    activeBatchForm.Activate();
+                    _activeBatchForm.Show();
+                    _activeBatchForm.WindowState = FormWindowState.Normal;
+                    _activeBatchForm.BringToFront();
+                    _activeBatchForm.Activate();
                     HideBatchIndicator(); // Hide icon/label when restored
                     Hide(); // Hide Form1 when batch form is restored
                 }
@@ -595,12 +596,12 @@ public partial class SteamAppId : Form
             batchProgressLabel.BringToFront(); // Make sure label is on top of icon
             batchProgressLabel.Click += (s, ev) =>
             {
-                if (activeBatchForm is { IsDisposed: false })
+                if (_activeBatchForm is { IsDisposed: false })
                 {
-                    activeBatchForm.Show();
-                    activeBatchForm.WindowState = FormWindowState.Normal;
-                    activeBatchForm.BringToFront();
-                    activeBatchForm.Activate();
+                    _activeBatchForm.Show();
+                    _activeBatchForm.WindowState = FormWindowState.Normal;
+                    _activeBatchForm.BringToFront();
+                    _activeBatchForm.Activate();
                     HideBatchIndicator(); // Hide icon/label when restored
                     Hide(); // Hide Form1 when batch form is restored
                 }
@@ -609,8 +610,8 @@ public partial class SteamAppId : Form
         }
 
         // Load LAN multiplayer setting
-        enableLanMultiplayer = _settings.LANMultiplayer;
-        lanMultiplayerCheckBox.Checked = enableLanMultiplayer;
+        EnableLanMultiplayer = _settings.LanMultiplayer;
+        lanMultiplayerCheckBox.Checked = EnableLanMultiplayer;
 
         if (_settings.Pinned)
         {
@@ -626,8 +627,8 @@ public partial class SteamAppId : Form
         // Update UI for auto-crack setting (value already loaded in constructor)
         // When enabled, show the green ON button. When disabled, show the red OFF button.
         Debug.WriteLine(
-            $"[FORM_LOAD] autoCrackEnabled = {autoCrackEnabled}, bringing {(autoCrackEnabled ? "autoCrackOn" : "autoCrackOff")} to front");
-        if (autoCrackEnabled)
+            $"[FORM_LOAD] autoCrackEnabled = {AutoCrackEnabled}, bringing {(AutoCrackEnabled ? "autoCrackOn" : "autoCrackOff")} to front");
+        if (AutoCrackEnabled)
         {
             autoCrackOn.BringToFront(); // Show green button when enabled
         }
@@ -654,21 +655,21 @@ public partial class SteamAppId : Form
         {
             ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
             Tit("Checking for updates", Color.LightSkyBlue);
-            await Updater.CheckGitHubNewerVersion("atom0s", "Steamless", "https://api.github.com/repos");
+            await Updater.CheckGitHubNewerVersion("atom0s", "Steamless");
             await Updater.UpdateGoldBergAsync();
             await Task.Delay(1500);
             Tit("Click folder && select game's parent directory.", Color.Cyan);
         }
 
-        t1 = new Timer();
-        t1.Tick += t1_Tick;
-        t1.Interval = 1000;
-        if (Directory.Exists($"{APPDATA}\\VRL"))
+        T1 = new Timer();
+        T1.Tick += t1_Tick;
+        T1.Interval = 1000;
+        if (Directory.Exists($"{Appdata}\\VRL"))
         {
-            VRLExists = true;
+            VrlExists = true;
         }
 
-        dataGridView1.DataSource = dataTableGeneration.DataTableToGenerate;
+        dataGridView1.DataSource = DataTableGeneration.DataTableToGenerate;
         dataGridView1.MultiSelect = false;
         string args2 = "";
         dataGridView1.Columns[0].Width = 540;
@@ -684,33 +685,33 @@ public partial class SteamAppId : Form
 
             try
             {
-                string Search = RemoveSpecialCharacters(args2.ToLower()).Trim();
-                string SplitSearch = SplitCamelCase(RemoveSpecialCharacters(args2)).Trim();
+                string search = RemoveSpecialCharacters(args2.ToLower()).Trim();
+                string splitSearch = SplitCamelCase(RemoveSpecialCharacters(args2)).Trim();
                 ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                    string.Format("Name like '" + Search.Replace("_", "").Trim() + "'");
+                    string.Format("Name like '" + search.Replace("_", "").Trim() + "'");
 
                 if (dataGridView1.Rows.Count == 0)
                 {
                     ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                        string.Format("Name like '" + SplitSearch.Replace("_", "").Trim() + "'");
+                        string.Format("Name like '" + splitSearch.Replace("_", "").Trim() + "'");
                 }
 
                 if (dataGridView1.Rows.Count == 0)
                 {
                     ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-                        SplitSearch.ToLower().Replace("_", "").Replace("vr", "").Replace("vrs", "").Trim() + "'");
+                        splitSearch.ToLower().Replace("_", "").Replace("vr", "").Replace("vrs", "").Trim() + "'");
                 }
 
                 if (dataGridView1.Rows.Count == 0)
                 {
                     ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-                        SplitSearch.ToLower().Replace("'", "").Replace("-", "").Replace(";", "").Trim() + "'");
+                        splitSearch.ToLower().Replace("'", "").Replace("-", "").Replace(";", "").Trim() + "'");
                 }
 
                 if (dataGridView1.Rows.Count == 0)
                 {
                     ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '%" +
-                        Search.Replace("_", "").Replace(" ", "%' AND Name LIKE '%").Replace(" and ", " ")
+                        search.Replace("_", "").Replace(" ", "%' AND Name LIKE '%").Replace(" and ", " ")
                             .Replace(" the ", " ").Replace(":", "") + "%'");
                     if (dataGridView1.Rows.Count > 0)
                     {
@@ -718,11 +719,11 @@ public partial class SteamAppId : Form
                     }
                     else
                     {
-                        dataTableGeneration = new DataTableGeneration();
-                        Task.Run(async () => await dataTableGeneration.GetDataTableAsync(dataTableGeneration)).Wait();
-                        dataGridView1.DataSource = dataTableGeneration.DataTableToGenerate;
+                        DataTableGeneration = new DataTableGeneration();
+                        Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
+                        dataGridView1.DataSource = DataTableGeneration.DataTableToGenerate;
                         ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string
-                            .Format("Name like '%" + SplitSearch.Replace("_", "").Replace(" ", "%' AND Name LIKE '%")
+                            .Format("Name like '%" + splitSearch.Replace("_", "").Replace(" ", "%' AND Name LIKE '%")
                                 .Replace(" and ", " ").Replace(" the ", " ").Replace(":", "") + "%'").Trim();
                         if (dataGridView1.Rows.Count > 0)
                         {
@@ -730,10 +731,10 @@ public partial class SteamAppId : Form
                         }
                         else
                         {
-                            dataTableGeneration = new DataTableGeneration();
-                            Task.Run(async () => await dataTableGeneration.GetDataTableAsync(dataTableGeneration))
+                            DataTableGeneration = new DataTableGeneration();
+                            Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration))
                                 .Wait();
-                            dataGridView1.DataSource = dataTableGeneration.DataTableToGenerate;
+                            dataGridView1.DataSource = DataTableGeneration.DataTableToGenerate;
                         }
                     }
                 }
@@ -787,15 +788,15 @@ public partial class SteamAppId : Form
 
         try
         {
-            if (VRLExists)
+            if (VrlExists)
             {
-                string PropName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
-                File.WriteAllText($"{APPDATA}\\VRL\\ProperName.txt", PropName);
+                string propName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
+                File.WriteAllText($"{Appdata}\\VRL\\ProperName.txt", propName);
             }
 
             CurrentAppId = dataGridView1[1, e.RowIndex].Value.ToString();
-            APPNAME = dataGridView1[0, e.RowIndex].Value.ToString().Trim();
-            Tat($"{APPNAME} ({CurrentAppId})");
+            Appname = dataGridView1[0, e.RowIndex].Value.ToString().Trim();
+            Tat($"{Appname} ({CurrentAppId})");
             searchTextBox.Clear();
             searchTextBox.Enabled = false;
             mainPanel.Visible = true;
@@ -806,7 +807,7 @@ public partial class SteamAppId : Form
             resinstruccZip.Visible = false;
 
             // Auto-crack if enabled
-            if (autoCrackEnabled && !string.IsNullOrEmpty(gameDir))
+            if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
             {
                 // Trigger crack just like clicking the button
                 startCrackPic_Click(null, null);
@@ -819,10 +820,10 @@ public partial class SteamAppId : Form
     {
         try
         {
-            if (VRLExists)
+            if (VrlExists)
             {
-                string PropName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
-                File.WriteAllText($"{APPDATA}\\VRL\\ProperName.txt", PropName);
+                string propName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
+                File.WriteAllText($"{Appdata}\\VRL\\ProperName.txt", propName);
             }
 
             SetSelectedGame(e.RowIndex);
@@ -864,15 +865,15 @@ public partial class SteamAppId : Form
                     return;
                 }
 
-                if (VRLExists)
+                if (VrlExists)
                 {
-                    string PropName = RemoveSpecialCharacters(dataGridView1[0, CurrentCell].Value.ToString());
-                    File.WriteAllText($"{APPDATA}\\VRL\\ProperName.txt", PropName);
+                    string propName = RemoveSpecialCharacters(dataGridView1[0, CurrentCell].Value.ToString());
+                    File.WriteAllText($"{Appdata}\\VRL\\ProperName.txt", propName);
                 }
 
                 CurrentAppId = dataGridView1[1, CurrentCell].Value.ToString();
-                APPNAME = dataGridView1[0, CurrentCell].Value.ToString().Trim();
-                Tat($"{APPNAME} ({CurrentAppId})");
+                Appname = dataGridView1[0, CurrentCell].Value.ToString().Trim();
+                Tat($"{Appname} ({CurrentAppId})");
                 searchTextBox.Clear();
                 searchTextBox.Enabled = false;
                 mainPanel.Visible = true;
@@ -1007,7 +1008,7 @@ public partial class SteamAppId : Form
             {
                 BackPressed = false;
                 SearchPause = false;
-                t1.Stop();
+                T1.Stop();
             }
         }
         catch
@@ -1020,7 +1021,7 @@ public partial class SteamAppId : Form
     {
         BackPressed = false;
         SearchPause = false;
-        t1.Stop();
+        T1.Stop();
     }
 
     private async Task PutTaskDelay()
@@ -1037,14 +1038,14 @@ public partial class SteamAppId : Form
 
         try
         {
-            if (textChanged)
+            if (_textChanged)
             {
                 await PutTaskDelay();
-                textChanged = false; // Reset the flag
+                _textChanged = false; // Reset the flag
                 return;
             }
 
-            textChanged = true;
+            _textChanged = true;
             string searchText = searchTextBox.Text.Trim();
 
             // BLIND SPOT DETECTION: Try to catch exact matches that are being missed
@@ -1186,33 +1187,33 @@ public partial class SteamAppId : Form
                 return;
             }
 
-            string Search = RemoveSpecialCharacters(searchTextBox.Text.ToLower()).Trim();
-            string SplitSearch = SplitCamelCase(RemoveSpecialCharacters(searchTextBox.Text)).Trim();
+            string search = RemoveSpecialCharacters(searchTextBox.Text.ToLower()).Trim();
+            string splitSearch = SplitCamelCase(RemoveSpecialCharacters(searchTextBox.Text)).Trim();
             ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                string.Format("Name like '" + Search.Replace("_", "").Trim() + "'");
+                string.Format("Name like '" + search.Replace("_", "").Trim() + "'");
 
             if (dataGridView1.Rows.Count == 0)
             {
                 ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                    string.Format("Name like '" + SplitSearch.Replace("_", "").Trim() + "'");
+                    string.Format("Name like '" + splitSearch.Replace("_", "").Trim() + "'");
             }
 
             if (dataGridView1.Rows.Count == 0)
             {
                 ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-                    SplitSearch.ToLower().Replace("_", "").Replace("vr", "").Replace("vrs", "").Trim() + "'");
+                    splitSearch.ToLower().Replace("_", "").Replace("vr", "").Replace("vrs", "").Trim() + "'");
             }
 
             if (dataGridView1.Rows.Count == 0)
             {
                 ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-                    SplitSearch.ToLower().Replace("'", "").Replace("-", "").Replace(";", "").Trim() + "'");
+                    splitSearch.ToLower().Replace("'", "").Replace("-", "").Replace(";", "").Trim() + "'");
             }
 
             if (dataGridView1.Rows.Count == 0)
             {
                 ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '%" +
-                    Search.Replace("_", "").Replace(" ", "%' AND Name LIKE '%").Replace(" and ", " ")
+                    search.Replace("_", "").Replace(" ", "%' AND Name LIKE '%").Replace(" and ", " ")
                         .Replace(" the ", " ").Replace(":", "") + "%'");
                 if (dataGridView1.Rows.Count > 0)
                 {
@@ -1221,7 +1222,7 @@ public partial class SteamAppId : Form
                 else
                 {
                     ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string
-                        .Format("Name like '%" + SplitSearch.Replace("_", "").Replace(" ", "%' AND Name LIKE '%")
+                        .Format("Name like '%" + splitSearch.Replace("_", "").Replace(" ", "%' AND Name LIKE '%")
                             .Replace(" and ", " ").Replace(" the ", " ").Replace(":", "") + "%'").Trim();
                     if (dataGridView1.Rows.Count > 0)
                     {
@@ -1229,17 +1230,17 @@ public partial class SteamAppId : Form
                     }
                     else
                     {
-                        Search = searchTextBox.Text.ToLower();
-                        if (Search.StartsWith("$"))
+                        search = searchTextBox.Text.ToLower();
+                        if (search.StartsWith("$"))
                         {
                             ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-                                Search.Replace("$", "").Replace("&", "and").Replace(":", " -") + "'");
+                                search.Replace("$", "").Replace("&", "and").Replace(":", " -") + "'");
                         }
                         else
                         {
-                            Search = RemoveSpecialCharacters(searchTextBox.Text.ToLower());
+                            search = RemoveSpecialCharacters(searchTextBox.Text.ToLower());
                             ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '%" +
-                                Search.Replace(" ", "%' AND Name LIKE '%").Replace(" and ", "").Replace(" & ", "")
+                                search.Replace(" ", "%' AND Name LIKE '%").Replace(" and ", "").Replace(" & ", "")
                                     .Replace(":", "") + "%'");
                         }
 
@@ -1248,7 +1249,7 @@ public partial class SteamAppId : Form
                         if (BackPressed)
                         {
                             SearchPause = true;
-                            t1.Start();
+                            T1.Start();
                         }
 
                         dataGridView1.ClearSelection();
@@ -1294,8 +1295,8 @@ public partial class SteamAppId : Form
                                     Color.Orange);
                                 btnManualEntry.Visible = true; // Make sure manual entry button is visible
                                 resinstruccZip.Visible = true;
-                                resinstruccZipTimer.Stop();
-                                resinstruccZipTimer.Start(); // Start 30 second timer
+                                _resinstruccZipTimer.Stop();
+                                _resinstruccZipTimer.Start(); // Start 30 second timer
                                 mainPanel.Visible = false; // Hide main panel so dataGridView is visible
                                 searchTextBox.Enabled = true; // Enable search when AppID panel shows
                                 // Don't show any popup - user can click Manual Entry if they want
@@ -1311,7 +1312,7 @@ public partial class SteamAppId : Form
             // Only auto-select if this is the INITIAL folder search AND exactly 1 match
             if (dataGridView1.Rows.Count == 1)
             {
-                if (isInitialFolderSearch)
+                if (_isInitialFolderSearch)
                 {
                     // This is THE initial folder search with 1 match - auto-select it
                     SetSelectedGame(0);
@@ -1328,23 +1329,23 @@ public partial class SteamAppId : Form
                 // More than 1 match = no perfect match, show manual entry option
                 btnManualEntry.Visible = true;
                 resinstruccZip.Visible = true;
-                resinstruccZipTimer.Stop();
-                resinstruccZipTimer.Start(); // Start 30 second timer
+                _resinstruccZipTimer.Stop();
+                _resinstruccZipTimer.Start(); // Start 30 second timer
             }
 
             // Clear the initial folder search flag - any further typing is manual
-            isInitialFolderSearch = false;
+            _isInitialFolderSearch = false;
 
             // Fallback: If we still have no game selected but we do have search results, ensure buttons are visible
             if (string.IsNullOrEmpty(CurrentAppId) && dataGridView1.Rows.Count > 1)
             {
                 btnManualEntry.Visible = true;
                 resinstruccZip.Visible = true;
-                resinstruccZipTimer.Stop();
-                resinstruccZipTimer.Start(); // Start 30 second timer
+                _resinstruccZipTimer.Stop();
+                _resinstruccZipTimer.Start(); // Start 30 second timer
             }
 
-            textChanged = false;
+            _textChanged = false;
         }
         catch { }
         // Remove duplicate auto-selection code that was causing issues
@@ -1352,16 +1353,16 @@ public partial class SteamAppId : Form
 
     private void dataGridView1_RowHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
     {
-        if (VRLExists)
+        if (VrlExists)
         {
-            string PropName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
-            File.WriteAllText($"{APPDATA}\\VRL\\ProperName.txt", PropName);
+            string propName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
+            File.WriteAllText($"{Appdata}\\VRL\\ProperName.txt", propName);
         }
 
         Tit("READY! Click skull folder above to perform crack!", Color.LightSkyBlue);
         CurrentAppId = dataGridView1[1, CurrentCell].Value.ToString();
-        APPNAME = dataGridView1[0, CurrentCell].Value.ToString().Trim();
-        Tat($"{APPNAME} ({CurrentAppId})");
+        Appname = dataGridView1[0, CurrentCell].Value.ToString().Trim();
+        Tat($"{Appname} ({CurrentAppId})");
         searchTextBox.Clear();
         searchTextBox.Enabled = false;
         mainPanel.Visible = true;
@@ -1370,7 +1371,7 @@ public partial class SteamAppId : Form
         resinstruccZip.Visible = false;
 
         // Auto-crack if enabled
-        if (autoCrackEnabled && !string.IsNullOrEmpty(gameDir))
+        if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
         {
             Tit("Autocracking...", Color.Yellow);
             // Trigger crack just like clicking the button
@@ -1452,19 +1453,19 @@ public partial class SteamAppId : Form
         if (result == DialogResult.Yes)
         {
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string gameFolderName = Path.GetFileName(gameDir);
+            string gameFolderName = Path.GetFileName(_gameDir);
             string newGameDir = Path.Combine(desktopPath, gameFolderName);
 
             try
             {
-                Tit($"Copying game from {gameDir} to Desktop...", Color.Yellow);
+                Tit($"Copying game from {_gameDir} to Desktop...", Color.Yellow);
 
                 // Copy all files recursively
-                await Task.Run(() => CopyDirectory(gameDir, newGameDir));
+                await Task.Run(() => CopyDirectory(_gameDir, newGameDir));
 
                 // Update gameDir to the new location
-                gameDir = newGameDir;
-                Tat(gameDir); // Update the displayed directory
+                _gameDir = newGameDir;
+                Tat(_gameDir); // Update the displayed directory
 
                 Tit("Game copied to Desktop! Retrying crack with new location...", Color.Lime);
 
@@ -1530,31 +1531,31 @@ public partial class SteamAppId : Form
     private async Task<bool> CrackCoreAsync() // Core cracking logic moved to separate method
     {
         int execount = -20;
-        int steam64count = -1;
+        int steam64Count = -1;
         int steamcount = -1;
         string parentdir = "";
 
         bool cracked = false;
         bool steamlessUnpacked = false; // Track if Steamless unpacked anything
-        string originalGameDir = gameDir; // Keep track of original location
+        string originalGameDir = _gameDir; // Keep track of original location
 
         // Initialize crack details tracking
         CurrentCrackDetails = new CrackDetails
         {
-            GameName = gameDirName ?? Path.GetFileName(gameDir), GamePath = gameDir, AppId = CurrentAppId
+            GameName = _gameDirName ?? Path.GetFileName(_gameDir), GamePath = _gameDir, AppId = CurrentAppId
         };
 
         Debug.WriteLine("[CRACK] === Starting CrackCoreAsync ===");
-        Debug.WriteLine($"[CRACK] Game Directory: {gameDir}");
+        Debug.WriteLine($"[CRACK] Game Directory: {_gameDir}");
         Debug.WriteLine($"[CRACK] AppID: {CurrentAppId}");
         Debug.WriteLine($"[CRACK] Current Directory: {Environment.CurrentDirectory}");
         LogHelper.Log(
-            $"[CRACK] === Starting crack for: {gameDirName ?? Path.GetFileName(gameDir)} (AppID: {CurrentAppId}) ===");
-        LogHelper.Log($"[CRACK] Path: {gameDir}");
+            $"[CRACK] === Starting crack for: {_gameDirName ?? Path.GetFileName(_gameDir)} (AppID: {CurrentAppId}) ===");
+        LogHelper.Log($"[CRACK] Path: {_gameDir}");
 
         try
         {
-            var files = Directory.GetFiles(gameDir, "*.*", SearchOption.AllDirectories);
+            var files = Directory.GetFiles(_gameDir, "*.*", SearchOption.AllDirectories);
             Debug.WriteLine($"[CRACK] Found {files.Length} files total");
             LogHelper.Log($"[CRACK] Found {files.Length} files, scanning for DLLs and EXEs...");
 
@@ -1564,7 +1565,7 @@ public partial class SteamAppId : Form
                 if (file.EndsWith("steam_api64.dll"))
                 {
                     Debug.WriteLine($"[CRACK] Found steam_api64.dll: {file}");
-                    steam64count++;
+                    steam64Count++;
                     parentdir = Directory.GetParent(file).FullName;
                     string steam = $"{parentdir}\\steam_settings";
                     if (Directory.Exists(steam))
@@ -1587,12 +1588,12 @@ public partial class SteamAppId : Form
                     }
 
                     Tit("Replacing steam_api64.dll.", Color.LightSkyBlue);
-                    string emulatorName = goldy ? "Goldberg" : "ALI213";
+                    string emulatorName = Goldy ? "Goldberg" : "ALI213";
                     CrackStatusChanged?.Invoke(this, $"Applying {emulatorName} emulator...");
 
                     try
                     {
-                        string sourceEmulatorDll = goldy
+                        string sourceEmulatorDll = Goldy
                             ? $"{BinPath}\\Goldberg\\steam_api64.dll"
                             : $"{BinPath}\\ALI213\\steam_api64.dll";
 
@@ -1609,7 +1610,7 @@ public partial class SteamAppId : Form
                             // Create backup and replace with emulator
                             File.Move(file, $"{file}.bak");
                             CurrentCrackDetails.DllsBackedUp.Add(file);
-                            if (goldy)
+                            if (Goldy)
                             {
                                 Directory.CreateDirectory(steam);
                             }
@@ -1631,7 +1632,7 @@ public partial class SteamAppId : Form
                         return false;
                     }
 
-                    if (!goldy)
+                    if (!Goldy)
                     {
                         if (File.Exists(parentdir + "\\SteamConfig.ini"))
                         {
@@ -1673,12 +1674,12 @@ public partial class SteamAppId : Form
 
                     try
                     {
-                        string sourceEmulatorDll = goldy
+                        string sourceEmulatorDll = Goldy
                             ? $"{BinPath}\\Goldberg\\steam_api.dll"
                             : $"{BinPath}\\ALI213\\steam_api.dll";
 
                         // Check if current file is already the emulator DLL
-                        string emulatorName = goldy ? "Goldberg" : "ALI213";
+                        string emulatorName = Goldy ? "Goldberg" : "ALI213";
                         if (AreFilesIdentical(file, sourceEmulatorDll))
                         {
                             Debug.WriteLine(
@@ -1691,7 +1692,7 @@ public partial class SteamAppId : Form
                             // Create backup and replace with emulator
                             File.Move(file, $"{file}.bak");
                             CurrentCrackDetails.DllsBackedUp.Add(file);
-                            if (goldy)
+                            if (Goldy)
                             {
                                 Directory.CreateDirectory(steam);
                             }
@@ -1713,7 +1714,7 @@ public partial class SteamAppId : Form
                         return false;
                     }
 
-                    if (!goldy)
+                    if (!Goldy)
                     {
                         try
                         {
@@ -1802,11 +1803,11 @@ public partial class SteamAppId : Form
 
                     await Task.Run(() => x2.WaitForExit());
 
-                    string Output = await errorTask + await outputTask;
+                    string output = await errorTask + await outputTask;
 
-                    Debug.WriteLine($"[CRACK] Steamless output: {Output}");
+                    Debug.WriteLine($"[CRACK] Steamless output: {output}");
                     Debug.WriteLine($"[CRACK] Steamless exit code: {x2.ExitCode}");
-                    LogHelper.Log($"[STEAMLESS] Exit code: {x2.ExitCode}, Output: {Output.Trim()}");
+                    LogHelper.Log($"[STEAMLESS] Exit code: {x2.ExitCode}, Output: {output.Trim()}");
 
                     if (File.Exists($"{file}.unpacked.exe"))
                     {
@@ -1825,9 +1826,9 @@ public partial class SteamAppId : Form
                     }
                 }
 
-                if (steamcount > 1 || execount > 1 || steam64count > 1)
+                if (steamcount > 1 || execount > 1 || steam64Count > 1)
                 {
-                    DialogResult Diagg = MessageBox.Show(
+                    DialogResult diagg = MessageBox.Show(
                         "This is the 2nd steam_api64.dll on this run - something is broken. " +
                         "The APPID has to match the ini/txt files or the cracks will not work.\n\n" +
                         "This usually happens when SACGUI determines the wrong parent dir " +
@@ -1837,10 +1838,10 @@ public partial class SteamAppId : Form
                         "-INCORRECT-\nD:\\SteamLibrary\\Common\n\n" +
                         "If you think this message is wrong, verify the path on bottom left and hit YES to continue..",
                         "Somethings wrong..., continue?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
-                    if (Diagg == DialogResult.Yes)
+                    if (diagg == DialogResult.Yes)
                     {
                         execount = -600;
-                        steam64count = -600;
+                        steam64Count = -600;
                         steamcount = -600;
                     }
                     else
@@ -1853,7 +1854,7 @@ public partial class SteamAppId : Form
 
             if (cracked)
             {
-                if (goldy)
+                if (Goldy)
                 {
                     if (Directory.Exists($"{parentdir}\\steam_settings"))
                     {
@@ -1866,7 +1867,7 @@ public partial class SteamAppId : Form
                     File.WriteAllText($"{parentdir}\\steam_settings\\steam_appid.txt", CurrentAppId);
 
                     // Check if user wants LAN multiplayer support (from checkbox)
-                    if (enableLanMultiplayer)
+                    if (EnableLanMultiplayer)
                     {
                         // Create custom_broadcasts.txt for multiplayer discovery
                         // Just a simple list of IPs, one per line
@@ -1903,14 +1904,14 @@ public partial class SteamAppId : Form
                             string lobbyConnectFileName =
                                 Path.GetFileName(lobbyConnectSource); // e.g. lobby_connect_x64.exe
                             string lobbyConnectDest =
-                                Path.Combine(gameDir, $"_{lobbyConnectFileName}"); // e.g. _lobby_connect_x64.exe
+                                Path.Combine(_gameDir, $"_{lobbyConnectFileName}"); // e.g. _lobby_connect_x64.exe
 
-                            Tit($"Copying lobby_connect to game folder: {gameDir}", Color.Yellow);
+                            Tit($"Copying lobby_connect to game folder: {_gameDir}", Color.Yellow);
                             File.Copy(lobbyConnectSource, lobbyConnectDest, true);
 
                             // Find the main game executable IN THE GAME DIRECTORY
                             string gameExe = "";
-                            var exeFiles = Directory.GetFiles(gameDir, "*.exe", SearchOption.TopDirectoryOnly)
+                            var exeFiles = Directory.GetFiles(_gameDir, "*.exe", SearchOption.TopDirectoryOnly)
                                 .Where(f => !f.Contains("lobby_connect") &&
                                             !f.Contains("UnityCrashHandler") &&
                                             !f.Contains("unins") &&
@@ -1926,7 +1927,7 @@ public partial class SteamAppId : Form
                                 // Try to find the most likely game exe
                                 gameExe = exeFiles.FirstOrDefault(f =>
                                               Path.GetFileNameWithoutExtension(f).ToLower()
-                                                  .Contains(gameDirName.ToLower()))
+                                                  .Contains(_gameDirName.ToLower()))
                                           ?? exeFiles[0];
                             }
 
@@ -1937,7 +1938,7 @@ public partial class SteamAppId : Form
 
                                 // Save the game exe path for lobby_connect
                                 string lobbyConfigFile = Path.GetFileNameWithoutExtension(lobbyConnectSource) + ".txt";
-                                File.WriteAllText(Path.Combine(gameDir, lobbyConfigFile), gameExe);
+                                File.WriteAllText(Path.Combine(_gameDir, lobbyConfigFile), gameExe);
 
                                 // Create batch files in steam_settings folder (tucked away)
                                 string steamSettingsPath = Path.Combine(parentdir, "steam_settings");
@@ -1946,7 +1947,7 @@ public partial class SteamAppId : Form
                                 string lobbyExeName =
                                     "_" + Path.GetFileName(lobbyConnectSource); // e.g. _lobby_connect_x64.exe
                                 string joinBatchContent = $@"@echo off
-cd /d ""{gameDir}""
+cd /d ""{_gameDir}""
 echo Searching for LAN games and connecting...
 {lobbyExeName} --connect ""{Path.GetFileName(gameExe)}""
 if errorlevel 1 (
@@ -1957,7 +1958,7 @@ exit";
 
                                 // Host batch - just launches the game normally
                                 string hostBatchContent = $@"@echo off
-cd /d ""{gameDir}""
+cd /d ""{_gameDir}""
 start """" ""{Path.GetFileName(gameExe)}""
 exit";
 
@@ -1997,9 +1998,9 @@ exit";
                                     string gameName = Path.GetFileNameWithoutExtension(gameExe);
 
                                     // Shortcuts in game folder
-                                    string joinShortcutPath = Path.Combine(gameDir, $"_[Join LAN] {gameName}.lnk");
-                                    string hostShortcutPath = Path.Combine(gameDir, $"_[Host LAN] {gameName}.lnk");
-                                    string editIPsShortcutPath = Path.Combine(gameDir, "_[Edit Multiplayer IPs].lnk");
+                                    string joinShortcutPath = Path.Combine(_gameDir, $"_[Join LAN] {gameName}.lnk");
+                                    string hostShortcutPath = Path.Combine(_gameDir, $"_[Host LAN] {gameName}.lnk");
+                                    string editIPsShortcutPath = Path.Combine(_gameDir, "_[Edit Multiplayer IPs].lnk");
 
                                     Tit($"Creating shortcuts in game folder for {gameName}", Color.Yellow);
 
@@ -2010,7 +2011,7 @@ Set oWS = WScript.CreateObject(""WScript.Shell"")
 ' Join LAN shortcut
 Set oLink = oWS.CreateShortcut(""{joinShortcutPath.Replace("\\", "\\\\").Replace("\"", "\"\"")}"")
 oLink.TargetPath = ""{joinBatchPath.Replace("\\", "\\\\").Replace("\"", "\"\"")}""
-oLink.WorkingDirectory = ""{gameDir.Replace("\\", "\\\\").Replace("\"", "\"\"")}""
+oLink.WorkingDirectory = ""{_gameDir.Replace("\\", "\\\\").Replace("\"", "\"\"")}""
 oLink.Description = ""Search and join LAN/Internet games for {gameName.Replace("\"", "\"\"")}""
 oLink.IconLocation = ""{gameExe.Replace("\\", "\\\\").Replace("\"", "\\\\")},0""
 oLink.Save
@@ -2018,7 +2019,7 @@ oLink.Save
 ' Host LAN shortcut
 Set oLink2 = oWS.CreateShortcut(""{hostShortcutPath.Replace("\\", "\\\\").Replace("\"", "\"\"")}"")
 oLink2.TargetPath = ""{hostBatchPath.Replace("\\", "\\\\").Replace("\"", "\"\"")}""
-oLink2.WorkingDirectory = ""{gameDir.Replace("\\", "\\\\").Replace("\"", "\"\"")}""
+oLink2.WorkingDirectory = ""{_gameDir.Replace("\\", "\\\\").Replace("\"", "\"\"")}""
 oLink2.Description = ""Host a LAN/Internet game for {gameName.Replace("\"", "\"\"")}""
 oLink2.IconLocation = ""{gameExe.Replace("\\", "\\\\").Replace("\"", "\\\\")},0""
 oLink2.Save
@@ -2168,7 +2169,7 @@ oLink3.Save";
                     Tit("Getting DLC info from Steam...", Color.Cyan);
                     try
                     {
-                        await FetchDLCInfoAsync(CurrentAppId, $"{parentdir}\\steam_settings");
+                        await FetchDlcInfoAsync(CurrentAppId, $"{parentdir}\\steam_settings");
                     }
                     catch (Exception ex)
                     {
@@ -2219,17 +2220,17 @@ oLink3.Save";
 
     public void IniFileEdit(string args)
     {
-        var IniProcess = new Process();
-        IniProcess.StartInfo.CreateNoWindow = true;
-        IniProcess.StartInfo.UseShellExecute = false;
-        IniProcess.StartInfo.FileName = $"{BinPath}\\ALI213\\inifile.exe";
+        var iniProcess = new Process();
+        iniProcess.StartInfo.CreateNoWindow = true;
+        iniProcess.StartInfo.UseShellExecute = false;
+        iniProcess.StartInfo.FileName = $"{BinPath}\\ALI213\\inifile.exe";
 
-        IniProcess.StartInfo.Arguments = args;
-        IniProcess.Start();
-        IniProcess.WaitForExit();
+        iniProcess.StartInfo.Arguments = args;
+        iniProcess.Start();
+        iniProcess.WaitForExit();
     }
 
-    private async Task FetchDLCInfoAsync(string appId, string outputFolder)
+    private async Task FetchDlcInfoAsync(string appId, string outputFolder)
     {
         using var httpClient = new HttpClient();
         httpClient.Timeout = TimeSpan.FromSeconds(30);
@@ -2305,7 +2306,7 @@ oLink3.Save";
     // Public method to suppress status updates when cracking from share window
     public void SetSuppressStatusUpdates(bool suppress)
     {
-        suppressStatusUpdates = suppress;
+        _suppressStatusUpdates = suppress;
     }
 
     private void pictureBox2_Click(object sender, EventArgs e)
@@ -2319,7 +2320,7 @@ oLink3.Save";
 
         if (folderSelectDialog.Show(Handle))
         {
-            gameDir = folderSelectDialog.FileName;
+            _gameDir = folderSelectDialog.FileName;
 
             // Hide crack buttons when starting new game selection
             HideCrackButtons();
@@ -2327,7 +2328,7 @@ oLink3.Save";
             // Always remember parent folder for next time
             try
             {
-                var parent = Directory.GetParent(gameDir);
+                var parent = Directory.GetParent(_gameDir);
                 if (parent != null)
                 {
                     _settings.LastDir = parent.FullName;
@@ -2337,11 +2338,11 @@ oLink3.Save";
             catch { }
 
             // Check if this is a folder containing multiple games (batch mode)
-            var gamesInFolder = DetectGamesInFolder(gameDir);
+            var gamesInFolder = DetectGamesInFolder(_gameDir);
             if (gamesInFolder.Count > 1)
             {
                 // Multiple games detected - batch folder
-                _settings.LastDir = gameDir;
+                _settings.LastDir = _gameDir;
                 AppSettings.Default.Save();
                 ShowBatchGameSelection(gamesInFolder);
                 return;
@@ -2350,15 +2351,15 @@ oLink3.Save";
             if (gamesInFolder.Count == 1)
             {
                 // Contains exactly one game subfolder - use that
-                gameDir = gamesInFolder[0];
-                gameDirName = Path.GetFileName(gameDir);
+                _gameDir = gamesInFolder[0];
+                _gameDirName = Path.GetFileName(_gameDir);
             }
-            else if (!IsGameFolder(gameDir))
+            else if (!IsGameFolder(_gameDir))
             {
                 // Not a game folder, not a batch folder - check if they selected something weird
                 try
                 {
-                    var steamApiFiles = Directory.GetFiles(gameDir, "steam_api*.dll", SearchOption.AllDirectories)
+                    var steamApiFiles = Directory.GetFiles(_gameDir, "steam_api*.dll", SearchOption.AllDirectories)
                         .Where(f => !f.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)).ToList();
 
                     if (steamApiFiles.Count > 2)
@@ -2368,7 +2369,7 @@ oLink3.Save";
                             "Unusual Folder Structure",
                             $"Found {steamApiFiles.Count} steam_api DLLs but couldn't detect game folders.\n" +
                             $"Did you accidentally select a root drive or system folder?",
-                            gameDir,
+                            _gameDir,
                             "Continue anyway",
                             "Cancel");
 
@@ -2385,11 +2386,11 @@ oLink3.Save";
             OpenDir.Visible = false;
             OpenDir.SendToBack();
             ZipToShare.Visible = false;
-            parentOfSelection = Directory.GetParent(gameDir).FullName;
-            gameDirName = Path.GetFileName(gameDir);
+            _parentOfSelection = Directory.GetParent(_gameDir).FullName;
+            _gameDirName = Path.GetFileName(_gameDir);
 
             // Try to get AppID from Steam manifest files
-            var manifestInfo = SteamManifestParser.GetAppIdFromManifest(gameDir);
+            var manifestInfo = SteamManifestParser.GetAppIdFromManifest(_gameDir);
             if (manifestInfo.HasValue)
             {
                 // We found the AppID from manifest!
@@ -2407,16 +2408,16 @@ oLink3.Save";
                 searchTextBox.Enabled = false;
                 mainPanel.Visible = true;
                 resinstruccZip.Visible = true;
-                resinstruccZipTimer.Stop();
-                resinstruccZipTimer.Start();
+                _resinstruccZipTimer.Stop();
+                _resinstruccZipTimer.Start();
                 startCrackPic.Visible = true;
 
                 // Skip the search entirely
-                isFirstClickAfterSelection = false;
-                isInitialFolderSearch = false;
+                _isFirstClickAfterSelection = false;
+                _isInitialFolderSearch = false;
 
                 // Auto-crack if enabled
-                if (autoCrackEnabled && !string.IsNullOrEmpty(gameDir))
+                if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
                 {
                     Debug.WriteLine("[MANIFEST] Auto-crack enabled, starting crack...");
                     Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Auto-cracking...",
@@ -2436,8 +2437,8 @@ oLink3.Save";
                 // No manifest found, proceed with normal search flow
                 btnManualEntry.Visible = true;
                 resinstruccZip.Visible = true;
-                resinstruccZipTimer.Stop();
-                resinstruccZipTimer.Start(); // Start 30 second timer
+                _resinstruccZipTimer.Stop();
+                _resinstruccZipTimer.Start(); // Start 30 second timer
                 mainPanel.Visible = false; // Hide mainPanel so dataGridView is visible
                 searchTextBox.Enabled = true; // Enable search when AppID panel shows
 
@@ -2446,15 +2447,15 @@ oLink3.Save";
                     Color.LightSkyBlue);
 
                 // Trigger the search
-                isFirstClickAfterSelection = true; // Set before changing text
-                isInitialFolderSearch = true; // This is the initial search from folder
-                searchTextBox.Text = gameDirName;
+                _isFirstClickAfterSelection = true; // Set before changing text
+                _isInitialFolderSearch = true; // This is the initial search from folder
+                searchTextBox.Text = _gameDirName;
             }
 
             // Stop label5 timer when game dir is selected
-            label5Timer.Stop();
+            _label5Timer.Stop();
             label5.Visible = false;
-            _settings.LastDir = parentOfSelection;
+            _settings.LastDir = _parentOfSelection;
             AppSettings.Default.Save();
         }
         else
@@ -2465,16 +2466,16 @@ oLink3.Save";
 
     private async void startCrackPic_Click(object sender, EventArgs e)
     {
-        if (!cracking)
+        if (!Cracking)
         {
-            cracking = true;
+            Cracking = true;
 
             // Hide OpenDir and ZipToShare during cracking
             OpenDir.Visible = false;
             ZipToShare.Visible = false;
 
             bool crackedSuccessfully = await CrackAsync();
-            cracking = false;
+            Cracking = false;
 
             // Check if we actually cracked anything
             if (crackedSuccessfully)
@@ -2503,8 +2504,8 @@ oLink3.Save";
 
     private void lanMultiplayerCheckBox_CheckedChanged(object sender, EventArgs e)
     {
-        enableLanMultiplayer = lanMultiplayerCheckBox.Checked;
-        AppSettings.Default.LANMultiplayer = enableLanMultiplayer;
+        EnableLanMultiplayer = lanMultiplayerCheckBox.Checked;
+        AppSettings.Default.LanMultiplayer = EnableLanMultiplayer;
         AppSettings.Default.Save();
     }
 
@@ -2512,19 +2513,19 @@ oLink3.Save";
     {
         if (dllSelect.SelectedIndex == 0)
         {
-            goldy = true;
+            Goldy = true;
             _settings.Goldy = true;
             // Show LAN checkbox for Goldberg
             lanMultiplayerCheckBox.Visible = true;
         }
         else if (dllSelect.SelectedIndex == 1)
         {
-            goldy = false;
+            Goldy = false;
             _settings.Goldy = false;
             // Hide LAN checkbox for Ali213 (not supported)
             lanMultiplayerCheckBox.Visible = false;
             lanMultiplayerCheckBox.Checked = false;
-            enableLanMultiplayer = false;
+            EnableLanMultiplayer = false;
         }
 
         AppSettings.Default.Save();
@@ -2602,16 +2603,16 @@ oLink3.Save";
                 }
 
                 //DIR
-                gameDir = d;
+                _gameDir = d;
 
                 // Hide OpenDir and ZipToShare when new directory selected
                 OpenDir.Visible = false;
                 ZipToShare.Visible = false;
-                parentOfSelection = Directory.GetParent(gameDir).FullName;
-                gameDirName = Path.GetFileName(gameDir);
+                _parentOfSelection = Directory.GetParent(_gameDir).FullName;
+                _gameDirName = Path.GetFileName(_gameDir);
 
                 // Try to get AppID from Steam manifest files
-                var manifestInfo = SteamManifestParser.GetAppIdFromManifest(gameDir);
+                var manifestInfo = SteamManifestParser.GetAppIdFromManifest(_gameDir);
                 if (manifestInfo.HasValue)
                 {
                     // We found the AppID from manifest!
@@ -2629,16 +2630,16 @@ oLink3.Save";
                     searchTextBox.Enabled = false;
                     mainPanel.Visible = true;
                     resinstruccZip.Visible = true;
-                    resinstruccZipTimer.Stop();
-                    resinstruccZipTimer.Start();
+                    _resinstruccZipTimer.Stop();
+                    _resinstruccZipTimer.Start();
                     startCrackPic.Visible = true;
 
                     // Skip the search entirely
-                    isInitialFolderSearch = false;
-                    isFirstClickAfterSelection = false;
+                    _isInitialFolderSearch = false;
+                    _isFirstClickAfterSelection = false;
 
                     // Auto-crack if enabled
-                    if (autoCrackEnabled && !string.IsNullOrEmpty(gameDir))
+                    if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
                     {
                         Debug.WriteLine("[MANIFEST] Auto-crack enabled, starting crack...");
                         Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Auto-cracking...",
@@ -2660,26 +2661,26 @@ oLink3.Save";
                     searchTextBox.Enabled = true; // Enable search when AppID panel shows
                     btnManualEntry.Visible = true;
                     resinstruccZip.Visible = true; // Show this too!
-                    resinstruccZipTimer.Stop();
-                    resinstruccZipTimer.Start(); // Start 30 second timer
+                    _resinstruccZipTimer.Stop();
+                    _resinstruccZipTimer.Start(); // Start 30 second timer
                     startCrackPic.Visible = true;
                     Tit("Please select the correct game from the list!! (if list empty do manual search!)",
                         Color.LightSkyBlue);
 
                     // Trigger the search
-                    isInitialFolderSearch = true; // This is the initial search
-                    searchTextBox.Text = gameDirName;
-                    isFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
+                    _isInitialFolderSearch = true; // This is the initial search
+                    searchTextBox.Text = _gameDirName;
+                    _isFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
                 }
 
                 // Stop label5 timer when game dir is selected
-                label5Timer.Stop();
+                _label5Timer.Stop();
                 label5.Visible = false;
 
-                isInitialFolderSearch = true; // This is the initial search
-                searchTextBox.Text = gameDirName;
-                isFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
-                _settings.LastDir = parentOfSelection;
+                _isInitialFolderSearch = true; // This is the initial search
+                searchTextBox.Text = _gameDirName;
+                _isFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
+                _settings.LastDir = _parentOfSelection;
                 AppSettings.Default.Save();
             }
             else
@@ -2702,9 +2703,9 @@ oLink3.Save";
         AppSettings.Default.Save();
 
         // Unpin share window too if it's open
-        if (shareWindow is { IsDisposed: false })
+        if (_shareWindow is { IsDisposed: false })
         {
-            shareWindow.TopMost = false;
+            _shareWindow.TopMost = false;
         }
     }
 
@@ -2716,15 +2717,15 @@ oLink3.Save";
         AppSettings.Default.Save();
 
         // Pin share window too if it's open
-        if (shareWindow is { IsDisposed: false })
+        if (_shareWindow is { IsDisposed: false })
         {
-            shareWindow.TopMost = true;
+            _shareWindow.TopMost = true;
         }
     }
 
     private void autoCrackOff_Click(object sender, EventArgs e)
     {
-        autoCrackEnabled = true;
+        AutoCrackEnabled = true;
         autoCrackOn.BringToFront();
         AppSettings.Default.AutoCrack = true;
         AppSettings.Default.Save();
@@ -2732,7 +2733,7 @@ oLink3.Save";
 
     private void autoCrackOn_Click(object sender, EventArgs e)
     {
-        autoCrackEnabled = false;
+        AutoCrackEnabled = false;
         autoCrackOff.BringToFront();
         AppSettings.Default.AutoCrack = false;
         AppSettings.Default.Save();
@@ -2740,12 +2741,12 @@ oLink3.Save";
 
     private void SteamAppId_FormClosing(object sender, FormClosingEventArgs e)
     {
-        Program.CmdKILL("APPID");
+        Program.CmdKill("APPID");
     }
 
     private void OpenDir_Click(object sender, EventArgs e)
     {
-        Process.Start("explorer.exe", gameDir);
+        Process.Start("explorer.exe", _gameDir);
     }
 
     // Override KeyProcessCmdKey to catch Ctrl+S
@@ -2783,9 +2784,9 @@ oLink3.Save";
         try
         {
             // Store original gameDir and restore after
-            var originalGameDir = gameDir;
-            gameDir = gamePath;
-            gameDirName = gameName;
+            var originalGameDir = _gameDir;
+            _gameDir = gamePath;
+            _gameDirName = gameName;
 
             if (crack)
             {
@@ -2802,7 +2803,7 @@ oLink3.Save";
                 if (!crackSuccess)
                 {
                     MessageBox.Show($"Failed to crack {gameName}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    gameDir = originalGameDir;
+                    _gameDir = originalGameDir;
                     return;
                 }
             }
@@ -2816,7 +2817,7 @@ oLink3.Save";
 
                 if (compressionForm.ShowDialog() != DialogResult.OK)
                 {
-                    gameDir = originalGameDir;
+                    _gameDir = originalGameDir;
                     return;
                 }
 
@@ -2828,12 +2829,12 @@ oLink3.Save";
                     compressionForm.SelectedFormat,
                     compressionForm.SelectedLevel,
                     compressionForm.UploadToBackend,
-                    compressionForm.EncryptForRIN,
+                    compressionForm.EncryptForRin,
                     parentForm
                 );
             }
 
-            gameDir = originalGameDir;
+            _gameDir = originalGameDir;
         }
         catch (Exception ex)
         {
@@ -2842,7 +2843,7 @@ oLink3.Save";
     }
 
     private async Task CompressAndUploadAsync(string gamePath, string gameName, bool isCracked,
-        string format, string level, bool upload, bool encryptForRIN, Form parentForm)
+        string format, string level, bool upload, bool encryptForRin, Form parentForm)
     {
         try
         {
@@ -2860,7 +2861,7 @@ oLink3.Save";
             }
 
             // Perform compression
-            bool compressionSuccess = await CompressGameAsync(gamePath, zipPath, format, level, encryptForRIN);
+            bool compressionSuccess = await CompressGameAsync(gamePath, zipPath, format, level, encryptForRin);
 
             if (!compressionSuccess)
             {
@@ -2914,7 +2915,7 @@ oLink3.Save";
     }
 
     private async Task<bool> CompressGameAsync(string sourcePath, string outputPath, string format, string level,
-        bool encryptForRIN)
+        bool encryptForRin)
     {
         try
         {
@@ -2926,7 +2927,7 @@ oLink3.Save";
                 if (!File.Exists(sevenZipPath))
                 {
                     // Fall back to System.IO.Compression for basic zip without password
-                    if (format.ToLower() == "zip" && !encryptForRIN)
+                    if (format.ToLower() == "zip" && !encryptForRin)
                     {
                         await Task.Run(() =>
                         {
@@ -2965,7 +2966,7 @@ oLink3.Save";
 
             // Build command arguments
             string archiveType = format.ToLower() == "7z" ? "7z" : "zip";
-            string passwordArg = encryptForRIN ? "-p\"cs.rin.ru\" -mhe=on" : "";
+            string passwordArg = encryptForRin ? "-p\"cs.rin.ru\" -mhe=on" : "";
 
             // Add -bsp1 to get progress percentage output
             string arguments =
@@ -3061,10 +3062,10 @@ oLink3.Save";
 
             // Check file size before upload
             var uploadFileInfo = new FileInfo(filePath);
-            var fileSizeMB = uploadFileInfo.Length / (1024.0 * 1024.0);
-            Debug.WriteLine($"[UPLOAD] File size: {fileSizeMB:F2} MB");
+            var fileSizeMb = uploadFileInfo.Length / (1024.0 * 1024.0);
+            Debug.WriteLine($"[UPLOAD] File size: {fileSizeMb:F2} MB");
 
-            if (fileSizeMB > 500)
+            if (fileSizeMb > 500)
             {
                 Debug.WriteLine("[UPLOAD] WARNING: File is larger than 500MB, may exceed server limits!");
 
@@ -3074,7 +3075,7 @@ oLink3.Save";
                     parentForm.Invoke(() =>
                     {
                         MessageBox.Show(
-                            $"File is {fileSizeMB:F0}MB. The server may reject files over 500MB.\n\nConsider using higher compression settings.",
+                            $"File is {fileSizeMb:F0}MB. The server may reject files over 500MB.\n\nConsider using higher compression settings.",
                             "Large File Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     });
                 }
@@ -3285,7 +3286,7 @@ oLink3.Save";
         // If button says "Cancel", cancel the compression
         if (ZipToShare.Text == "Cancel")
         {
-            zipCancellationTokenSource?.Cancel();
+            _zipCancellationTokenSource?.Cancel();
             ZipToShare.Text = "Zip Dir";
             // Reset button appearance (remove orange glow)
             ZipToShare.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
@@ -3300,7 +3301,7 @@ oLink3.Save";
 
         try
         {
-            string gameName = gameDirName;
+            string gameName = _gameDirName;
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
             string compressionType = AppSettings.Default.ZipFormat;
@@ -3338,9 +3339,9 @@ oLink3.Save";
             }
 
             // Prepare cancellation token but DON'T change button yet
-            zipCancellationTokenSource = new CancellationTokenSource();
+            _zipCancellationTokenSource = new CancellationTokenSource();
 
-            bool use7z = true; // Always use 7z for both .zip and .7z
+            bool use7Z = true; // Always use 7z for both .zip and .7z
             CompressionLevel compressionLevel;
 
             // Parse compression level from string
@@ -3381,8 +3382,8 @@ oLink3.Save";
             }
 
             // Determine file extension based on compression type
-            bool is7zFormat = compressionType.StartsWith("7Z");
-            string zipName = is7zFormat ? $"[SACGUI] {safeGameName}.7z" : $"[SACGUI] {safeGameName}.zip";
+            bool is7ZFormat = compressionType.StartsWith("7Z");
+            string zipName = is7ZFormat ? $"[SACGUI] {safeGameName}.7z" : $"[SACGUI] {safeGameName}.zip";
             zipPath = Path.Combine(desktopPath, zipName);
 
             // HSL to RGB converter for smooth color transitions
@@ -3437,7 +3438,7 @@ oLink3.Save";
                 return Color.FromArgb((int)(r * 255), (int)(g * 255), (int)(b * 255));
             }
 
-            if (use7z)
+            if (use7Z)
             {
                 // Show initial progress
                 Tit($"Starting 7z compression (level {levelNum})...", HslToRgb(0, 1.0, 0.75));
@@ -3448,7 +3449,7 @@ oLink3.Save";
                     double colorHue = 0;
 
                     // Check if cancelled before starting
-                    if (zipCancellationTokenSource.Token.IsCancellationRequested)
+                    if (_zipCancellationTokenSource.Token.IsCancellationRequested)
                     {
                         compressionCancelled = true;
                         return;
@@ -3468,52 +3469,52 @@ oLink3.Save";
                     string sevenZipPath = $"{BinPath}\\7z\\7za.exe";
 
                     // Build 7z command with actual compression level and progress output to stdout
-                    string formatType = is7zFormat ? "7z" : "zip";
+                    string formatType = is7ZFormat ? "7z" : "zip";
 
                     // Smart RAM detection - adapt dictionary size to available memory
                     string memParams = "";
                     if (formatType == "7z" && levelNum > 0)
                     {
                         // Get available physical memory using PerformanceCounter
-                        ulong availRAM = 1024; // Default 1GB if detection fails
+                        ulong availRam = 1024; // Default 1GB if detection fails
                         try
                         {
                             using var pc = new PerformanceCounter("Memory", "Available MBytes");
-                            availRAM = (ulong)pc.NextValue();
+                            availRam = (ulong)pc.NextValue();
                         }
                         catch
                         {
                             // Fallback to conservative default
-                            availRAM = 1024;
+                            availRam = 1024;
                         }
 
                         // Use 10% of available RAM for dictionary, with limits for 32-bit exe
-                        ulong targetDict = availRAM / 10;
+                        ulong targetDict = availRam / 10;
 
                         // Set dictionary based on available RAM and compression level
                         // 64-bit 7z.exe can use MUCH more memory!
                         int dictSize;
-                        if (availRAM < 2048) // Less than 2GB available
+                        if (availRam < 2048) // Less than 2GB available
                         {
                             dictSize = 64;
                         }
-                        else if (availRAM < 4096) // 2-4GB available
+                        else if (availRam < 4096) // 2-4GB available
                         {
                             dictSize = 128;
                         }
-                        else if (availRAM < 8192) // 4-8GB available
+                        else if (availRam < 8192) // 4-8GB available
                         {
                             dictSize = 256;
                         }
-                        else if (availRAM < 16384) // 8-16GB available
+                        else if (availRam < 16384) // 8-16GB available
                         {
                             dictSize = 512;
                         }
-                        else if (availRAM < 32768) // 16-32GB available
+                        else if (availRam < 32768) // 16-32GB available
                         {
                             dictSize = 1024; // 1GB dictionary
                         }
-                        else if (availRAM < 65536) // 32-64GB available
+                        else if (availRam < 65536) // 32-64GB available
                         {
                             dictSize = 1536; // 1.5GB dictionary
                         }
@@ -3540,10 +3541,10 @@ oLink3.Save";
 
                         memParams = $" -md={dictSize}m";
                         Debug.WriteLine(
-                            $"[7Z] Available RAM: {availRAM}MB, Using dictionary: {dictSize}MB for level {levelNum}");
+                            $"[7Z] Available RAM: {availRam}MB, Using dictionary: {dictSize}MB for level {levelNum}");
                     }
 
-                    string args = $"a -mx{levelNum} -t{formatType}{memParams} -bsp1 \"{zipPath}\" \"{gameDir}\"\\* -r";
+                    string args = $"a -mx{levelNum} -t{formatType}{memParams} -bsp1 \"{zipPath}\" \"{_gameDir}\"\\* -r";
 
                     var psi = new ProcessStartInfo
                     {
@@ -3611,7 +3612,7 @@ oLink3.Save";
                     // Wait for process with cancellation support and show progress
                     while (!p.HasExited)
                     {
-                        if (zipCancellationTokenSource.Token.IsCancellationRequested)
+                        if (_zipCancellationTokenSource.Token.IsCancellationRequested)
                         {
                             p.Kill();
                             compressionCancelled = true;
@@ -3642,7 +3643,7 @@ oLink3.Save";
                 // Use standard .NET zip (this shouldn't run since use7z is always true)
                 await Task.Run(async () =>
                 {
-                    var allFiles = Directory.GetFiles(gameDir, "*", SearchOption.AllDirectories);
+                    var allFiles = Directory.GetFiles(_gameDir, "*", SearchOption.AllDirectories);
                     int totalFiles = allFiles.Length;
                     int currentFile = 0;
                     double colorHue = 0;
@@ -3665,7 +3666,7 @@ oLink3.Save";
                             Tit($"{compressionText} {percentage}%", currentColor);
                         });
 
-                        string relativePath = file.Replace(gameDir + Path.DirectorySeparatorChar, "");
+                        string relativePath = file.Replace(_gameDir + Path.DirectorySeparatorChar, "");
                         var entry = archive.CreateEntry(Path.Combine(gameName, relativePath), compressionLevel);
                         await using (var entryStream = entry.Open())
                         await using (var fileStream = File.OpenRead(file))
@@ -3748,13 +3749,13 @@ oLink3.Save";
 
     private void ManAppBtn_Click(object sender, EventArgs e)
     {
-        if (ManAppBox.Text.Length > 2 && isnumeric)
+        if (ManAppBox.Text.Length > 2 && Isnumeric)
         {
             CurrentAppId = ManAppBox.Text;
-            APPNAME = "";
+            Appname = "";
 
             // Try to fetch game name from Steam API
-            FetchGameNameFromSteamAPI(CurrentAppId);
+            FetchGameNameFromSteamApi(CurrentAppId);
 
             searchTextBox.Clear();
             ManAppBox.Clear();
@@ -3768,7 +3769,7 @@ oLink3.Save";
             resinstruccZip.Visible = false;
 
             // Auto-crack if enabled
-            if (autoCrackEnabled && !string.IsNullOrEmpty(gameDir))
+            if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
             {
                 // Trigger crack just like clicking the button
                 startCrackPic_Click(null, null);
@@ -3787,22 +3788,22 @@ oLink3.Save";
         if (!double.TryParse(ManAppBox.Text, out parsedValue))
         {
             ManAppBox.Text = "";
-            isnumeric = false;
+            Isnumeric = false;
         }
 
         if (ManAppBox.Text.Length > 0)
         {
             ManAppBtn.Enabled = true;
-            isnumeric = true;
+            Isnumeric = true;
         }
         else
         {
-            isnumeric = false;
+            Isnumeric = false;
             ManAppBtn.Enabled = false;
         }
     }
 
-    private async void FetchGameNameFromSteamAPI(string appId)
+    private async void FetchGameNameFromSteamApi(string appId)
     {
         try
         {
@@ -3820,8 +3821,8 @@ oLink3.Save";
                     int endIndex = json.IndexOf("\"", nameIndex, StringComparison.Ordinal);
                     if (endIndex != -1)
                     {
-                        APPNAME = json.Substring(nameIndex, endIndex - nameIndex);
-                        Tat($"{APPNAME} ({appId})");
+                        Appname = json.Substring(nameIndex, endIndex - nameIndex);
+                        Tat($"{Appname} ({appId})");
                         return;
                     }
                 }
@@ -3850,13 +3851,13 @@ oLink3.Save";
     {
         if (e.KeyCode == Keys.Enter)
         {
-            if (ManAppBox.Text.Length > 2 && isnumeric)
+            if (ManAppBox.Text.Length > 2 && Isnumeric)
             {
                 CurrentAppId = ManAppBox.Text;
-                APPNAME = "";
+                Appname = "";
                 btnManualEntry.Visible = false;
                 // Try to fetch game name from Steam API
-                FetchGameNameFromSteamAPI(CurrentAppId);
+                FetchGameNameFromSteamApi(CurrentAppId);
 
                 searchTextBox.Clear();
                 searchTextBox.Enabled = false;
@@ -3870,7 +3871,7 @@ oLink3.Save";
                 resinstruccZip.Visible = false;
 
                 // Auto-crack if enabled
-                if (autoCrackEnabled && !string.IsNullOrEmpty(gameDir))
+                if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
                 {
                     // Trigger crack just like clicking the button
                     startCrackPic_Click(null, null);
@@ -3906,10 +3907,10 @@ oLink3.Save";
     private void searchTextBox_MouseClick(object sender, MouseEventArgs e)
     {
         // Only clear on FIRST click after folder/file selection
-        if (isFirstClickAfterSelection)
+        if (_isFirstClickAfterSelection)
         {
             searchTextBox.Clear();
-            isFirstClickAfterSelection = false; // Reset flag
+            _isFirstClickAfterSelection = false; // Reset flag
         }
     }
 
@@ -3919,16 +3920,16 @@ oLink3.Save";
         ActiveControl = null;
 
         // Prevent multiple share windows - reuse existing one
-        if (shareWindow is { IsDisposed: false })
+        if (_shareWindow is { IsDisposed: false })
         {
-            shareWindow.BringToFront();
-            shareWindow.Activate();
+            _shareWindow.BringToFront();
+            _shareWindow.Activate();
             return;
         }
 
         // Show the enhanced share window with your Steam games
-        shareWindow = new EnhancedShareWindow(this);
-        shareWindow.FormClosed += (s, args) =>
+        _shareWindow = new EnhancedShareWindow(this);
+        _shareWindow.FormClosed += (s, args) =>
         {
             // Reposition main form to center on where child was
             if (s is Form childForm)
@@ -3938,33 +3939,33 @@ oLink3.Save";
                 Location = new Point(Math.Max(0, newX), Math.Max(0, newY));
             }
 
-            shareWindow = null;
+            _shareWindow = null;
             Show();
         };
 
         // Position share window centered on main form's location
-        shareWindow.StartPosition = FormStartPosition.Manual;
-        int centerX = Location.X + (Width - shareWindow.Width) / 2;
-        int centerY = Location.Y + (Height - shareWindow.Height) / 2;
-        shareWindow.Location = new Point(Math.Max(0, centerX), Math.Max(0, centerY));
+        _shareWindow.StartPosition = FormStartPosition.Manual;
+        int centerX = Location.X + (Width - _shareWindow.Width) / 2;
+        int centerY = Location.Y + (Height - _shareWindow.Height) / 2;
+        _shareWindow.Location = new Point(Math.Max(0, centerX), Math.Max(0, centerY));
 
         // Sync window state - restoring either window restores both
-        shareWindow.Resize += ShareWindow_Resize;
+        _shareWindow.Resize += ShareWindow_Resize;
 
         // Sync pin state - use actual saved setting, not the form's TopMost which might be wrong
-        shareWindow.TopMost = AppSettings.Default.Pinned;
+        _shareWindow.TopMost = AppSettings.Default.Pinned;
 
         // Show share window first, then hide main (no delay)
-        shareWindow.Show();
+        _shareWindow.Show();
         Hide();
-        shareWindow.BringToFront();
-        shareWindow.Activate();
+        _shareWindow.BringToFront();
+        _shareWindow.Activate();
     }
 
     private void ShareWindow_Resize(object sender, EventArgs e)
     {
         // When share window is restored, restore main window too
-        if (shareWindow is { WindowState: FormWindowState.Normal } &&
+        if (_shareWindow is { WindowState: FormWindowState.Normal } &&
             WindowState == FormWindowState.Minimized)
         {
             WindowState = FormWindowState.Normal;
@@ -4157,8 +4158,8 @@ oLink3.Save";
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
-    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-    private const int DWMWCP_ROUND = 2;
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwcpRound = 2;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct WindowCompositionAttribData
@@ -4177,12 +4178,12 @@ oLink3.Save";
         public int AnimationId;
     }
 
-    private const int WCA_ACCENT_POLICY = 19;
-    private const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
+    private const int WcaAccentPolicy = 19;
+    private const int AccentEnableAcrylicblurbehind = 4;
 
     // Fix borderless form taskbar
-    private const int WS_MINIMIZEBOX = 0x20000;
-    private const int CS_DBLCLKS = 0x8;
+    private const int WsMinimizebox = 0x20000;
+    private const int CsDblclks = 0x8;
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -4195,8 +4196,8 @@ oLink3.Save";
         get
         {
             CreateParams cp = base.CreateParams;
-            cp.Style |= WS_MINIMIZEBOX;
-            cp.ClassStyle |= CS_DBLCLKS;
+            cp.Style |= WsMinimizebox;
+            cp.ClassStyle |= CsDblclks;
             return cp;
         }
     }
@@ -4204,137 +4205,6 @@ oLink3.Save";
     #endregion
 
     #region Crack Details Tracking
-
-    /// <summary>
-    ///     Tracks details about what was cracked during a crack operation
-    /// </summary>
-    public class CrackDetails
-    {
-        public string GameName { get; set; }
-        public string GamePath { get; set; }
-        public string AppId { get; set; }
-        public List<string> DllsBackedUp { get; } = [];
-        public List<string> DllsReplaced { get; } = [];
-        public List<string> ExesTried { get; } = []; // All EXEs Steamless attempted
-        public List<string> ExesUnpacked { get; } = []; // EXEs with Steam Stub that were unpacked
-        public List<string> ExesSkipped { get; } = []; // Legacy - no longer used
-        public List<string> Errors { get; } = [];
-        public bool Success { get; set; }
-        public DateTime Timestamp { get; set; } = DateTime.Now;
-
-        // Zip/Upload tracking
-        public bool ZipAttempted { get; set; }
-        public bool ZipSuccess { get; set; }
-        public string ZipError { get; set; }
-        public string ZipPath { get; set; }
-        public TimeSpan? ZipDuration { get; set; }
-        public long ZipFileSize { get; set; }
-        public bool UploadAttempted { get; set; }
-        public bool UploadSuccess { get; set; }
-        public string UploadError { get; set; }
-        public string UploadUrl { get; set; } // 1fichier URL
-        public string PyDriveUrl { get; set; } // Converted PyDrive URL
-        public int UploadRetryCount { get; set; }
-        public TimeSpan? UploadDuration { get; set; }
-
-        public bool HasAnyChanges => DllsReplaced.Count > 0 || ExesUnpacked.Count > 0;
-        public bool HasDetails => HasAnyChanges || ZipAttempted || UploadAttempted;
-
-        public string GetSummary()
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"=== Crack Details for {GameName} ===");
-            sb.AppendLine($"Path: {GamePath}");
-            sb.AppendLine($"AppID: {AppId}");
-            sb.AppendLine($"Time: {Timestamp:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine($"Success: {Success}");
-            sb.AppendLine();
-
-            if (DllsBackedUp.Count > 0)
-            {
-                sb.AppendLine($"DLLs Backed Up ({DllsBackedUp.Count}):");
-                foreach (var dll in DllsBackedUp)
-                {
-                    sb.AppendLine($"  - {dll}");
-                }
-
-                sb.AppendLine();
-            }
-
-            if (DllsReplaced.Count > 0)
-            {
-                sb.AppendLine($"DLLs Replaced ({DllsReplaced.Count}):");
-                foreach (var dll in DllsReplaced)
-                {
-                    sb.AppendLine($"  - {dll}");
-                }
-
-                sb.AppendLine();
-            }
-
-            if (ExesTried.Count > 0)
-            {
-                sb.AppendLine($"EXEs Scanned by Steamless ({ExesTried.Count}):");
-                foreach (var exe in ExesTried)
-                {
-                    bool wasUnpacked = ExesUnpacked.Any(u => u.EndsWith(exe));
-                    sb.AppendLine($"  - {exe} {(wasUnpacked ? "[UNPACKED - Had Steam Stub]" : "[No Steam Stub]")}");
-                }
-
-                sb.AppendLine();
-            }
-
-            if (Errors.Count > 0)
-            {
-                sb.AppendLine($"Errors ({Errors.Count}):");
-                foreach (var err in Errors)
-                {
-                    sb.AppendLine($"  - {err}");
-                }
-
-                sb.AppendLine();
-            }
-
-            // Zip status
-            if (ZipAttempted)
-            {
-                sb.AppendLine($"Zip: {(ZipSuccess ? "Success" : "Failed")}");
-                if (!string.IsNullOrEmpty(ZipPath))
-                {
-                    sb.AppendLine($"  Path: {ZipPath}");
-                }
-
-                if (!string.IsNullOrEmpty(ZipError))
-                {
-                    sb.AppendLine($"  Error: {ZipError}");
-                }
-
-                sb.AppendLine();
-            }
-
-            // Upload status
-            if (UploadAttempted)
-            {
-                sb.AppendLine($"Upload: {(UploadSuccess ? "Success" : "Failed")}");
-                if (UploadRetryCount > 0)
-                {
-                    sb.AppendLine($"  Retries: {UploadRetryCount}");
-                }
-
-                if (!string.IsNullOrEmpty(UploadUrl))
-                {
-                    sb.AppendLine($"  URL: {UploadUrl}");
-                }
-
-                if (!string.IsNullOrEmpty(UploadError))
-                {
-                    sb.AppendLine($"  Error: {UploadError}");
-                }
-            }
-
-            return sb.ToString();
-        }
-    }
 
     /// <summary>
     ///     Current crack details being populated during a crack operation
@@ -4350,10 +4220,10 @@ oLink3.Save";
 
     #region Batch Progress Indicator
 
-    private PictureBox batchIndicator;
-    private BatchGameSelectionForm activeBatchForm;
-    private Image batchIconBase;
-    private ToolTip batchIndicatorTooltip;
+    private PictureBox _batchIndicator;
+    private BatchGameSelectionForm _activeBatchForm;
+    private Image _batchIconBase;
+    private ToolTip _batchIndicatorTooltip;
 
     #endregion
 
@@ -4401,10 +4271,10 @@ oLink3.Save";
     /// </summary>
     private void InitializeBatchIndicator()
     {
-        try { batchIconBase = Resources.batch_icon; }
+        try { _batchIconBase = Resources.batch_icon; }
         catch { }
 
-        batchIndicator = new PictureBox
+        _batchIndicator = new PictureBox
         {
             Size = new Size(48, 48),
             Location = new Point(10, ClientSize.Height - 58),
@@ -4414,24 +4284,24 @@ oLink3.Save";
             SizeMode = PictureBoxSizeMode.Zoom
         };
 
-        batchIndicatorTooltip = new ToolTip();
-        batchIndicatorTooltip.SetToolTip(batchIndicator, "Click to restore batch window");
+        _batchIndicatorTooltip = new ToolTip();
+        _batchIndicatorTooltip.SetToolTip(_batchIndicator, "Click to restore batch window");
 
-        batchIndicator.Click += (s, e) =>
+        _batchIndicator.Click += (s, e) =>
         {
-            if (activeBatchForm is { IsDisposed: false })
+            if (_activeBatchForm is { IsDisposed: false })
             {
-                activeBatchForm.Show();
-                activeBatchForm.WindowState = FormWindowState.Normal;
-                activeBatchForm.BringToFront();
-                activeBatchForm.Activate();
-                batchIndicator.Visible = false;
+                _activeBatchForm.Show();
+                _activeBatchForm.WindowState = FormWindowState.Normal;
+                _activeBatchForm.BringToFront();
+                _activeBatchForm.Activate();
+                _batchIndicator.Visible = false;
                 Hide(); // Hide Form1 when batch form is restored
             }
         };
 
-        Controls.Add(batchIndicator);
-        batchIndicator.BringToFront();
+        Controls.Add(_batchIndicator);
+        _batchIndicator.BringToFront();
     }
 
     /// <summary>
@@ -4447,30 +4317,30 @@ oLink3.Save";
             return;
         }
 
-        if (batchIconBase == null)
+        if (_batchIconBase == null)
         {
             return;
         }
 
         // Create a new image with the percentage drawn on it
-        var bmp = new Bitmap(batchIconBase.Width, batchIconBase.Height);
+        var bmp = new Bitmap(_batchIconBase.Width, _batchIconBase.Height);
         using (var g = Graphics.FromImage(bmp))
         {
-            g.DrawImage(batchIconBase, 0, 0);
+            g.DrawImage(_batchIconBase, 0, 0);
             g.TextRenderingHint = TextRenderingHint.AntiAlias;
 
             // Draw percentage centered in the front window's main area
             string text = percent.ToString();
-            using (var font = new Font("Segoe UI", batchIconBase.Width / 5, FontStyle.Bold))
+            using (var font = new Font("Segoe UI", _batchIconBase.Width / 5, FontStyle.Bold))
             using (var brush = new SolidBrush(Color.White))
             using (var outline = new Pen(Color.FromArgb(200, 20, 25, 45), 3))
             {
                 // Front window area is roughly: X 35-98%, Y 58-95%
                 var textRect = new RectangleF(
-                    batchIconBase.Width * 0.35f,
-                    batchIconBase.Height * 0.58f,
-                    batchIconBase.Width * 0.63f,
-                    batchIconBase.Height * 0.37f);
+                    _batchIconBase.Width * 0.35f,
+                    _batchIconBase.Height * 0.58f,
+                    _batchIconBase.Width * 0.63f,
+                    _batchIconBase.Height * 0.37f);
 
                 var sf = new StringFormat
                 {
@@ -4495,9 +4365,9 @@ oLink3.Save";
             }
         }
 
-        batchIndicator.Image?.Dispose();
-        batchIndicator.Image = bmp;
-        batchIndicatorTooltip.SetToolTip(batchIndicator, $"Batch: {percent}% - Click to restore");
+        _batchIndicator.Image?.Dispose();
+        _batchIndicator.Image = bmp;
+        _batchIndicatorTooltip.SetToolTip(_batchIndicator, $"Batch: {percent}% - Click to restore");
 
         // Update user's designed label
         if (batchProgressLabel != null)
@@ -4690,7 +4560,7 @@ oLink3.Save";
     {
         var form = new BatchGameSelectionForm(gamePaths);
         form.Owner = this; // Set owner so icon can be copied
-        activeBatchForm = form; // Track the active batch form
+        _activeBatchForm = form; // Track the active batch form
 
         // Position batch form centered on where main form was
         form.StartPosition = FormStartPosition.Manual;
@@ -4722,7 +4592,7 @@ oLink3.Save";
                 Location = new Point(Math.Max(0, newX), Math.Max(0, newY));
             }
 
-            activeBatchForm = null;
+            _activeBatchForm = null;
             HideBatchIndicator();
             Show();
         };
@@ -4987,14 +4857,14 @@ oLink3.Save";
 
                 try
                 {
-                    gameDir = game.Path;
-                    gameDirName = game.Name;
-                    parentOfSelection = Directory.GetParent(game.Path).FullName;
+                    _gameDir = game.Path;
+                    _gameDirName = game.Name;
+                    _parentOfSelection = Directory.GetParent(game.Path).FullName;
                     CurrentAppId = game.AppId;
 
-                    suppressStatusUpdates = true;
+                    _suppressStatusUpdates = true;
                     bool crackSucceeded = await CrackAsync();
-                    suppressStatusUpdates = false;
+                    _suppressStatusUpdates = false;
 
                     crackResults[game.Path] = crackSucceeded;
 
@@ -5035,7 +4905,7 @@ oLink3.Save";
                 crackResults[game.Path] = true;
             }
 
-            suppressStatusUpdates = false;
+            _suppressStatusUpdates = false;
 
             // ========== PHASE 2 & 3: ZIP + UPLOAD PIPELINE ==========
             // Pipeline: zip one game, then upload it while zipping the next
@@ -5592,8 +5462,8 @@ oLink3.Save";
         int initialWaitSeconds = 30;
         if (fileSizeBytes > 5L * 1024 * 1024 * 1024) // 5GB+
         {
-            long sizeInGB = fileSizeBytes / (1024 * 1024 * 1024);
-            initialWaitSeconds = (int)(sizeInGB * 12);
+            long sizeInGb = fileSizeBytes / (1024 * 1024 * 1024);
+            initialWaitSeconds = (int)(sizeInGb * 12);
             initialWaitSeconds = Math.Min(initialWaitSeconds, 108000); // Cap at 30 hours
             initialWaitSeconds = Math.Max(initialWaitSeconds, 30);
         }
@@ -5602,10 +5472,10 @@ oLink3.Save";
         int maxRetries = Math.Max(10, (initialWaitSeconds / 30) + 5);
         int retryDelay = 30000;
 
-        double sizeGB = fileSizeBytes / (1024.0 * 1024.0 * 1024.0);
+        double sizeGb = fileSizeBytes / (1024.0 * 1024.0 * 1024.0);
         Console.WriteLine($"[CONVERT] Starting conversion for {oneFichierUrl}");
         Console.WriteLine(
-            $"[CONVERT] File size: {sizeGB:F2} GB, Initial wait: {initialWaitSeconds}s, Max retries: {maxRetries}");
+            $"[CONVERT] File size: {sizeGb:F2} GB, Initial wait: {initialWaitSeconds}s, Max retries: {maxRetries}");
 
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {

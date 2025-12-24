@@ -1,4 +1,6 @@
-namespace SteamAutocrackGUI;
+using APPID.Utilities.UI;
+
+namespace APPID.Models;
 
 /// <summary>
 ///     Represents an upload slot for concurrent upload operations in the batch processing form.

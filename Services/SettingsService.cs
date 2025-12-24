@@ -31,10 +31,10 @@ public sealed class SettingsService : ISettingsService
         set => AppSettings.Default.AutoCrack = value;
     }
 
-    public bool LANMultiplayer
+    public bool LanMultiplayer
     {
-        get => AppSettings.Default.LANMultiplayer;
-        set => AppSettings.Default.LANMultiplayer = value;
+        get => AppSettings.Default.LanMultiplayer;
+        set => AppSettings.Default.LanMultiplayer = value;
     }
 
     public bool UseRinPassword

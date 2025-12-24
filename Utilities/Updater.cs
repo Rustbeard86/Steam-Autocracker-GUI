@@ -1,14 +1,11 @@
 using System.Net.NetworkInformation;
-using APPID.Utilities;
-using Newtonsoft.Json;
-using Octokit;
-using RestSharp;
-using FileMode = System.IO.FileMode;
+using System.Text.Json;
+using APPID.Utilities.Network;
 
-namespace APPID;
+namespace APPID.Utilities;
 
 /// <summary>
-///     Handles checking for and downloading updates for external dependencies like Steamless and GoldBerg emulator.
+///     Handles checking for and downloading updates for external dependencies like Steamless and Goldberg emulator.
 /// </summary>
 internal static class Updater
 {
@@ -18,46 +15,14 @@ internal static class Updater
         Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory,
         "_bin");
 
-    public static bool HasInternet { get; private set; }
-    public static bool IsOffline { get; private set; }
-
-    /// <summary>
-    ///     Fetches JSON data from GitHub API.
-    /// </summary>
-    private static dynamic? GetJson(string requestURL)
-    {
-        // Certificate validation is now handled by RestClient options
-        try
-        {
-            string baseURL = "https://api.github.com/repos/";
-            var options = new RestClientOptions(baseURL)
-            {
-                RemoteCertificateValidationCallback = (sender, certificate, chain, sslPolicyErrors) => true
-            };
-
-            var client = new RestClient(options);
-            Debug.WriteLine($"Requesting: {baseURL}{requestURL}");
-
-            var request = new RestRequest(requestURL);
-            RestResponse queryResult = client.Execute(request);
-
-            return queryResult.Content is not null
-                ? JsonConvert.DeserializeObject<dynamic>(queryResult.Content)
-                : null;
-        }
-        catch (Exception ex)
-        {
-            LogHelper.LogError($"getJson failed for {requestURL}", ex);
-            return null;
-        }
-    }
+    private static bool HasInternet { get; set; }
+    private static bool IsOffline { get; set; }
 
     /// <summary>
     ///     Checks for internet connectivity by pinging multiple DNS servers.
     /// </summary>
     public static async Task<bool> CheckForNetAsync()
     {
-        // Certificate validation is now handled per-HttpClient via HttpClientFactory
         if (IsOffline)
         {
             return HasInternet;
@@ -83,32 +48,37 @@ internal static class Updater
     /// <summary>
     ///     Checks for newer version of Steamless on GitHub and updates if available.
     /// </summary>
-    public static async Task CheckGitHubNewerVersion(string user, string repo, string apiBase)
+    public static async Task CheckGitHubNewerVersion(string user, string repo)
     {
+        string url = $"https://api.github.com/repos/{user}/{repo}/releases";
         try
         {
-            // Certificate validation is now handled per-HttpClient via HttpClientFactory
+            using var client = HttpClientFactory.CreateClient();
 
-            dynamic? obj = GetJson($"{user}/{repo}/releases");
-            if (obj is null)
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
             {
                 return;
             }
 
-            var client = new GitHubClient(new ProductHeaderValue(repo));
-            IReadOnlyList<Release> releases = await client.Repository.Release.GetAll(user, repo);
+            string json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
 
-            if (releases.Count == 0)
+            var releases = doc.RootElement;
+            if (releases.GetArrayLength() == 0)
             {
                 return;
             }
 
-            string latestGitHubVersion = releases[0].TagName.Replace("v", "");
+            var latestRelease = releases[0];
+            string latestGitHubVersion = latestRelease.GetProperty("tag_name").GetString()?.Replace("v", "") ?? "";
             string versionFilePath = Path.Combine(BinPath, $"{repo}.ver");
 
             string localVersion = File.Exists(versionFilePath)
-                ? File.ReadAllText(versionFilePath).Trim()
+                ? await File.ReadAllTextAsync(versionFilePath)
                 : string.Empty;
+
+            localVersion = localVersion.Trim();
 
             if (localVersion == latestGitHubVersion)
             {
@@ -124,98 +94,106 @@ internal static class Updater
                 Directory.Delete(steamlessPath, true);
             }
 
-            // Find download URL
-            foreach (var item in obj[0])
+            // Find and download the zip asset
+            if (latestRelease.TryGetProperty("assets", out var assets))
             {
-                string itemStr = item.ToString();
-                if (!itemStr.Contains("browser_download_url"))
+                foreach (var asset in assets.EnumerateArray())
                 {
-                    continue;
+                    string assetName = asset.GetProperty("name").GetString() ?? "";
+                    if (assetName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
+                        if (string.IsNullOrEmpty(downloadUrl))
+                        {
+                            continue;
+                        }
+
+                        // Download the new version
+                        var downloadResponse = await client.GetAsync(downloadUrl);
+                        await using (FileStream fs = new("SLS.zip", FileMode.Create))
+                        {
+                            await downloadResponse.Content.CopyToAsync(fs);
+                        }
+
+                        // Extract and update
+                        await ExtractFileAsync("SLS.zip", steamlessPath);
+                        File.Delete("SLS.zip");
+                        await File.WriteAllTextAsync(versionFilePath, latestGitHubVersion);
+                        break;
+                    }
                 }
-
-                string downloadUrl = StringTools.RemoveEverythingBeforeFirstRemoveString(
-                    item.Value.ToString(),
-                    "browser_download_url\": \"");
-                downloadUrl = StringTools.RemoveEverythingAfterFirstRemoveString(downloadUrl, "\"");
-
-                // Download the new version using HttpClient
-                using var httpClient = HttpClientFactory.CreateClient();
-                HttpResponseMessage response = await httpClient.GetAsync(downloadUrl);
-                await using (FileStream fs = new("SLS.zip", FileMode.CreateNew))
-                {
-                    await response.Content.CopyToAsync(fs);
-                }
-
-                // Extract and update
-                await ExtractFileAsync("SLS.zip", steamlessPath);
-                File.Delete("SLS.zip");
-                File.Delete(versionFilePath);
-                await File.WriteAllTextAsync(versionFilePath, latestGitHubVersion);
-                break;
             }
         }
         catch (Exception ex)
         {
-            // Silently ignore rate limit and other API errors - not critical
             LogHelper.LogNetwork($"GitHub API check skipped: {ex.Message}");
         }
     }
 
     /// <summary>
-    ///     Checks for and downloads updates for GoldBerg Steam emulator.
+    ///     Checks for and downloads updates for Goldberg Steam emulator.
     /// </summary>
     public static async Task UpdateGoldBergAsync()
     {
+        const string url = "https://api.github.com/repos/Detanup01/gbe_fork/releases/latest";
         try
         {
-            // Certificate validation is now handled per-HttpClient via HttpClientFactory
+            using var client = HttpClientFactory.CreateClient();
 
-            // Get latest release from the fork
-            dynamic? obj = GetJson("Detanup01/gbe_fork/releases/latest");
-            if (obj is null)
+            var response = await client.GetAsync(url);
+            if (!response.IsSuccessStatusCode)
             {
-                MessageBox.Show("Unable to check for GoldBerg updates. Please try again later.");
+                MessageBox.Show(@"Unable to check for Goldberg updates. Please try again later.");
                 return;
             }
 
-            string latestVersion = obj.tag_name.ToString().Replace("release-", "");
+            string json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var release = doc.RootElement;
+
+            string latestVersion = release.GetProperty("tag_name").GetString()?.Replace("release-", "") ?? "";
             string versionFile = Path.Combine(BinPath, "Goldberg", "version.txt");
 
             string localVersion = File.Exists(versionFile)
-                ? File.ReadAllText(versionFile).Trim()
+                ? await File.ReadAllTextAsync(versionFile)
                 : string.Empty;
+
+            localVersion = localVersion.Trim();
 
             if (localVersion == latestVersion)
             {
                 return; // Already up to date
             }
 
-            LogHelper.LogUpdate("GoldBerg (gbe_fork)", $"{localVersion} -> {latestVersion}");
+            LogHelper.LogUpdate("Goldberg (gbe_fork)", $"{localVersion} -> {latestVersion}");
 
             // Find the Windows release asset
             string? downloadUrl = null;
-            foreach (var asset in obj.assets)
+            if (release.TryGetProperty("assets", out var assets))
             {
-                if (asset.name.ToString() == "emu-win-release.7z")
+                foreach (var asset in assets.EnumerateArray())
                 {
-                    downloadUrl = asset.browser_download_url.ToString();
-                    break;
+                    string assetName = asset.GetProperty("name").GetString() ?? "";
+                    if (assetName == "emu-win-release.7z")
+                    {
+                        downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                        break;
+                    }
                 }
             }
 
             if (string.IsNullOrEmpty(downloadUrl))
             {
-                MessageBox.Show("Windows release asset not found for GoldBerg fork.");
+                MessageBox.Show(@"Windows release asset not found for Goldberg fork.");
                 return;
             }
 
-            // Download the new version using HttpClient
-            using var httpClient = HttpClientFactory.CreateClient();
-            string tempFile = "gbe_fork.7z";
-            HttpResponseMessage response = await httpClient.GetAsync(downloadUrl);
-            await using (FileStream fs = new(tempFile, FileMode.CreateNew))
+            // Download the new version
+            const string tempFile = "gbe_fork.7z";
+            var downloadResponse = await client.GetAsync(downloadUrl);
+            await using (FileStream fs = new(tempFile, FileMode.Create))
             {
-                await response.Content.CopyToAsync(fs);
+                await downloadResponse.Content.CopyToAsync(fs);
             }
 
             // Extract to temporary directory
@@ -231,7 +209,6 @@ internal static class Updater
             string goldbergDir = Path.Combine(BinPath, "Goldberg");
             Directory.CreateDirectory(goldbergDir);
 
-            // Copy the specific DLL files from known paths
             CopyIfExists(
                 Path.Combine(tempDir, "release", "regular", "x64", "steam_api64.dll"),
                 Path.Combine(goldbergDir, "steam_api64.dll"));
@@ -240,40 +217,30 @@ internal static class Updater
                 Path.Combine(tempDir, "release", "regular", "x32", "steam_api.dll"),
                 Path.Combine(goldbergDir, "steam_api.dll"));
 
-            // Copy generate_interfaces tools if they exist
-            string[] possibleToolPaths =
+            // Copy generate_interfaces tools
+            string[] toolPaths =
             [
                 Path.Combine(tempDir, "release", "tools", "generate_interfaces", "generate_interfaces_x64.exe"),
-                Path.Combine(tempDir, "release", "tools", "generate_interfaces", "generate_interfaces_x32.exe"),
-                Path.Combine(tempDir, "tools", "generate_interfaces", "generate_interfaces_x64.exe"),
-                Path.Combine(tempDir, "tools", "generate_interfaces", "generate_interfaces_x32.exe"),
-                Path.Combine(tempDir, "generate_interfaces_x64.exe"),
-                Path.Combine(tempDir, "generate_interfaces_x32.exe")
+                Path.Combine(tempDir, "release", "tools", "generate_interfaces", "generate_interfaces_x32.exe")
             ];
 
-            foreach (string toolPath in possibleToolPaths.Where(File.Exists))
+            foreach (string toolPath in toolPaths.Where(File.Exists))
             {
-                string fileName = Path.GetFileName(toolPath);
-                string destPath = Path.Combine(goldbergDir, fileName);
+                string destPath = Path.Combine(goldbergDir, Path.GetFileName(toolPath));
                 File.Copy(toolPath, destPath, true);
-                Debug.WriteLine($"Copied tool: {fileName}");
             }
 
-            // Copy lobby_connect tools for LAN multiplayer
-            string[] lobbyConnectPaths =
+            // Copy lobby_connect tools
+            string[] lobbyPaths =
             [
                 Path.Combine(tempDir, "release", "tools", "lobby_connect", "lobby_connect_x64.exe"),
-                Path.Combine(tempDir, "release", "tools", "lobby_connect", "lobby_connect_x32.exe"),
-                Path.Combine(tempDir, "tools", "lobby_connect", "lobby_connect_x64.exe"),
-                Path.Combine(tempDir, "tools", "lobby_connect", "lobby_connect_x32.exe")
+                Path.Combine(tempDir, "release", "tools", "lobby_connect", "lobby_connect_x32.exe")
             ];
 
-            foreach (string lobbyPath in lobbyConnectPaths.Where(File.Exists))
+            foreach (string lobbyPath in lobbyPaths.Where(File.Exists))
             {
-                string fileName = Path.GetFileName(lobbyPath);
-                string destPath = Path.Combine(BinPath, fileName);
+                string destPath = Path.Combine(BinPath, Path.GetFileName(lobbyPath));
                 File.Copy(lobbyPath, destPath, true);
-                Debug.WriteLine($"Copied lobby_connect tool to _bin: {fileName}");
             }
 
             // Clean up
@@ -285,8 +252,7 @@ internal static class Updater
         }
         catch (Exception ex)
         {
-            // Silently ignore - not critical, probably rate limited
-            LogHelper.LogError("UpdateGoldBerg failed", ex);
+            LogHelper.LogError("UpdateGoldberg failed", ex);
         }
     }
 
@@ -302,21 +268,23 @@ internal static class Updater
             {
                 WindowStyle = ProcessWindowStyle.Hidden,
                 FileName = sevenZipPath,
-                Arguments = $"x \"{sourceArchive}\" -y -o\"{destination}\""
+                Arguments = $"x \"{sourceArchive}\" -y -o\"{destination}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
 
             using var process = Process.Start(startInfo);
-            if (process is not null && !process.HasExited)
+            if (process != null)
             {
-                await Task.Run(() => process.WaitForExit());
+                await process.WaitForExitAsync();
             }
         }
         catch (Exception ex)
         {
             LogHelper.LogError($"ExtractFileAsync failed for {sourceArchive}", ex);
             MessageBox.Show(
-                "Unable to extract updated files. If you have WinRAR, try uninstalling it then trying again!",
-                "Extraction Error",
+                @"Unable to extract updated files. If you have WinRAR, try uninstalling it then trying again!",
+                @"Extraction Error",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
@@ -327,13 +295,13 @@ internal static class Updater
     /// </summary>
     private static async Task<bool> CheckForInternetAsync(string host)
     {
-        using var myPing = new Ping();
-        byte[] buffer = new byte[32];
-        const int timeout = 20000; // 20 seconds - async so no UI blocking
-        var pingOptions = new PingOptions();
-
         try
         {
+            using var myPing = new Ping();
+            byte[] buffer = new byte[32];
+            const int timeout = 20000; // 20 seconds - async so no UI blocking
+            var pingOptions = new PingOptions();
+
             PingReply reply = await myPing.SendPingAsync(host, timeout, buffer, pingOptions);
             if (reply.Status == IPStatus.Success)
             {

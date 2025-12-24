@@ -1,12 +1,12 @@
-namespace SteamAutocrackGUI;
+namespace APPID.Models;
 
 /// <summary>
 ///     Response from the Steam Store search API.
 /// </summary>
 internal sealed class SteamStoreSearchResponse
 {
-    public int total { get; set; }
-    public List<SteamStoreSearchItem>? items { get; set; }
+    public int Total { get; set; }
+    public List<SteamStoreSearchItem>? Items { get; set; }
 }
 
 /// <summary>
@@ -14,7 +14,7 @@ internal sealed class SteamStoreSearchResponse
 /// </summary>
 internal sealed class SteamStoreSearchItem
 {
-    public string? type { get; set; }
-    public string? name { get; set; }
-    public int id { get; set; }
+    public string? Type { get; set; }
+    public string? Name { get; set; }
+    public int Id { get; set; }
 }

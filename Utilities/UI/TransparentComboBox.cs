@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Drawing.Drawing2D;
 
-namespace APPID;
+namespace APPID.Utilities.UI;
 
 /// <summary>
 ///     Custom ComboBox control with transparent background and modern dark theme styling.

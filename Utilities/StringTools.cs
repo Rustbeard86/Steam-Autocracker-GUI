@@ -1,4 +1,4 @@
-﻿namespace APPID;
+namespace APPID.Utilities;
 
 /// <summary>
 ///     Provides utility methods for string manipulation operations.

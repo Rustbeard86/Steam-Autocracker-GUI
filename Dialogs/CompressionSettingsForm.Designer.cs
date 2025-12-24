@@ -1,6 +1,6 @@
 using System.ComponentModel;
 
-namespace SteamAutocrackGUI
+namespace APPID
 {
     partial class CompressionSettingsForm
     {

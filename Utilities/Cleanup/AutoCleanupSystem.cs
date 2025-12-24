@@ -1,4 +1,4 @@
-namespace SteamAppIdIdentifier;
+namespace APPID.Utilities.Cleanup;
 
 public static class AutoCleanupSystem
 {
@@ -358,7 +358,7 @@ public static class AutoCleanupSystem
 
         txtDetails.Text = details;
 
-        var btnOK = new Button
+        var btnOk = new Button
         {
             Text = "Proceed with Upload",
             Font = new Font("Segoe UI", 10, FontStyle.Bold),
@@ -370,7 +370,7 @@ public static class AutoCleanupSystem
             DialogResult = DialogResult.OK
         };
 
-        successForm.Controls.AddRange(lblTitle, lblSummary, txtDetails, btnOK);
+        successForm.Controls.AddRange(lblTitle, lblSummary, txtDetails, btnOk);
         successForm.ShowDialog();
     }
 
@@ -420,7 +420,7 @@ public static class AutoCleanupSystem
             Text = string.Join("\n", result.Errors)
         };
 
-        var btnOK = new Button
+        var btnOk = new Button
         {
             Text = "OK",
             Size = new Size(100, 30),
@@ -431,7 +431,7 @@ public static class AutoCleanupSystem
             DialogResult = DialogResult.OK
         };
 
-        errorForm.Controls.AddRange(lblTitle, lblMessage, txtErrors, btnOK);
+        errorForm.Controls.AddRange(lblTitle, lblMessage, txtErrors, btnOk);
         errorForm.ShowDialog();
     }
 
@@ -464,27 +464,5 @@ public static class AutoCleanupSystem
         public List<string> DeletedFiles { get; set; } = [];
         public List<string> Errors { get; set; } = [];
         public string Summary { get; set; }
-    }
-}
-
-// Integration with share window
-public static class ShareCleanIntegration
-{
-    public static async Task<bool> PrepareCleanShare(
-        string gamePath,
-        string gameName,
-        string appId,
-        Form parentForm)
-    {
-        // First check if it's clean
-        var verification = CleanFilesVerifier.VerifyCleanInstallation(gamePath);
-
-        if (verification.IsClean)
-        {
-            return true; // Already clean, good to go
-        }
-
-        // Not clean - offer automatic cleanup
-        return await AutoCleanupSystem.HandleContaminatedGame(gamePath, gameName, parentForm);
     }
 }

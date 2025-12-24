@@ -9,8 +9,8 @@ namespace APPID.Services;
 public sealed class UploadService : IUploadService
 {
     private const string UploadEndpoint = "https://share.harryeffingpotter.com/upload";
-    private const int MaxFileSizeMB = 500;
-    private const double BytesToMB = 1024.0 * 1024.0;
+    private const int MaxFileSizeMb = 500;
+    private const double BytesToMb = 1024.0 * 1024.0;
     private const string AppVersion = "SACGUI-2.3";
 
     // Reuse HttpClient to avoid socket exhaustion
@@ -28,13 +28,13 @@ public sealed class UploadService : IUploadService
         try
         {
             var fileInfo = new FileInfo(filePath);
-            var fileSizeMB = fileInfo.Length / BytesToMB;
+            var fileSizeMb = fileInfo.Length / BytesToMb;
 
-            LogHelper.Log($"[UPLOAD] Starting upload: {Path.GetFileName(filePath)} ({fileSizeMB:F2} MB)");
+            LogHelper.Log($"[UPLOAD] Starting upload: {Path.GetFileName(filePath)} ({fileSizeMb:F2} MB)");
 
-            if (fileSizeMB > MaxFileSizeMB)
+            if (fileSizeMb > MaxFileSizeMb)
             {
-                LogHelper.Log($"[UPLOAD] WARNING: File is {fileSizeMB:F0}MB (exceeds {MaxFileSizeMB}MB limit)");
+                LogHelper.Log($"[UPLOAD] WARNING: File is {fileSizeMb:F0}MB (exceeds {MaxFileSizeMb}MB limit)");
             }
 
             using var content = new MultipartFormDataContent();

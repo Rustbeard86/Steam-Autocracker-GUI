@@ -5,67 +5,15 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using APPID;
+using APPID.Dialogs;
+using APPID.Models;
 using APPID.Properties;
 using APPID.Services;
 using APPID.Services.Interfaces;
-using SAC_GUI;
-using SteamAutocrackGUI;
+using APPID.Utilities.UI;
 using Timer = System.Windows.Forms.Timer;
 
-namespace SteamAppIdIdentifier;
-
-/// <summary>
-///     Custom progress bar with neon blue gradient styling for EnhancedShareWindow
-/// </summary>
-public class ShareNeonProgressBar : ProgressBar
-{
-    public ShareNeonProgressBar()
-    {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer,
-            true);
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var rect = ClientRectangle;
-
-        // Dark background
-        using (var bgBrush = new SolidBrush(Color.FromArgb(10, 12, 20)))
-        {
-            e.Graphics.FillRectangle(bgBrush, rect);
-        }
-
-        // Border
-        using (var borderPen = new Pen(Color.FromArgb(40, 50, 70)))
-        {
-            e.Graphics.DrawRectangle(borderPen, 0, 0, rect.Width - 1, rect.Height - 1);
-        }
-
-        // Progress fill with neon blue gradient
-        if (Value > 0)
-        {
-            int fillWidth = (int)((rect.Width - 4) * ((double)Value / Maximum));
-            if (fillWidth > 0)
-            {
-                using (var brush = new LinearGradientBrush(
-                           new Rectangle(2, 2, fillWidth, rect.Height - 4),
-                           Color.FromArgb(0, 150, 255), // Bright neon blue
-                           Color.FromArgb(0, 100, 200), // Darker blue
-                           LinearGradientMode.Vertical))
-                {
-                    e.Graphics.FillRectangle(brush, 2, 2, fillWidth, rect.Height - 4);
-                }
-
-                // Add glow effect on top
-                using (var glowBrush = new SolidBrush(Color.FromArgb(40, 150, 220, 255)))
-                {
-                    e.Graphics.FillRectangle(glowBrush, 2, 2, fillWidth, (rect.Height - 4) / 3);
-                }
-            }
-        }
-    }
-}
+namespace APPID;
 
 /// <summary>
 ///     Custom DataGridView that supports transparent background for acrylic effect
@@ -97,41 +45,41 @@ public partial class EnhancedShareWindow : Form
     private readonly IBatchGameDataService _gameData;
 
     // Crack details tracking
-    private readonly Dictionary<string, SteamAppId.CrackDetails> crackDetailsMap = new();
+    private readonly Dictionary<string, CrackDetails> _crackDetailsMap = new();
 
-    private readonly Form parentForm;
+    private readonly Form _parentForm;
 
     // Cancellation support for batch processing
-    private CancellationTokenSource batchCancellationTokenSource;
+    private CancellationTokenSource _batchCancellationTokenSource;
 
     // Batch compression settings
-    private string batchCompressionFormat = "ZIP";
-    private string batchCompressionLevel = "0";
-    private bool batchUsePassword;
-    private Button btnCancelUpload;
-    private bool cancelAllRemaining;
-    private string currentProcessingGame;
-    private bool gameSizeColumnSortedOnce;
-    private Label lblUploadEta;
-    private Label lblUploadGame;
-    private Label lblUploadSize;
-    private Label lblUploadSpeed;
+    private string _batchCompressionFormat = "ZIP";
+    private string _batchCompressionLevel = "0";
+    private bool _batchUsePassword;
+    private Button _btnCancelUpload;
+    private bool _cancelAllRemaining;
+    private string _currentProcessingGame;
+    private bool _gameSizeColumnSortedOnce;
+    private Label _lblUploadEta;
+    private Label _lblUploadGame;
+    private Label _lblUploadSize;
+    private Label _lblUploadSpeed;
 
-    private Point mouseDownPoint = Point.Empty;
-    private bool skipCurrentGame;
+    private Point _mouseDownPoint = Point.Empty;
+    private bool _skipCurrentGame;
 
     // Toggle states for processing logic
-    private bool toggleCrackOn;
-    private bool toggleShareOn;
-    private bool toggleZipOn;
+    private bool _toggleCrackOn;
+    private bool _toggleShareOn;
+    private bool _toggleZipOn;
 
     // Upload details panel controls
-    private Panel uploadDetailsPanel;
-    private ShareNeonProgressBar uploadProgressBar;
+    private Panel _uploadDetailsPanel;
+    private ShareNeonProgressBar _uploadProgressBar;
 
     public EnhancedShareWindow(Form parent, IBatchGameDataService gameData = null, IFormattingService formatting = null)
     {
-        parentForm = parent;
+        _parentForm = parent;
 
         // Initialize services - use provided or create defaults
         _gameData = gameData ?? new BatchGameDataService(new FileSystemService());
@@ -289,8 +237,8 @@ public partial class EnhancedShareWindow : Form
             var row = gamesGrid.Rows[e.RowIndex];
             string installPath = row.Cells["InstallPath"].Value?.ToString();
             bool hasDetails = !string.IsNullOrEmpty(installPath) &&
-                              crackDetailsMap.ContainsKey(installPath) &&
-                              crackDetailsMap[installPath].HasDetails;
+                              _crackDetailsMap.ContainsKey(installPath) &&
+                              _crackDetailsMap[installPath].HasDetails;
 
             e.Paint(e.CellBounds, DataGridViewPaintParts.All & ~DataGridViewPaintParts.ContentForeground);
 
@@ -372,9 +320,9 @@ public partial class EnhancedShareWindow : Form
         }
 
         // On first click of GameSize column, sort descending (biggest to smallest)
-        if (gamesGrid.Columns[e.ColumnIndex].Name == "GameSize" && !gameSizeColumnSortedOnce)
+        if (gamesGrid.Columns[e.ColumnIndex].Name == "GameSize" && !_gameSizeColumnSortedOnce)
         {
-            gameSizeColumnSortedOnce = true;
+            _gameSizeColumnSortedOnce = true;
             gamesGrid.Sort(gamesGrid.Columns[e.ColumnIndex], ListSortDirection.Descending);
         }
     }
@@ -403,13 +351,13 @@ public partial class EnhancedShareWindow : Form
 
     private void CenterOverParent()
     {
-        if (parentForm is { IsHandleCreated: true })
+        if (_parentForm is { IsHandleCreated: true })
         {
-            int x = parentForm.Left + (parentForm.Width - Width) / 2;
-            int y = parentForm.Top + (parentForm.Height - Height) / 2;
+            int x = _parentForm.Left + (_parentForm.Width - Width) / 2;
+            int y = _parentForm.Top + (_parentForm.Height - Height) / 2;
 
             // Clamp to screen bounds
-            var screen = Screen.FromControl(parentForm).WorkingArea;
+            var screen = Screen.FromControl(_parentForm).WorkingArea;
             x = Math.Max(screen.Left, Math.Min(x, screen.Right - Width));
             y = Math.Max(screen.Top, Math.Min(y, screen.Bottom - Height));
 
@@ -656,9 +604,9 @@ public partial class EnhancedShareWindow : Form
             else
             {
                 // Games are checked - set crack flag and blink Process
-                if (!toggleCrackOn)
+                if (!_toggleCrackOn)
                 {
-                    toggleCrackOn = true;
+                    _toggleCrackOn = true;
                 }
 
                 _ = BlinkProcessButton();
@@ -677,14 +625,14 @@ public partial class EnhancedShareWindow : Form
             else
             {
                 // Games are checked - set zip+share flags and blink Process
-                if (!toggleZipOn)
+                if (!_toggleZipOn)
                 {
-                    toggleZipOn = true;
+                    _toggleZipOn = true;
                 }
 
-                if (!toggleShareOn)
+                if (!_toggleShareOn)
                 {
-                    toggleShareOn = true;
+                    _toggleShareOn = true;
                 }
 
                 _ = BlinkProcessButton();
@@ -703,19 +651,19 @@ public partial class EnhancedShareWindow : Form
             else
             {
                 // Games are checked - set all flags and blink Process
-                if (!toggleCrackOn)
+                if (!_toggleCrackOn)
                 {
-                    toggleCrackOn = true;
+                    _toggleCrackOn = true;
                 }
 
-                if (!toggleZipOn)
+                if (!_toggleZipOn)
                 {
-                    toggleZipOn = true;
+                    _toggleZipOn = true;
                 }
 
-                if (!toggleShareOn)
+                if (!_toggleShareOn)
                 {
-                    toggleShareOn = true;
+                    _toggleShareOn = true;
                 }
 
                 _ = BlinkProcessButton();
@@ -727,9 +675,9 @@ public partial class EnhancedShareWindow : Form
         // Handle Details button click
         if (colName == "Details")
         {
-            if (!string.IsNullOrEmpty(installPath) && crackDetailsMap.ContainsKey(installPath))
+            if (!string.IsNullOrEmpty(installPath) && _crackDetailsMap.ContainsKey(installPath))
             {
-                ShowCrackDetails(crackDetailsMap[installPath]);
+                ShowCrackDetails(_crackDetailsMap[installPath]);
             }
             else
             {
@@ -866,7 +814,7 @@ public partial class EnhancedShareWindow : Form
             }
 
             // Verify this is the main form
-            if (parentForm is not SteamAppId mainForm)
+            if (_parentForm is not SteamAppId mainForm)
             {
                 MessageBox.Show("Cannot access cracking functionality.", "Error", MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -966,7 +914,7 @@ public partial class EnhancedShareWindow : Form
         {
             try
             {
-                if (parentForm is SteamAppId parentFormTyped)
+                if (_parentForm is SteamAppId parentFormTyped)
                 {
                     // Restore .bak files
                     try
@@ -1104,7 +1052,7 @@ public partial class EnhancedShareWindow : Form
         if (cracked)
         {
             // Call the main form's cracking method
-            if (parentForm is SteamAppId parentFormTyped)
+            if (_parentForm is SteamAppId parentFormTyped)
             {
                 // Suppress status updates on main window while cracking from share window
                 parentFormTyped.SetSuppressStatusUpdates(true);
@@ -1305,7 +1253,7 @@ public partial class EnhancedShareWindow : Form
             }
 
             // Show progress window
-            var progressForm = new RGBProgressWindow(gameName, cracked ? "Cracked" : "Clean");
+            var progressForm = new RgbProgressWindow(gameName, cracked ? "Cracked" : "Clean");
             progressForm.TopMost = TopMost;
             progressForm.Show(this);
             progressForm.CenterOverParent(this);
@@ -1406,7 +1354,7 @@ public partial class EnhancedShareWindow : Form
                 // User chose to upload
                 row.Cells[btnColumn].Value = "⏳ Uploading...";
 
-                var uploadProgress = new RGBProgressWindow(gameName, "Uploading");
+                var uploadProgress = new RgbProgressWindow(gameName, "Uploading");
                 uploadProgress.TopMost = TopMost;
                 string uploadUrl = await UploadFileWithProgress(outputPath, uploadProgress);
 
@@ -1621,7 +1569,7 @@ public partial class EnhancedShareWindow : Form
     }
 
     private bool CompressGameProper(string sourcePath, string outputPath, string format, string level,
-        string password = null, RGBProgressWindow progressWindow = null, bool includeParentFolder = false)
+        string password = null, RgbProgressWindow progressWindow = null, bool includeParentFolder = false)
     {
         try
         {
@@ -1669,29 +1617,29 @@ public partial class EnhancedShareWindow : Form
                     {
                         // Get available RAM
                         var pc = new PerformanceCounter("Memory", "Available MBytes");
-                        float availRAM = pc.NextValue();
+                        float availRam = pc.NextValue();
 
                         // Calculate appropriate dictionary size (in MB)
                         // 64-bit 7z.exe can use MUCH more memory!
                         int dictSize = 256; // Default 256MB
 
-                        if (availRAM < 2048)
+                        if (availRam < 2048)
                         {
                             dictSize = 64; // Very low RAM
                         }
-                        else if (availRAM < 4096)
+                        else if (availRam < 4096)
                         {
                             dictSize = 128; // Low RAM
                         }
-                        else if (availRAM < 8192)
+                        else if (availRam < 8192)
                         {
                             dictSize = 256; // Moderate RAM
                         }
-                        else if (availRAM < 16384)
+                        else if (availRam < 16384)
                         {
                             dictSize = 512; // Good RAM
                         }
-                        else if (availRAM < 32768)
+                        else if (availRam < 32768)
                         {
                             dictSize = 1024; // Great RAM (1GB dictionary)
                         }
@@ -1703,7 +1651,7 @@ public partial class EnhancedShareWindow : Form
                         // Add memory limit for working buffers (separate from dictionary)
                         // This prevents runaway memory usage during compression
                         dictParams = $" -md={dictSize}m -mmt=on -mmem={dictSize * 3}m";
-                        Debug.WriteLine($"[7z] Using dictionary size: {dictSize}MB (Available RAM: {availRAM}MB)");
+                        Debug.WriteLine($"[7z] Using dictionary size: {dictSize}MB (Available RAM: {availRam}MB)");
                     }
                     catch
                     {
@@ -1776,8 +1724,8 @@ public partial class EnhancedShareWindow : Form
                                 {
                                     progressWindow.Invoke(() =>
                                     {
-                                        progressWindow.progressBar.Value = Math.Min(percentage, 100);
-                                        progressWindow.lblStatus.Text = $"Compressing... {percentage}%";
+                                        progressWindow.ProgressBar.Value = Math.Min(percentage, 100);
+                                        progressWindow.LblStatus.Text = $"Compressing... {percentage}%";
                                     });
                                 }
                                 catch { }
@@ -1863,8 +1811,8 @@ public partial class EnhancedShareWindow : Form
                                         {
                                             progressWindow.Invoke(() =>
                                             {
-                                                progressWindow.progressBar.Value = Math.Min(percentage, 100);
-                                                progressWindow.lblStatus.Text =
+                                                progressWindow.ProgressBar.Value = Math.Min(percentage, 100);
+                                                progressWindow.LblStatus.Text =
                                                     $"Compressing (reduced)... {percentage}%";
                                             });
                                         }
@@ -1927,8 +1875,8 @@ public partial class EnhancedShareWindow : Form
                         {
                             progressWindow.Invoke(() =>
                             {
-                                progressWindow.progressBar.Value = Math.Min(percentage, 100);
-                                progressWindow.lblStatus.Text =
+                                progressWindow.ProgressBar.Value = Math.Min(percentage, 100);
+                                progressWindow.LblStatus.Text =
                                     $"Compressing... {percentage}% ({currentFile}/{totalFiles} files)";
                             });
                         }
@@ -1950,7 +1898,7 @@ public partial class EnhancedShareWindow : Form
         }
     }
 
-    private async Task<string> UploadFileWithProgress(string filePath, RGBProgressWindow progressWindow)
+    private async Task<string> UploadFileWithProgress(string filePath, RgbProgressWindow progressWindow)
     {
         Debug.WriteLine("[UPLOAD] === Starting 1fichier upload from EnhancedShareWindow ===");
         Debug.WriteLine($"[UPLOAD] File: {filePath}");
@@ -1979,7 +1927,7 @@ public partial class EnhancedShareWindow : Form
                         progressWindow.BeginInvoke(() =>
                         {
                             // Only update progress bar - status text is handled by statusCallback with MB/s info
-                            progressWindow.progressBar.Value = Math.Max(0, Math.Min(100, percentage));
+                            progressWindow.ProgressBar.Value = Math.Max(0, Math.Min(100, percentage));
                         });
                     }
                     catch { }
@@ -1996,7 +1944,7 @@ public partial class EnhancedShareWindow : Form
                     {
                         progressWindow.BeginInvoke(() =>
                         {
-                            progressWindow.lblStatus.Text = status;
+                            progressWindow.LblStatus.Text = status;
                         });
                     }
                 }
@@ -2008,7 +1956,7 @@ public partial class EnhancedShareWindow : Form
 
             // Show the progress window centered over parent (after creating progress handlers)
             progressWindow.TopMost = TopMost;
-            progressWindow.lblStatus.Text = "Starting upload...";
+            progressWindow.LblStatus.Text = "Starting upload...";
             progressWindow.Show(this);
             progressWindow.CenterOverParent(this);
             progressWindow.BringToFront();
@@ -2073,7 +2021,7 @@ public partial class EnhancedShareWindow : Form
         }
     }
 
-    private async Task<string> Convert1FichierLink(string oneFichierUrl, RGBProgressWindow progressWindow = null)
+    private async Task<string> Convert1FichierLink(string oneFichierUrl, RgbProgressWindow progressWindow = null)
     {
         // Force HTTPS - AllDebrid requires it
         if (oneFichierUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
@@ -2105,7 +2053,7 @@ public partial class EnhancedShareWindow : Form
                 {
                     progressWindow.Invoke(() =>
                     {
-                        progressWindow.lblStatus.Text = "Checking status...";
+                        progressWindow.LblStatus.Text = "Checking status...";
                     });
                 }
 
@@ -2143,7 +2091,7 @@ public partial class EnhancedShareWindow : Form
                             {
                                 progressWindow.Invoke(() =>
                                 {
-                                    progressWindow.lblStatus.Text =
+                                    progressWindow.LblStatus.Text =
                                         $"1fichier is still scanning the file, will retry again in {retryDelay / 1000}s";
                                 });
                             }
@@ -2390,9 +2338,9 @@ public partial class EnhancedShareWindow : Form
         form.Owner = this;
         if (form.ShowDialog(this) == DialogResult.OK)
         {
-            batchCompressionFormat = form.SelectedFormat;
-            batchCompressionLevel = form.SelectedLevel;
-            batchUsePassword = form.UseRinPassword;
+            _batchCompressionFormat = form.SelectedFormat;
+            _batchCompressionLevel = form.SelectedLevel;
+            _batchUsePassword = form.UseRinPassword;
         }
     }
 
@@ -2426,7 +2374,7 @@ public partial class EnhancedShareWindow : Form
         Close();
 
         // Open BatchGameSelectionForm with selected paths
-        if (parentForm is SteamAppId mainForm)
+        if (_parentForm is SteamAppId mainForm)
         {
             mainForm.OpenBatchConversionWithPaths(selectedPaths);
         }
@@ -2438,7 +2386,7 @@ public partial class EnhancedShareWindow : Form
     private async Task ProcessSelectedGames()
     {
         // Check if any toggles are on
-        if (!toggleCrackOn && !toggleZipOn && !toggleShareOn)
+        if (!_toggleCrackOn && !_toggleZipOn && !_toggleShareOn)
         {
             MessageBox.Show("Please enable at least one action (Crack, Zip, or Share).",
                 "No Action Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -2472,16 +2420,16 @@ public partial class EnhancedShareWindow : Form
         }
 
         // Reset cancellation state
-        cancelAllRemaining = false;
-        skipCurrentGame = false;
-        currentProcessingGame = null;
+        _cancelAllRemaining = false;
+        _skipCurrentGame = false;
+        _currentProcessingGame = null;
 
         // Disable UI during processing
         btnProcessSelected.Enabled = false;
         btnSettings.Enabled = false;
 
-        var mainForm = parentForm as SteamAppId;
-        if (mainForm == null && toggleCrackOn)
+        var mainForm = _parentForm as SteamAppId;
+        if (mainForm == null && _toggleCrackOn)
         {
             MessageBox.Show("Cannot access main form for cracking.", "Error", MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
@@ -2638,19 +2586,19 @@ public partial class EnhancedShareWindow : Form
         }
 
         // ========== PHASE 1: CRACK (Sequential due to shared state) ==========
-        if (toggleCrackOn)
+        if (_toggleCrackOn)
         {
             foreach (var game in gamesToProcess)
             {
                 // Check for cancel all
-                if (cancelAllRemaining)
+                if (_cancelAllRemaining)
                 {
                     UpdateActionColumn(game.row, "CrackOnly", "Cancelled", Color.Gray);
                     crackResults[game.path] = false;
                     continue;
                 }
 
-                currentProcessingGame = game.name;
+                _currentProcessingGame = game.name;
                 UpdateActionColumn(game.row, "CrackOnly", "⚡ Cracking...", Color.Yellow);
 
                 if (string.IsNullOrEmpty(game.appId))
@@ -2677,7 +2625,7 @@ public partial class EnhancedShareWindow : Form
                             Color.FromArgb(60, 0, 60));
 
                         // Save that we cracked this game (for crack-only mode)
-                        if (!toggleZipOn && !toggleShareOn)
+                        if (!_toggleZipOn && !_toggleShareOn)
                         {
                             SaveSharedGame(game.appId, game.buildId, "cracked_only");
                         }
@@ -2706,8 +2654,8 @@ public partial class EnhancedShareWindow : Form
         }
 
         // ========== PHASE 2: ZIP (Parallel) ==========
-        string shareColumn = toggleCrackOn ? "ShareCracked" : "ShareClean";
-        if (toggleZipOn)
+        string shareColumn = _toggleCrackOn ? "ShareCracked" : "ShareClean";
+        if (_toggleZipOn)
         {
             var gamesToZip = gamesToProcess.Where(g => crackResults.ContainsKey(g.path) && crackResults[g.path])
                 .ToList();
@@ -2720,11 +2668,11 @@ public partial class EnhancedShareWindow : Form
                 }
 
                 string sevenZipPath = ResourceExtractor.GetBinFilePath(Path.Combine("7z", "7za.exe"));
-                string password = batchUsePassword ? "rin" : null;
+                string password = _batchUsePassword ? "rin" : null;
 
                 var zipTasks = gamesToZip.Select(async game =>
                 {
-                    string ext = batchCompressionFormat == "7Z" ? ".7z" : ".zip";
+                    string ext = _batchCompressionFormat == "7Z" ? ".7z" : ".zip";
                     string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                     string safeGameName = game.name;
                     foreach (char c in Path.GetInvalidFileNameChars())
@@ -2732,7 +2680,7 @@ public partial class EnhancedShareWindow : Form
                         safeGameName = safeGameName.Replace(c.ToString(), "");
                     }
 
-                    string prefix = toggleCrackOn ? "[SACGUI] CRACKED" : "[SACGUI] CLEAN";
+                    string prefix = _toggleCrackOn ? "[SACGUI] CRACKED" : "[SACGUI] CLEAN";
                     string archivePath = Path.Combine(desktopPath, $"{prefix} {safeGameName}{ext}");
                     archivePaths[game.path] = archivePath;
 
@@ -2744,9 +2692,9 @@ public partial class EnhancedShareWindow : Form
                     {
                         try
                         {
-                            string formatArg = batchCompressionFormat == "7Z" ? "-t7z" : "-tzip";
+                            string formatArg = _batchCompressionFormat == "7Z" ? "-t7z" : "-tzip";
                             string args =
-                                $"a {formatArg} -mx={batchCompressionLevel} -bsp1 \"{archivePath}\" \"{game.path}\\*\"";
+                                $"a {formatArg} -mx={_batchCompressionLevel} -bsp1 \"{archivePath}\" \"{game.path}\\*\"";
                             if (!string.IsNullOrEmpty(password))
                             {
                                 args += $" -p{password}";
@@ -2815,15 +2763,15 @@ public partial class EnhancedShareWindow : Form
                 foreach (var result in zipResults)
                 {
                     // Store zip details
-                    if (!crackDetailsMap.ContainsKey(result.game.path))
+                    if (!_crackDetailsMap.ContainsKey(result.game.path))
                     {
-                        crackDetailsMap[result.game.path] = new SteamAppId.CrackDetails
+                        _crackDetailsMap[result.game.path] = new CrackDetails
                         {
                             GameName = result.game.name, GamePath = result.game.path
                         };
                     }
 
-                    var details = crackDetailsMap[result.game.path];
+                    var details = _crackDetailsMap[result.game.path];
                     details.ZipAttempted = true;
                     details.ZipSuccess = result.zipSuccess;
                     details.ZipDuration = result.zipDuration;
@@ -2847,7 +2795,7 @@ public partial class EnhancedShareWindow : Form
         }
 
         // ========== PHASE 3: SHARE/UPLOAD ==========
-        if (toggleShareOn && !cancelAllRemaining)
+        if (_toggleShareOn && !_cancelAllRemaining)
         {
             var gamesToUpload = gamesToProcess.Where(g => crackResults.ContainsKey(g.path) && crackResults[g.path])
                 .ToList();
@@ -2856,18 +2804,18 @@ public partial class EnhancedShareWindow : Form
             // Show upload panel (docked to bottom, will push grid up)
             if (gamesToUpload.Count > 0)
             {
-                uploadDetailsPanel.Visible = true;
-                uploadDetailsPanel.BringToFront();
+                _uploadDetailsPanel.Visible = true;
+                _uploadDetailsPanel.BringToFront();
 
                 // Reset Skip/Cancel buttons
-                if (uploadDetailsPanel.Controls["btnSkip"] is Button skipBtn)
+                if (_uploadDetailsPanel.Controls["btnSkip"] is Button skipBtn)
                 {
                     skipBtn.Enabled = true;
                     skipBtn.Text = "Skip";
                 }
 
-                btnCancelUpload.Enabled = true;
-                btnCancelUpload.Text = "Cancel All";
+                _btnCancelUpload.Enabled = true;
+                _btnCancelUpload.Text = "Cancel All";
 
                 // Force layout update
                 PerformLayout();
@@ -2876,15 +2824,15 @@ public partial class EnhancedShareWindow : Form
             foreach (var game in gamesToUpload)
             {
                 // Check for cancel all at start of each game
-                if (cancelAllRemaining)
+                if (_cancelAllRemaining)
                 {
                     UpdateActionColumn(game.row, shareColumn, "Cancelled", Color.Gray);
                     continue;
                 }
 
                 // Reset skip flag for this game
-                skipCurrentGame = false;
-                currentProcessingGame = game.name;
+                _skipCurrentGame = false;
+                _currentProcessingGame = game.name;
 
                 string archivePath = archivePaths.GetValueOrDefault(game.path);
                 if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath))
@@ -2901,7 +2849,7 @@ public partial class EnhancedShareWindow : Form
                 string lastError = null;
                 int attempt = 0;
 
-                while (!uploadSuccess && attempt < maxRetries && !skipCurrentGame && !cancelAllRemaining)
+                while (!uploadSuccess && attempt < maxRetries && !_skipCurrentGame && !_cancelAllRemaining)
                 {
                     attempt++;
                     string statusPrefix = attempt > 1 ? $"Retry {attempt}/{maxRetries}: " : "";
@@ -2909,9 +2857,9 @@ public partial class EnhancedShareWindow : Form
                     UpdateActionColumn(game.row, shareColumn, $"{statusPrefix}0%", Color.Magenta);
 
                     // Create a new cancellation token for this upload
-                    batchCancellationTokenSource?.Dispose();
-                    batchCancellationTokenSource = new CancellationTokenSource();
-                    var token = batchCancellationTokenSource.Token;
+                    _batchCancellationTokenSource?.Dispose();
+                    _batchCancellationTokenSource = new CancellationTokenSource();
+                    var token = _batchCancellationTokenSource.Token;
 
                     try
                     {
@@ -2922,7 +2870,7 @@ public partial class EnhancedShareWindow : Form
                         var startTime = DateTime.Now;
                         long lastBytes = 0;
                         double smoothedSpeed = 0;
-                        DateTime lastUIUpdate = DateTime.MinValue;
+                        DateTime lastUiUpdate = DateTime.MinValue;
                         int lastPct = -1;
 
                         var progress = new Progress<double>(p =>
@@ -2945,9 +2893,9 @@ public partial class EnhancedShareWindow : Form
                             }
 
                             // Throttle UI updates to every 200ms or when percentage changes
-                            if ((DateTime.Now - lastUIUpdate).TotalMilliseconds > 200 || pct != lastPct)
+                            if ((DateTime.Now - lastUiUpdate).TotalMilliseconds > 200 || pct != lastPct)
                             {
-                                lastUIUpdate = DateTime.Now;
+                                lastUiUpdate = DateTime.Now;
                                 lastPct = pct;
 
                                 if (!IsDisposed)
@@ -2986,7 +2934,7 @@ public partial class EnhancedShareWindow : Form
 
                             // Store upload details including duration
                             UpdateUploadStatus(game.path, true, result.DownloadUrl, null, attempt - 1);
-                            if (crackDetailsMap.TryGetValue(game.path, out SteamAppId.CrackDetails? value))
+                            if (_crackDetailsMap.TryGetValue(game.path, out CrackDetails? value))
                             {
                                 value.UploadDuration = uploadDuration;
                             }
@@ -2994,7 +2942,7 @@ public partial class EnhancedShareWindow : Form
                             uploadSuccess = true;
 
                             // Save shared game data for persistence
-                            SaveSharedGame(game.appId, game.buildId, toggleCrackOn ? "cracked" : "clean");
+                            SaveSharedGame(game.appId, game.buildId, _toggleCrackOn ? "cracked" : "clean");
                         }
                         else
                         {
@@ -3005,12 +2953,12 @@ public partial class EnhancedShareWindow : Form
                     }
                     catch (OperationCanceledException)
                     {
-                        if (skipCurrentGame && !cancelAllRemaining)
+                        if (_skipCurrentGame && !_cancelAllRemaining)
                         {
                             UpdateActionColumn(game.row, shareColumn, "Skipped", Color.Yellow);
                             Debug.WriteLine($"[BATCH] Upload skipped for {game.name}");
                         }
-                        else if (cancelAllRemaining)
+                        else if (_cancelAllRemaining)
                         {
                             UpdateActionColumn(game.row, shareColumn, "Cancelled", Color.Gray);
                         }
@@ -3023,9 +2971,9 @@ public partial class EnhancedShareWindow : Form
                         Debug.WriteLine($"[BATCH] Upload attempt {attempt} error for {game.name}: {ex.Message}");
 
                         // Wait before retry (exponential backoff) - but check for skip/cancel
-                        if (attempt < maxRetries && !skipCurrentGame && !cancelAllRemaining)
+                        if (attempt < maxRetries && !_skipCurrentGame && !_cancelAllRemaining)
                         {
-                            for (int i = attempt * 2; i > 0 && !skipCurrentGame && !cancelAllRemaining; i--)
+                            for (int i = attempt * 2; i > 0 && !_skipCurrentGame && !_cancelAllRemaining; i--)
                             {
                                 UpdateActionColumn(game.row, shareColumn, $"Retry in {i}s...", Color.Yellow);
                                 await Task.Delay(1000);
@@ -3034,7 +2982,7 @@ public partial class EnhancedShareWindow : Form
                     }
                 }
 
-                if (!uploadSuccess && !skipCurrentGame && !cancelAllRemaining)
+                if (!uploadSuccess && !_skipCurrentGame && !_cancelAllRemaining)
                 {
                     // Show truncated error in status
                     string shortError = lastError?.Length > 30 ? lastError.Substring(0, 30) + "..." : lastError;
@@ -3046,7 +2994,7 @@ public partial class EnhancedShareWindow : Form
             // Hide upload panel
             HideUploadDetails();
         }
-        else if (cancelAllRemaining && toggleShareOn)
+        else if (_cancelAllRemaining && _toggleShareOn)
         {
             // Mark remaining as cancelled
             var gamesToUpload = gamesToProcess.Where(g => crackResults.ContainsKey(g.path) && crackResults[g.path])
@@ -3056,7 +3004,7 @@ public partial class EnhancedShareWindow : Form
                 UpdateActionColumn(game.row, shareColumn, "Cancelled", Color.Gray);
             }
         }
-        else if (toggleCrackOn && !toggleZipOn && !toggleShareOn)
+        else if (_toggleCrackOn && !_toggleZipOn && !_toggleShareOn)
         {
             // Crack only - already updated above
         }
@@ -3078,8 +3026,8 @@ public partial class EnhancedShareWindow : Form
             // Update status to show we're waiting for conversions
             lblStatus.Text = "Waiting for Debrid conversions...";
             lblStatus.ForeColor = Color.FromArgb(255, 200, 100);
-            lblUploadGame.Text = "Uploads complete - converting to PyDrive...";
-            await ShowBatchUploadSummary(uploadResults, toggleCrackOn);
+            _lblUploadGame.Text = "Uploads complete - converting to PyDrive...";
+            await ShowBatchUploadSummary(uploadResults, _toggleCrackOn);
             lblStatus.Text = "Ready";
             lblStatus.ForeColor = Color.FromArgb(150, 150, 150);
         }
@@ -3111,7 +3059,7 @@ public partial class EnhancedShareWindow : Form
         btnSettings.Enabled = true;
 
         // Hide upload details panel
-        uploadDetailsPanel.Visible = false;
+        _uploadDetailsPanel.Visible = false;
     }
 
     private async Task ShowBatchUploadSummary(List<(string name, string url, long fileSize)> uploadResults,
@@ -3217,8 +3165,8 @@ public partial class EnhancedShareWindow : Form
         {
             if (fileSize > 5L * 1024 * 1024 * 1024) // 5GB+
             {
-                long sizeInGB = fileSize / (1024 * 1024 * 1024);
-                int seconds = (int)(sizeInGB * 12); // 12 seconds per GB
+                long sizeInGb = fileSize / (1024 * 1024 * 1024);
+                int seconds = (int)(sizeInGb * 12); // 12 seconds per GB
                 return Math.Min(Math.Max(seconds, 30), 1800); // 30s to 30min
             }
 
@@ -3515,8 +3463,8 @@ public partial class EnhancedShareWindow : Form
             // Calculate initial wait time based on file size
             if (fileSize > 5L * 1024 * 1024 * 1024) // 5GB+
             {
-                long sizeInGB = fileSize / (1024 * 1024 * 1024);
-                secondsRemaining = (int)(sizeInGB * 12); // 12 seconds per GB
+                long sizeInGb = fileSize / (1024 * 1024 * 1024);
+                secondsRemaining = (int)(sizeInGb * 12); // 12 seconds per GB
                 secondsRemaining = Math.Min(secondsRemaining, 1800); // Cap at 30 minutes
                 secondsRemaining = Math.Max(secondsRemaining, 30); // At least 30 seconds
             }
@@ -3876,7 +3824,7 @@ public partial class EnhancedShareWindow : Form
     {
         if (e.Button == MouseButtons.Left)
         {
-            mouseDownPoint = new Point(e.X, e.Y);
+            _mouseDownPoint = new Point(e.X, e.Y);
             Cursor = Cursors.SizeAll;
 
             // Handle mouse move
@@ -3888,11 +3836,11 @@ public partial class EnhancedShareWindow : Form
 
     private void TitleBar_MouseMove(object sender, MouseEventArgs e)
     {
-        if (e.Button == MouseButtons.Left && mouseDownPoint != Point.Empty)
+        if (e.Button == MouseButtons.Left && _mouseDownPoint != Point.Empty)
         {
             Location = new Point(
-                Location.X + e.X - mouseDownPoint.X,
-                Location.Y + e.Y - mouseDownPoint.Y
+                Location.X + e.X - _mouseDownPoint.X,
+                Location.Y + e.Y - _mouseDownPoint.Y
             );
         }
     }
@@ -3900,7 +3848,7 @@ public partial class EnhancedShareWindow : Form
     private void TitleBar_MouseUp(object sender, MouseEventArgs e)
     {
         Cursor = Cursors.Default;
-        mouseDownPoint = Point.Empty;
+        _mouseDownPoint = Point.Empty;
 
         var titleBarControl = sender as Control;
         titleBarControl.MouseMove -= TitleBar_MouseMove;
@@ -4365,15 +4313,6 @@ public partial class EnhancedShareWindow : Form
         public int AnimationId;
     }
 
-    private class SteamGame
-    {
-        public string AppId { get; set; }
-        public string Name { get; set; }
-        public string InstallDir { get; set; }
-        public string BuildId { get; set; }
-        public long LastUpdated { get; set; }
-    }
-
     #region Upload Details Panel Methods
 
     /// <summary>
@@ -4394,18 +4333,18 @@ public partial class EnhancedShareWindow : Form
             return;
         }
 
-        uploadDetailsPanel.Visible = true;
-        lblUploadGame.Text = $"Uploading: {gameName}";
-        lblUploadSize.Text = $"0 / {_gameData.FormatFileSize(totalBytes)}";
-        lblUploadSpeed.Text = "";
-        lblUploadEta.Text = "";
-        uploadProgressBar.Value = 0;
-        uploadProgressBar.Invalidate();
+        _uploadDetailsPanel.Visible = true;
+        _lblUploadGame.Text = $"Uploading: {gameName}";
+        _lblUploadSize.Text = $"0 / {_gameData.FormatFileSize(totalBytes)}";
+        _lblUploadSpeed.Text = "";
+        _lblUploadEta.Text = "";
+        _uploadProgressBar.Value = 0;
+        _uploadProgressBar.Invalidate();
 
         // Reset buttons
-        btnCancelUpload.Text = "Cancel All";
-        btnCancelUpload.Enabled = true;
-        if (uploadDetailsPanel.Controls["btnSkip"] is Button skipBtn)
+        _btnCancelUpload.Text = "Cancel All";
+        _btnCancelUpload.Enabled = true;
+        if (_uploadDetailsPanel.Controls["btnSkip"] is Button skipBtn)
         {
             skipBtn.Text = "Skip";
             skipBtn.Enabled = true;
@@ -4430,28 +4369,28 @@ public partial class EnhancedShareWindow : Form
             return;
         }
 
-        uploadProgressBar.Value = Math.Min(percent, 100);
-        uploadProgressBar.Invalidate();
-        lblUploadSize.Text = $"{_gameData.FormatFileSize(uploadedBytes)} / {_gameData.FormatFileSize(totalBytes)}";
+        _uploadProgressBar.Value = Math.Min(percent, 100);
+        _uploadProgressBar.Invalidate();
+        _lblUploadSize.Text = $"{_gameData.FormatFileSize(uploadedBytes)} / {_gameData.FormatFileSize(totalBytes)}";
 
         if (bytesPerSecond > 0)
         {
-            lblUploadSpeed.Text = $"{_gameData.FormatFileSize((long)bytesPerSecond)}/s";
+            _lblUploadSpeed.Text = $"{_gameData.FormatFileSize((long)bytesPerSecond)}/s";
 
             long remainingBytes = totalBytes - uploadedBytes;
             if (remainingBytes > 0)
             {
                 double secondsRemaining = remainingBytes / bytesPerSecond;
-                lblUploadEta.Text = _formatting.FormatEta(secondsRemaining);
+                _lblUploadEta.Text = _formatting.FormatEta(secondsRemaining);
             }
             else
             {
-                lblUploadEta.Text = "";
+                _lblUploadEta.Text = "";
             }
         }
 
         // Force immediate UI refresh
-        uploadDetailsPanel.Refresh();
+        _uploadDetailsPanel.Refresh();
     }
 
     /// <summary>
@@ -4472,7 +4411,7 @@ public partial class EnhancedShareWindow : Form
             return;
         }
 
-        uploadDetailsPanel.Visible = false;
+        _uploadDetailsPanel.Visible = false;
     }
 
     #endregion
@@ -4482,14 +4421,14 @@ public partial class EnhancedShareWindow : Form
     /// <summary>
     ///     Stores crack details for a game by install path
     /// </summary>
-    public void SetCrackDetails(string installPath, SteamAppId.CrackDetails details)
+    public void SetCrackDetails(string installPath, CrackDetails details)
     {
         if (string.IsNullOrEmpty(installPath) || details == null)
         {
             return;
         }
 
-        crackDetailsMap[installPath] = details;
+        _crackDetailsMap[installPath] = details;
     }
 
     /// <summary>
@@ -4502,15 +4441,15 @@ public partial class EnhancedShareWindow : Form
             return;
         }
 
-        if (!crackDetailsMap.ContainsKey(installPath))
+        if (!_crackDetailsMap.ContainsKey(installPath))
         {
-            crackDetailsMap[installPath] = new SteamAppId.CrackDetails
+            _crackDetailsMap[installPath] = new CrackDetails
             {
                 GameName = Path.GetFileName(installPath), GamePath = installPath
             };
         }
 
-        var details = crackDetailsMap[installPath];
+        var details = _crackDetailsMap[installPath];
         details.ZipAttempted = true;
         details.ZipSuccess = success;
         details.ZipPath = zipPath;
@@ -4528,15 +4467,15 @@ public partial class EnhancedShareWindow : Form
             return;
         }
 
-        if (!crackDetailsMap.ContainsKey(installPath))
+        if (!_crackDetailsMap.ContainsKey(installPath))
         {
-            crackDetailsMap[installPath] = new SteamAppId.CrackDetails
+            _crackDetailsMap[installPath] = new CrackDetails
             {
                 GameName = Path.GetFileName(installPath), GamePath = installPath
             };
         }
 
-        var details = crackDetailsMap[installPath];
+        var details = _crackDetailsMap[installPath];
         details.UploadAttempted = true;
         details.UploadSuccess = success;
         details.UploadUrl = url;
@@ -4547,7 +4486,7 @@ public partial class EnhancedShareWindow : Form
     /// <summary>
     ///     Shows crack details in a popup dialog
     /// </summary>
-    private void ShowCrackDetails(SteamAppId.CrackDetails details)
+    private void ShowCrackDetails(CrackDetails details)
     {
         if (details == null)
         {
@@ -4754,392 +4693,4 @@ public partial class EnhancedShareWindow : Form
     }
 
     #endregion
-}
-
-// Modern Progress Bar with cool blue gradient
-public class ModernProgressBar : ProgressBar
-{
-    public ModernProgressBar()
-    {
-        SetStyle(ControlStyles.UserPaint, true);
-        SetStyle(ControlStyles.AllPaintingInWmPaint, true);
-        SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-        // Draw dark background
-        e.Graphics.FillRectangle(new SolidBrush(Color.FromArgb(15, 15, 15)), e.ClipRectangle);
-
-        // Calculate progress bar fill width
-        int progressWidth = (int)(e.ClipRectangle.Width * ((double)Value / Maximum));
-
-        if (progressWidth > 0)
-        {
-            // Create gradient brush for sky blue effect
-            var progressRect = new Rectangle(0, 0, progressWidth, e.ClipRectangle.Height);
-            using (var brush = new LinearGradientBrush(
-                       progressRect,
-                       Color.FromArgb(135, 206, 250), // Light sky blue
-                       Color.FromArgb(100, 175, 220), // Darker sky blue
-                       LinearGradientMode.Vertical))
-            {
-                e.Graphics.FillRectangle(brush, progressRect);
-            }
-
-            // Add subtle highlight on top for depth
-            var highlightRect = new Rectangle(0, 0, progressWidth, e.ClipRectangle.Height / 3);
-            using (var highlightBrush = new SolidBrush(Color.FromArgb(40, 255, 255, 255)))
-            {
-                e.Graphics.FillRectangle(highlightBrush, highlightRect);
-            }
-        }
-    }
-}
-
-// RGB Progress Window
-public class RGBProgressWindow : Form
-{
-    private const int WM_NCLBUTTONDOWN = 0xA1;
-    private const int HTCAPTION = 0x2;
-    private Button btnCancel;
-    private int colorStep;
-    private DateTime countdownStartTime;
-    private long currentFileSize;
-    private Label lblScrollingInfo;
-    internal Label lblStatus;
-
-    internal ProgressBar progressBar;
-    private Timer rgbTimer;
-    private int scrollOffset;
-    private string scrollText = "";
-    private Timer scrollTimer;
-    private int totalCountdownMinutes;
-
-    public RGBProgressWindow(string gameName, string type)
-    {
-        GameName = gameName;
-        InitializeWindow(gameName, type);
-
-        // Enable dragging the form
-        MouseDown += RGBProgressWindow_MouseDown;
-    }
-
-    public bool WasCancelled { get; private set; }
-
-    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
-    public string OneFichierUrl { get; set; }
-
-    public string GameName { get; private set; }
-
-    [DllImport("user32.dll")]
-    private static extern bool ReleaseCapture();
-
-    [DllImport("user32.dll")]
-    private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
-
-    public void CenterOverParent(Form parent)
-    {
-        if (parent is { IsHandleCreated: true })
-        {
-            // Calculate center position
-            int x = parent.Left + (parent.Width - Width) / 2;
-            int y = parent.Top + (parent.Height - Height) / 2;
-            Location = new Point(x, y);
-        }
-    }
-
-    private void InitializeWindow(string gameName, string type)
-    {
-        Text = $"Sharing {gameName} ({type})";
-        Size = new Size(500, 260); // Increased height for scrolling text
-        StartPosition = FormStartPosition.Manual; // We'll set position manually
-        FormBorderStyle = FormBorderStyle.None;
-        BackColor = Color.FromArgb(5, 8, 20);
-
-        // Apply rounded corners when form loads
-        Load += (s, e) =>
-        {
-            try
-            {
-                int preference = NativeMethods.DWMWCP_ROUND;
-                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE,
-                    ref preference, sizeof(int));
-            }
-            catch { }
-        };
-
-        // Scrolling info label - hidden by default
-        lblScrollingInfo = new Label
-        {
-            Text = "",
-            Font = new Font("Segoe UI", 9, FontStyle.Italic),
-            ForeColor = Color.FromArgb(120, 192, 255), // Soft cyan
-            Location = new Point(25, 25),
-            Size = new Size(450, 20),
-            AutoSize = false,
-            Visible = false
-        };
-
-        lblStatus = new Label
-        {
-            Text = "Preparing...",
-            Font = new Font("Segoe UI", 11),
-            ForeColor = Color.Cyan, // Start with a color, will be animated
-            Location = new Point(25, 70),
-            Size = new Size(450, 30)
-        };
-
-        progressBar = new ModernProgressBar
-        {
-            Location = new Point(25, 110),
-            Size = new Size(450, 30),
-            Style = ProgressBarStyle.Continuous,
-            BackColor = Color.FromArgb(15, 15, 15),
-            Value = 0,
-            Minimum = 0,
-            Maximum = 100
-        };
-
-        btnCancel = new Button
-        {
-            Text = "✖ Cancel",
-            Location = new Point(200, 165),
-            Size = new Size(100, 30),
-            BackColor = Color.FromArgb(40, 40, 40),
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Standard,
-            Font = new Font("Segoe UI", 9)
-        };
-        btnCancel.Click += (s, e) =>
-        {
-            WasCancelled = true;
-            lblStatus.Text = "Cancelled by user";
-            lblStatus.ForeColor = Color.Orange;
-            btnCancel.Enabled = false;
-            rgbTimer?.Stop();
-            scrollTimer?.Stop();
-            Close();
-        };
-
-        Controls.AddRange(lblScrollingInfo, lblStatus, progressBar, btnCancel);
-
-        // RGB effect
-        SetupRGBEffect();
-
-        // Apply acrylic on load
-        Load += (s, e) => ApplyAcrylicToProgressWindow();
-    }
-
-    private void ApplyAcrylicToProgressWindow()
-    {
-        AcrylicHelper.ApplyAcrylic(this, false);
-    }
-
-    private void SetupRGBEffect()
-    {
-        rgbTimer = new Timer { Interval = 50 };
-        rgbTimer.Tick += (s, e) =>
-        {
-            colorStep = (colorStep + 5) % 360;
-            var color = HSLToRGB(colorStep, 1.0, 0.72); // Bright vibrant colors
-            // Apply RGB effect to the text
-            lblStatus.ForeColor = color;
-
-            // Apply RGB to scrolling info text too
-            if (lblScrollingInfo is { Visible: true })
-            {
-                lblScrollingInfo.ForeColor = color;
-            }
-
-            // Try to color the progress bar (might not work on all Windows versions)
-            try
-            {
-                progressBar.ForeColor = color;
-                // For Windows 10+, we can try to use visual styles
-                progressBar.Style = ProgressBarStyle.Continuous;
-            }
-            catch { }
-        };
-        rgbTimer.Start();
-    }
-
-    private Color HSLToRGB(double h, double s, double l)
-    {
-        double r, g, b;
-        h = h / 360.0;
-
-        if (s == 0)
-        {
-            r = g = b = l;
-        }
-        else
-        {
-            var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-            var p = 2 * l - q;
-            r = HueToRGB(p, q, h + 1.0 / 3);
-            g = HueToRGB(p, q, h);
-            b = HueToRGB(p, q, h - 1.0 / 3);
-        }
-
-        return Color.FromArgb((int)(r * 255), (int)(g * 255), (int)(b * 255));
-    }
-
-    private double HueToRGB(double p, double q, double t)
-    {
-        if (t < 0)
-        {
-            t += 1;
-        }
-
-        if (t > 1)
-        {
-            t -= 1;
-        }
-
-        if (t < 1.0 / 6)
-        {
-            return p + (q - p) * 6 * t;
-        }
-
-        if (t < 1.0 / 2)
-        {
-            return q;
-        }
-
-        if (t < 2.0 / 3)
-        {
-            return p + (q - p) * (2.0 / 3 - t) * 6;
-        }
-
-        return p;
-    }
-
-    public void UpdateStatus(string status)
-    {
-        if (IsHandleCreated)
-        {
-            Invoke(() =>
-            {
-                lblStatus.Text = status;
-                progressBar.Value = Math.Min(progressBar.Value + 20, 100);
-            });
-        }
-    }
-
-    public void SetProgress(int percentage, string status)
-    {
-        if (IsHandleCreated)
-        {
-            Invoke(() =>
-            {
-                lblStatus.Text = status;
-                progressBar.Value = Math.Max(0, Math.Min(100, percentage));
-            });
-        }
-    }
-
-    public void Complete(string url)
-    {
-        if (IsHandleCreated)
-        {
-            Invoke(() =>
-            {
-                lblStatus.Text = "✅ Complete! Upload URL copied to clipboard.";
-                lblStatus.ForeColor = Color.Lime;
-                progressBar.Value = 100;
-                Clipboard.SetText(url);
-                rgbTimer.Stop();
-                BackColor = Color.FromArgb(0, 50, 0);
-            });
-        }
-    }
-
-    public void ShowLargeFileWarning(long fileSizeBytes, int estimatedMinutes)
-    {
-        if (IsHandleCreated)
-        {
-            Invoke(() =>
-            {
-                // Set up countdown
-                countdownStartTime = DateTime.Now;
-                totalCountdownMinutes = estimatedMinutes;
-                currentFileSize = fileSizeBytes;
-
-                // Update scrolling text
-                UpdateCountdownText();
-                lblScrollingInfo.Visible = true;
-
-                // Start scrolling animation with countdown updates
-                if (scrollTimer == null)
-                {
-                    scrollTimer = new Timer();
-                    scrollTimer.Interval = 1000; // Update every second for countdown
-                    scrollTimer.Tick += (s, e) =>
-                    {
-                        UpdateCountdownText();
-
-                        // Do scrolling effect
-                        if (!string.IsNullOrEmpty(scrollText))
-                        {
-                            scrollOffset = (scrollOffset + 2) % scrollText.Length;
-                            string displayText = scrollText.Substring(scrollOffset) +
-                                                 scrollText.Substring(0, scrollOffset);
-                            lblScrollingInfo.Text =
-                                displayText.Substring(0, Math.Min(displayText.Length, 60)); // Show 60 chars
-                        }
-                    };
-                }
-
-                scrollTimer.Start();
-            });
-        }
-    }
-
-    private void UpdateCountdownText()
-    {
-        var elapsed = DateTime.Now - countdownStartTime;
-        var remaining = totalCountdownMinutes - (int)elapsed.TotalMinutes;
-        if (remaining < 1)
-        {
-            remaining = 1; // Always show at least 1 minute
-        }
-
-        string minuteText = remaining == 1 ? "minute" : "minutes";
-
-        // Only show compression tip for files over 10GB
-        string compressionTip = "";
-        if (currentFileSize > 10L * 1024 * 1024 * 1024) // 10GB
-        {
-            compressionTip = "     💡 Tip: 7z ultra compression can make processing up to 40% faster!";
-        }
-
-        scrollText =
-            $"     Waiting for 1fichier to scan the file...     This will take roughly {remaining} more {minuteText}...{compressionTip}     Cancel anytime to get the 1fichier link...     ";
-    }
-
-    public void ShowError(string error)
-    {
-        if (IsHandleCreated)
-        {
-            Invoke(() =>
-            {
-                lblStatus.Text = error;
-                lblStatus.ForeColor = Color.Red;
-                rgbTimer.Stop();
-                BackColor = Color.FromArgb(50, 0, 0);
-            });
-        }
-    }
-
-    private void RGBProgressWindow_MouseDown(object sender, MouseEventArgs e)
-    {
-        if (e.Button == MouseButtons.Left)
-        {
-            ReleaseCapture();
-            SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
-        }
-    }
 }

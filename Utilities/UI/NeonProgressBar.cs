@@ -1,6 +1,6 @@
 using System.Drawing.Drawing2D;
 
-namespace SteamAutocrackGUI;
+namespace APPID.Utilities.UI;
 
 /// <summary>
 ///     Custom progress bar with neon blue gradient styling

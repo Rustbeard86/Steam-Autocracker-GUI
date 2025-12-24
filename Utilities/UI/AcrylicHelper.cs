@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace APPID;
+namespace APPID.Utilities.UI;
 
 [StructLayout(LayoutKind.Sequential)]
 public struct WindowCompositionAttribData
@@ -24,15 +24,15 @@ public struct AccentPolicy
 /// </summary>
 public static class NativeMethods
 {
-    public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
-    public const int DWMWCP_ROUND = 2;
-    public const int WCA_ACCENT_POLICY = 19;
-    public const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
-    public const int ACCENT_ENABLE_TRANSPARENTGRADIENT = 2;
-    public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
-    public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
-    public const int DWMWA_NCRENDERING_POLICY = 2;
-    public const int DWMNCRP_DISABLED = 1;
+    public const int DwmwaWindowCornerPreference = 33;
+    public const int DwmwcpRound = 2;
+    public const int WcaAccentPolicy = 19;
+    public const int AccentEnableAcrylicblurbehind = 4;
+    public const int AccentEnableTransparentgradient = 2;
+    public const int DwmwaUseImmersiveDarkMode = 20;
+    public const int DwmwaSystembackdropType = 38;
+    public const int DwmwaNcrenderingPolicy = 2;
+    public const int DwmncrpDisabled = 1;
 
     [DllImport("user32.dll")]
     public static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttribData data);
@@ -59,8 +59,8 @@ public static class AcrylicHelper
         {
             try
             {
-                int preference = NativeMethods.DWMWCP_ROUND;
-                NativeMethods.DwmSetWindowAttribute(form.Handle, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE,
+                int preference = NativeMethods.DwmwcpRound;
+                NativeMethods.DwmSetWindowAttribute(form.Handle, NativeMethods.DwmwaWindowCornerPreference,
                     ref preference, sizeof(int));
             }
             catch
@@ -74,8 +74,8 @@ public static class AcrylicHelper
         {
             try
             {
-                int policy = NativeMethods.DWMNCRP_DISABLED;
-                NativeMethods.DwmSetWindowAttribute(form.Handle, NativeMethods.DWMWA_NCRENDERING_POLICY, ref policy,
+                int policy = NativeMethods.DwmncrpDisabled;
+                NativeMethods.DwmSetWindowAttribute(form.Handle, NativeMethods.DwmwaNcrenderingPolicy, ref policy,
                     sizeof(int));
             }
             catch
@@ -88,7 +88,7 @@ public static class AcrylicHelper
         try
         {
             int darkMode = 1;
-            NativeMethods.DwmSetWindowAttribute(form.Handle, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode,
+            NativeMethods.DwmSetWindowAttribute(form.Handle, NativeMethods.DwmwaUseImmersiveDarkMode, ref darkMode,
                 sizeof(int));
         }
         catch

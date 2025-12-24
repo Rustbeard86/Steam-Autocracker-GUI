@@ -18,7 +18,7 @@ public interface ISettingsService
     bool AutoCrack { get; set; }
 
     /// <summary>Gets or sets whether LAN multiplayer is enabled.</summary>
-    bool LANMultiplayer { get; set; }
+    bool LanMultiplayer { get; set; }
 
     /// <summary>Gets or sets whether to use RIN password for archives.</summary>
     bool UseRinPassword { get; set; }

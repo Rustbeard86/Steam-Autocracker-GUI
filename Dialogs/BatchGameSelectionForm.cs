@@ -1,48 +1,49 @@
 using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
-using APPID;
+using APPID.Models;
 using APPID.Properties;
 using APPID.Services;
 using APPID.Services.Interfaces;
+using APPID.Utilities.UI;
 using Timer = System.Windows.Forms.Timer;
 
-namespace SteamAutocrackGUI;
+namespace APPID.Dialogs;
 
 public class BatchGameSelectionForm : Form
 {
-    private const int WM_NCLBUTTONDOWN = 0xA1;
-    private const int HTCAPTION = 0x2;
-    private const int MAX_UPLOAD_SLOTS = 3;
+    private const int WmNclbuttondown = 0xA1;
+    private const int Htcaption = 0x2;
+    private const int MaxUploadSlots = 3;
 
     // Service dependencies
     private readonly IAppIdDetectionService _appIdDetection;
     private readonly IFormattingService _formatting;
     private readonly IBatchGameDataService _gameData;
-    private readonly Dictionary<string, string> convertingUrls = []; // gamePath -> 1fichier URL during conversion
-    private readonly Dictionary<string, SteamAppId.CrackDetails> crackDetailsMap = []; // gamePath -> crack details
-    private readonly Dictionary<int, string> detectedAppIds = [];
-    private readonly Dictionary<string, string> finalUrls = []; // gamePath -> final URL (pydrive or 1fichier)
-    private readonly List<string> gamePaths;
-    private readonly UploadSlot[] uploadSlots = new UploadSlot[MAX_UPLOAD_SLOTS];
+    private readonly Dictionary<string, string> _convertingUrls = []; // gamePath -> 1fichier URL during conversion
+    private readonly Dictionary<string, CrackDetails> _crackDetailsMap = []; // gamePath -> crack details
+    private readonly Dictionary<int, string> _detectedAppIds = [];
+    private readonly Dictionary<string, string> _finalUrls = []; // gamePath -> final URL (pydrive or 1fichier)
+    private readonly List<string> _gamePaths;
+    private readonly UploadSlot[] _uploadSlots = new UploadSlot[MaxUploadSlots];
 
-    private string allLinksMarkdown = string.Empty;
-    private string allLinksPhpBB = string.Empty;
-    private string? allLinksPlaintext;
+    private string _allLinksMarkdown = string.Empty;
+    private string _allLinksPhpBb = string.Empty;
+    private string? _allLinksPlaintext;
 
-    private ToolTip? batchToolTip;
-    private Button? btnCancelAll;
-    private bool cancelAllRemaining;
-    private Button? copyDiscordBtn;
-    private Button? copyPlaintextBtn;
-    private Button? copyRinBtn;
+    private ToolTip? _batchToolTip;
+    private Button? _btnCancelAll;
+    private bool _cancelAllRemaining;
+    private Button? _copyDiscordBtn;
+    private Button? _copyPlaintextBtn;
+    private Button? _copyRinBtn;
 
-    private DataGridView? gameGrid;
-    private Panel? uploadSlotsContainer;
+    private DataGridView? _gameGrid;
+    private Panel? _uploadSlotsContainer;
 
     public BatchGameSelectionForm(List<string> paths, IAppIdDetectionService? appIdDetection = null,
         IBatchGameDataService? gameData = null, IFormattingService? formatting = null)
     {
-        gamePaths = paths;
+        _gamePaths = paths;
 
         // Initialize services - use provided or create defaults
         var fileSystem = new FileSystemService();
@@ -110,7 +111,7 @@ public class BatchGameSelectionForm : Form
     private static extern bool ReleaseCapture();
 
     [DllImport("user32.dll")]
-    private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+    private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
 
     // Event for when Process is clicked
     public event Action<List<BatchGameItem>, string, string, bool> ProcessRequested;
@@ -182,7 +183,7 @@ public class BatchGameSelectionForm : Form
         // Subtitle
         var subtitleLabel = new Label
         {
-            Text = $"Found {gamePaths.Count} games. Select actions for each:",
+            Text = $"Found {_gamePaths.Count} games. Select actions for each:",
             Font = new Font("Segoe UI", 9),
             ForeColor = Color.FromArgb(180, 180, 185),
             Location = new Point(15, 48),
@@ -192,7 +193,7 @@ public class BatchGameSelectionForm : Form
         Controls.Add(subtitleLabel);
 
         // DataGridView for games - anchored to resize with form
-        gameGrid = new DataGridView
+        _gameGrid = new DataGridView
         {
             Location = new Point(10, 75),
             Size = new Size(735, 300),
@@ -215,29 +216,29 @@ public class BatchGameSelectionForm : Form
         };
 
         // Style headers - semi-transparent dark
-        gameGrid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(20, 25, 40);
-        gameGrid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(150, 200, 255);
-        gameGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-        gameGrid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(20, 25, 40);
-        gameGrid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-        gameGrid.ColumnHeadersHeight = 40;
+        _gameGrid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(20, 25, 40);
+        _gameGrid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(150, 200, 255);
+        _gameGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+        _gameGrid.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.FromArgb(20, 25, 40);
+        _gameGrid.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+        _gameGrid.ColumnHeadersHeight = 40;
 
         // Style rows - semi-transparent dark
-        gameGrid.DefaultCellStyle.BackColor = Color.FromArgb(12, 15, 28);
-        gameGrid.DefaultCellStyle.ForeColor = Color.FromArgb(220, 255, 255);
-        gameGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 70, 110);
-        gameGrid.DefaultCellStyle.SelectionForeColor = Color.White;
-        gameGrid.RowTemplate.Height = 28;
+        _gameGrid.DefaultCellStyle.BackColor = Color.FromArgb(12, 15, 28);
+        _gameGrid.DefaultCellStyle.ForeColor = Color.FromArgb(220, 255, 255);
+        _gameGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 70, 110);
+        _gameGrid.DefaultCellStyle.SelectionForeColor = Color.White;
+        _gameGrid.RowTemplate.Height = 28;
 
         // Alternate row style - slightly different shade
-        gameGrid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(18, 22, 38);
+        _gameGrid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(18, 22, 38);
 
         // Add columns
         var nameCol = new DataGridViewTextBoxColumn
         {
             Name = "GameName", HeaderText = "Game", Width = 200, ReadOnly = true
         };
-        gameGrid.Columns.Add(nameCol);
+        _gameGrid.Columns.Add(nameCol);
 
         var appIdCol = new DataGridViewTextBoxColumn
         {
@@ -250,7 +251,7 @@ public class BatchGameSelectionForm : Form
                 Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.FromArgb(100, 200, 255)
             }
         };
-        gameGrid.Columns.Add(appIdCol);
+        _gameGrid.Columns.Add(appIdCol);
 
         var sizeCol = new DataGridViewTextBoxColumn
         {
@@ -260,16 +261,16 @@ public class BatchGameSelectionForm : Form
             ReadOnly = true,
             DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleRight }
         };
-        gameGrid.Columns.Add(sizeCol);
+        _gameGrid.Columns.Add(sizeCol);
 
         var crackCol = new DataGridViewCheckBoxColumn { Name = "Crack", HeaderText = "Crack", Width = 55 };
-        gameGrid.Columns.Add(crackCol);
+        _gameGrid.Columns.Add(crackCol);
 
         var zipCol = new DataGridViewCheckBoxColumn { Name = "Zip", HeaderText = "Zip", Width = 45 };
-        gameGrid.Columns.Add(zipCol);
+        _gameGrid.Columns.Add(zipCol);
 
         var uploadCol = new DataGridViewCheckBoxColumn { Name = "Upload", HeaderText = "Upload", Width = 55 };
-        gameGrid.Columns.Add(uploadCol);
+        _gameGrid.Columns.Add(uploadCol);
 
         // Add tooltips to checkbox column headers
         crackCol.ToolTipText = "Click header to select/deselect all";
@@ -287,13 +288,13 @@ public class BatchGameSelectionForm : Form
                 Alignment = DataGridViewContentAlignment.MiddleCenter, ForeColor = Color.Gray
             }
         };
-        gameGrid.Columns.Add(statusCol);
+        _gameGrid.Columns.Add(statusCol);
 
         var detailsCol = new DataGridViewTextBoxColumn
         {
             Name = "Details", HeaderText = "", Width = 40, ReadOnly = true
         };
-        gameGrid.Columns.Add(detailsCol);
+        _gameGrid.Columns.Add(detailsCol);
 
         // Track header checkbox states
         Dictionary<string, bool> headerCheckStates = new() { ["Crack"] = true, ["Zip"] = false, ["Upload"] = false };
@@ -313,12 +314,12 @@ public class BatchGameSelectionForm : Form
             // ignored
         }
 
-        gameGrid.CellPainting += (s, e) =>
+        _gameGrid.CellPainting += (s, e) =>
         {
             // Paint checkbox column HEADERS with actual checkbox
             if (e is { RowIndex: -1, ColumnIndex: >= 0 })
             {
-                string colName = gameGrid.Columns[e.ColumnIndex].Name;
+                string colName = _gameGrid.Columns[e.ColumnIndex].Name;
                 if (colName == "Crack" || colName == "Zip" || colName == "Upload")
                 {
                     e.PaintBackground(e.ClipBounds, true);
@@ -388,7 +389,7 @@ public class BatchGameSelectionForm : Form
 
             if (e is { ColumnIndex: >= 0, RowIndex: >= 0 })
             {
-                string colName = gameGrid.Columns[e.ColumnIndex].Name;
+                string colName = _gameGrid.Columns[e.ColumnIndex].Name;
 
                 // Custom paint checkbox cells (Crack, Zip, Upload) - styled
                 if (colName == "Crack" || colName == "Zip" || colName == "Upload")
@@ -513,20 +514,20 @@ public class BatchGameSelectionForm : Form
         LoadGamesAsync();
 
         // Handle clicks on cells
-        gameGrid.CellClick += (s, e) =>
+        _gameGrid.CellClick += (s, e) =>
         {
             if (e.RowIndex < 0)
             {
                 return;
             }
 
-            string colName = gameGrid.Columns[e.ColumnIndex].Name;
+            string colName = _gameGrid.Columns[e.ColumnIndex].Name;
 
             // Single-click on AppID opens search dialog (works for any value)
             if (colName == "AppId")
             {
-                string gameName = gameGrid.Rows[e.RowIndex].Cells["GameName"].Value?.ToString() ?? "";
-                string currentAppId = gameGrid.Rows[e.RowIndex].Cells["AppId"].Value?.ToString() ?? "";
+                string gameName = _gameGrid.Rows[e.RowIndex].Cells["GameName"].Value?.ToString() ?? "";
+                string currentAppId = _gameGrid.Rows[e.RowIndex].Cells["AppId"].Value?.ToString() ?? "";
                 if (currentAppId == "?")
                 {
                     currentAppId = "";
@@ -535,10 +536,10 @@ public class BatchGameSelectionForm : Form
                 string newAppId = ShowAppIdSearchDialog(gameName, currentAppId);
                 if (newAppId != null)
                 {
-                    detectedAppIds[e.RowIndex] = newAppId;
-                    gameGrid.Rows[e.RowIndex].Cells["AppId"].Value = string.IsNullOrEmpty(newAppId) ? "?" : newAppId;
+                    _detectedAppIds[e.RowIndex] = newAppId;
+                    _gameGrid.Rows[e.RowIndex].Cells["AppId"].Value = string.IsNullOrEmpty(newAppId) ? "?" : newAppId;
 
-                    var cell = gameGrid.Rows[e.RowIndex].Cells["AppId"];
+                    var cell = _gameGrid.Rows[e.RowIndex].Cells["AppId"];
                     if (string.IsNullOrEmpty(newAppId))
                     {
                         cell.Style.ForeColor = Color.Orange;
@@ -557,19 +558,19 @@ public class BatchGameSelectionForm : Form
             // Single-click on Status column - copy URL if available
             if (colName == "Status")
             {
-                string gamePath = gameGrid.Rows[e.RowIndex].Tag?.ToString();
-                string status = gameGrid.Rows[e.RowIndex].Cells["Status"].Value?.ToString() ?? "";
+                string gamePath = _gameGrid.Rows[e.RowIndex].Tag?.ToString();
+                string status = _gameGrid.Rows[e.RowIndex].Cells["Status"].Value?.ToString() ?? "";
                 string urlToCopy = null;
 
                 // Check for converting URL (1fichier link during conversion)
                 if (status.StartsWith("Converting") && !string.IsNullOrEmpty(gamePath) &&
-                    convertingUrls.TryGetValue(gamePath, out string? url))
+                    _convertingUrls.TryGetValue(gamePath, out string? url))
                 {
                     urlToCopy = url;
                 }
                 // Check for final URL (PyDrive or 1fichier after completion)
                 else if ((status.Contains("PyDrive") || status.Contains("1fichier")) &&
-                         !string.IsNullOrEmpty(gamePath) && finalUrls.TryGetValue(gamePath, out string? finalUrl))
+                         !string.IsNullOrEmpty(gamePath) && _finalUrls.TryGetValue(gamePath, out string? finalUrl))
                 {
                     urlToCopy = finalUrl;
                 }
@@ -581,9 +582,9 @@ public class BatchGameSelectionForm : Form
                         Clipboard.SetText(urlToCopy);
                         // Visual feedback - show "Copied! ✓" for 3 seconds
                         string originalStatus = status;
-                        Color originalColor = gameGrid.Rows[e.RowIndex].Cells["Status"].Style.ForeColor;
-                        gameGrid.Rows[e.RowIndex].Cells["Status"].Value = "Copied! ✓";
-                        gameGrid.Rows[e.RowIndex].Cells["Status"].Style.ForeColor = Color.Cyan;
+                        Color originalColor = _gameGrid.Rows[e.RowIndex].Cells["Status"].Style.ForeColor;
+                        _gameGrid.Rows[e.RowIndex].Cells["Status"].Value = "Copied! ✓";
+                        _gameGrid.Rows[e.RowIndex].Cells["Status"].Style.ForeColor = Color.Cyan;
 
                         var timer = new Timer { Interval = 3000 };
                         int rowIdx = e.RowIndex;
@@ -591,10 +592,10 @@ public class BatchGameSelectionForm : Form
                         {
                             timer.Stop();
                             timer.Dispose();
-                            if (!IsDisposed && rowIdx < gameGrid.Rows.Count)
+                            if (!IsDisposed && rowIdx < _gameGrid.Rows.Count)
                             {
-                                gameGrid.Rows[rowIdx].Cells["Status"].Value = originalStatus;
-                                gameGrid.Rows[rowIdx].Cells["Status"].Style.ForeColor = originalColor;
+                                _gameGrid.Rows[rowIdx].Cells["Status"].Value = originalStatus;
+                                _gameGrid.Rows[rowIdx].Cells["Status"].Style.ForeColor = originalColor;
                             }
                         };
                         timer.Start();
@@ -611,7 +612,7 @@ public class BatchGameSelectionForm : Form
             // Handle checkbox columns
             if (colName == "Crack" || colName == "Zip" || colName == "Upload")
             {
-                var cell = gameGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                var cell = _gameGrid.Rows[e.RowIndex].Cells[e.ColumnIndex];
                 bool currentValue = (bool)(cell.Value ?? false);
                 bool newValue = !currentValue;
                 cell.Value = newValue;
@@ -622,12 +623,12 @@ public class BatchGameSelectionForm : Form
                 if (colName == "Upload" && newValue)
                 {
                     // Upload requires Zip only (not Crack - can share uncracked games)
-                    gameGrid.Rows[e.RowIndex].Cells["Zip"].Value = true;
+                    _gameGrid.Rows[e.RowIndex].Cells["Zip"].Value = true;
                 }
                 else if (colName == "Zip" && !newValue)
                 {
                     // Unchecking Zip unchecks Upload (can't upload without zip)
-                    gameGrid.Rows[e.RowIndex].Cells["Upload"].Value = false;
+                    _gameGrid.Rows[e.RowIndex].Cells["Upload"].Value = false;
                 }
                 // Note: Crack is now fully independent - unchecking it does NOT affect Zip/Upload
 
@@ -637,9 +638,9 @@ public class BatchGameSelectionForm : Form
             // Handle Details button click
             if (colName == "Details")
             {
-                string gamePath = gameGrid.Rows[e.RowIndex].Tag?.ToString();
+                string gamePath = _gameGrid.Rows[e.RowIndex].Tag?.ToString();
                 if (!string.IsNullOrEmpty(gamePath) &&
-                    crackDetailsMap.TryGetValue(gamePath, out SteamAppId.CrackDetails? value))
+                    _crackDetailsMap.TryGetValue(gamePath, out CrackDetails? value))
                 {
                     ShowCrackDetails(value);
                 }
@@ -651,10 +652,10 @@ public class BatchGameSelectionForm : Form
             }
         };
 
-        Controls.Add(gameGrid);
+        Controls.Add(_gameGrid);
 
         // Initialize tooltip
-        batchToolTip = new ToolTip { AutoPopDelay = 5000, InitialDelay = 300, ReshowDelay = 200 };
+        _batchToolTip = new ToolTip { AutoPopDelay = 5000, InitialDelay = 300, ReshowDelay = 200 };
 
         // Compression settings button - bottom left, anchored (custom painted with image)
         var settingsBtn = new Button
@@ -719,21 +720,21 @@ public class BatchGameSelectionForm : Form
         settingsBtn.MouseEnter += (s, e) => settingsBtn.Invalidate();
         settingsBtn.MouseLeave += (s, e) => settingsBtn.Invalidate();
         settingsBtn.Click += (s, e) => OpenCompressionSettings();
-        batchToolTip.SetToolTip(settingsBtn, "Compression settings");
+        _batchToolTip.SetToolTip(settingsBtn, "Compression settings");
         Controls.Add(settingsBtn);
 
         // compressionLabel removed - user didn't want it
 
         // Column header click toggles all/none for checkbox columns
-        gameGrid.ColumnHeaderMouseClick += (s, e) =>
+        _gameGrid.ColumnHeaderMouseClick += (s, e) =>
         {
-            string colName = gameGrid.Columns[e.ColumnIndex].Name;
+            string colName = _gameGrid.Columns[e.ColumnIndex].Name;
             if (colName == "Crack" || colName == "Zip" || colName == "Upload")
             {
                 // Toggle based on header state: if header checked, uncheck all; if unchecked, check all
                 bool headerChecked = headerCheckStates.ContainsKey(colName) && headerCheckStates[colName];
                 bool newValue = !headerChecked;
-                foreach (DataGridViewRow row in gameGrid.Rows)
+                foreach (DataGridViewRow row in _gameGrid.Rows)
                 {
                     row.Cells[colName].Value = newValue;
                     // Dependency: Upload requires Zip
@@ -758,11 +759,11 @@ public class BatchGameSelectionForm : Form
                     headerCheckStates["Upload"] = false;
                 }
 
-                gameGrid.InvalidateColumn(gameGrid.Columns[colName].Index);
+                _gameGrid.InvalidateColumn(_gameGrid.Columns[colName].Index);
                 if (colName == "Upload" || colName == "Zip")
                 {
-                    gameGrid.InvalidateColumn(gameGrid.Columns["Zip"].Index);
-                    gameGrid.InvalidateColumn(gameGrid.Columns["Upload"].Index);
+                    _gameGrid.InvalidateColumn(_gameGrid.Columns["Zip"].Index);
+                    _gameGrid.InvalidateColumn(_gameGrid.Columns["Upload"].Index);
                 }
 
                 UpdateCountLabel();
@@ -770,28 +771,28 @@ public class BatchGameSelectionForm : Form
         };
 
         // Commit checkbox edits immediately so CellValueChanged fires right away
-        gameGrid.CurrentCellDirtyStateChanged += (s, e) =>
+        _gameGrid.CurrentCellDirtyStateChanged += (s, e) =>
         {
-            if (gameGrid.IsCurrentCellDirty && gameGrid.CurrentCell is DataGridViewCheckBoxCell)
+            if (_gameGrid.IsCurrentCellDirty && _gameGrid.CurrentCell is DataGridViewCheckBoxCell)
             {
-                gameGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+                _gameGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
             }
         };
 
         // When individual row checkboxes change, update header checkbox state
-        gameGrid.CellValueChanged += (s, e) =>
+        _gameGrid.CellValueChanged += (s, e) =>
         {
             if (e.RowIndex < 0)
             {
                 return; // Ignore header row
             }
 
-            string colName = gameGrid.Columns[e.ColumnIndex].Name;
+            string colName = _gameGrid.Columns[e.ColumnIndex].Name;
             if (colName == "Crack" || colName == "Zip" || colName == "Upload")
             {
                 // Check if ALL rows are checked for this column
                 bool allChecked = true;
-                foreach (DataGridViewRow row in gameGrid.Rows)
+                foreach (DataGridViewRow row in _gameGrid.Rows)
                 {
                     if (!(bool)(row.Cells[colName].Value ?? false))
                     {
@@ -804,7 +805,7 @@ public class BatchGameSelectionForm : Form
                 if (headerCheckStates[colName] != allChecked)
                 {
                     headerCheckStates[colName] = allChecked;
-                    gameGrid.InvalidateColumn(e.ColumnIndex);
+                    _gameGrid.InvalidateColumn(e.ColumnIndex);
                 }
 
                 UpdateCountLabel();
@@ -813,7 +814,7 @@ public class BatchGameSelectionForm : Form
 
         // Upload slots container (hidden by default, shown during uploads)
         // Docked to bottom of form
-        uploadSlotsContainer = new Panel
+        _uploadSlotsContainer = new Panel
         {
             Dock = DockStyle.Bottom,
             Height = 114, // 3 slots * 38px
@@ -823,7 +824,7 @@ public class BatchGameSelectionForm : Form
         };
 
         // Create 3 upload slots (added in reverse order for proper Dock.Top stacking)
-        for (int i = MAX_UPLOAD_SLOTS - 1; i >= 0; i--)
+        for (int i = MaxUploadSlots - 1; i >= 0; i--)
         {
             var slot = new UploadSlot
             {
@@ -907,28 +908,28 @@ public class BatchGameSelectionForm : Form
             };
             slot.BtnSkip.Click += (s, e) =>
             {
-                uploadSlots[slotIndex].Cancellation?.Cancel();
+                _uploadSlots[slotIndex].Cancellation?.Cancel();
                 slot.BtnSkip.Text = "...";
                 slot.BtnSkip.Enabled = false;
             };
             slot.Panel.Controls.Add(slot.BtnSkip);
 
-            uploadSlotsContainer.Controls.Add(slot.Panel);
-            uploadSlots[i] = slot;
+            _uploadSlotsContainer.Controls.Add(slot.Panel);
+            _uploadSlots[i] = slot;
         }
 
-        Controls.Add(uploadSlotsContainer);
+        Controls.Add(_uploadSlotsContainer);
 
         // Cancel All button - above upload slots on right, shown during uploads
-        btnCancelAll = CreateStyledButton("Cancel All", new Point(ClientSize.Width - 125, 380), new Size(110, 28),
+        _btnCancelAll = CreateStyledButton("Cancel All", new Point(ClientSize.Width - 125, 380), new Size(110, 28),
             Color.FromArgb(140, 50, 50));
-        btnCancelAll.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-        btnCancelAll.Visible = false;
-        batchToolTip.SetToolTip(btnCancelAll, "Cancel all remaining uploads");
-        btnCancelAll.Click += (s, e) =>
+        _btnCancelAll.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+        _btnCancelAll.Visible = false;
+        _batchToolTip.SetToolTip(_btnCancelAll, "Cancel all remaining uploads");
+        _btnCancelAll.Click += (s, e) =>
         {
-            cancelAllRemaining = true;
-            foreach (var slot in uploadSlots)
+            _cancelAllRemaining = true;
+            foreach (var slot in _uploadSlots)
             {
                 slot.Cancellation?.Cancel();
                 if (slot.BtnSkip != null)
@@ -937,10 +938,10 @@ public class BatchGameSelectionForm : Form
                 }
             }
 
-            btnCancelAll.Text = "Cancelling...";
-            btnCancelAll.Enabled = false;
+            _btnCancelAll.Text = "Cancelling...";
+            _btnCancelAll.Enabled = false;
         };
-        Controls.Add(btnCancelAll);
+        Controls.Add(_btnCancelAll);
 
         // Start button - bottom right, anchored
         var processBtn = CreateStyledButton("Start", new Point(573, 485), new Size(80, 40), Color.FromArgb(0, 100, 70));
@@ -949,9 +950,9 @@ public class BatchGameSelectionForm : Form
         {
             // Check for missing AppIDs on games that need cracking
             List<string> missingAppIds = [];
-            for (int i = 0; i < gameGrid.Rows.Count; i++)
+            for (int i = 0; i < _gameGrid.Rows.Count; i++)
             {
-                var row = gameGrid.Rows[i];
+                var row = _gameGrid.Rows[i];
                 bool crack = (bool)(row.Cells["Crack"].Value ?? false);
                 string appId = row.Cells["AppId"].Value?.ToString();
 
@@ -983,9 +984,9 @@ public class BatchGameSelectionForm : Form
             // Clear previous selections before adding new ones
             SelectedGames.Clear();
 
-            for (int i = 0; i < gameGrid.Rows.Count; i++)
+            for (int i = 0; i < _gameGrid.Rows.Count; i++)
             {
-                var row = gameGrid.Rows[i];
+                var row = _gameGrid.Rows[i];
                 bool crack = (bool)(row.Cells["Crack"].Value ?? false);
                 bool zip = (bool)(row.Cells["Zip"].Value ?? false);
                 bool upload = (bool)(row.Cells["Upload"].Value ?? false);
@@ -999,8 +1000,8 @@ public class BatchGameSelectionForm : Form
                 {
                     SelectedGames.Add(new BatchGameItem
                     {
-                        Name = Path.GetFileName(gamePaths[i]),
-                        Path = gamePaths[i],
+                        Name = Path.GetFileName(_gamePaths[i]),
+                        Path = _gamePaths[i],
                         AppId = appId,
                         ShouldCrack = crack,
                         ShouldZip = zip,
@@ -1019,7 +1020,7 @@ public class BatchGameSelectionForm : Form
             // Fire the event - form stays open
             ProcessRequested?.Invoke(SelectedGames, CompressionFormat, CompressionLevel, UseRinPassword);
         };
-        batchToolTip.SetToolTip(processBtn, "Start processing selected games (crack, zip, upload)");
+        _batchToolTip.SetToolTip(processBtn, "Start processing selected games (crack, zip, upload)");
         Controls.Add(processBtn);
 
         // Cancel button - bottom right, anchored (closer to Start)
@@ -1029,7 +1030,7 @@ public class BatchGameSelectionForm : Form
         {
             Close();
         };
-        batchToolTip.SetToolTip(cancelBtn, "Close this window without processing");
+        _batchToolTip.SetToolTip(cancelBtn, "Close this window without processing");
         Controls.Add(cancelBtn);
     }
 
@@ -1054,14 +1055,14 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        for (int i = 0; i < gameGrid.Rows.Count; i++)
+        for (int i = 0; i < _gameGrid.Rows.Count; i++)
         {
-            if (gameGrid.Rows[i].Tag?.ToString() == gamePath)
+            if (_gameGrid.Rows[i].Tag?.ToString() == gamePath)
             {
-                gameGrid.Rows[i].Cells["Status"].Value = status;
+                _gameGrid.Rows[i].Cells["Status"].Value = status;
                 if (color.HasValue)
                 {
-                    gameGrid.Rows[i].Cells["Status"].Style.ForeColor = color.Value;
+                    _gameGrid.Rows[i].Cells["Status"].Style.ForeColor = color.Value;
                 }
 
                 break;
@@ -1090,12 +1091,12 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        if (rowIndex >= 0 && rowIndex < gameGrid.Rows.Count)
+        if (rowIndex >= 0 && rowIndex < _gameGrid.Rows.Count)
         {
-            gameGrid.Rows[rowIndex].Cells["Status"].Value = status;
+            _gameGrid.Rows[rowIndex].Cells["Status"].Value = status;
             if (color.HasValue)
             {
-                gameGrid.Rows[rowIndex].Cells["Status"].Style.ForeColor = color.Value;
+                _gameGrid.Rows[rowIndex].Cells["Status"].Style.ForeColor = color.Value;
             }
         }
     }
@@ -1123,7 +1124,7 @@ public class BatchGameSelectionForm : Form
 
         if (!string.IsNullOrEmpty(gamePath) && !string.IsNullOrEmpty(oneFichierUrl))
         {
-            convertingUrls[gamePath] = oneFichierUrl;
+            _convertingUrls[gamePath] = oneFichierUrl;
         }
     }
 
@@ -1148,7 +1149,7 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        convertingUrls.Remove(gamePath);
+        _convertingUrls.Remove(gamePath);
     }
 
     /// <summary>
@@ -1174,7 +1175,7 @@ public class BatchGameSelectionForm : Form
 
         if (!string.IsNullOrEmpty(gamePath) && !string.IsNullOrEmpty(finalUrl))
         {
-            finalUrls[gamePath] = finalUrl;
+            _finalUrls[gamePath] = finalUrl;
         }
     }
 
@@ -1194,11 +1195,11 @@ public class BatchGameSelectionForm : Form
         }
 
         // Find a free slot
-        for (int i = 0; i < MAX_UPLOAD_SLOTS; i++)
+        for (int i = 0; i < MaxUploadSlots; i++)
         {
-            if (!uploadSlots[i].InUse)
+            if (!_uploadSlots[i].InUse)
             {
-                var slot = uploadSlots[i];
+                var slot = _uploadSlots[i];
                 slot.InUse = true;
                 slot.GamePath = gamePath;
                 slot.Cancellation?.Dispose();
@@ -1210,14 +1211,14 @@ public class BatchGameSelectionForm : Form
                 slot.LblEta.Text = "";
                 slot.ProgressBar.Value = 0;
                 slot.BtnSkip.Text = "Skip";
-                slot.BtnSkip.Enabled = !cancelAllRemaining;
+                slot.BtnSkip.Enabled = !_cancelAllRemaining;
                 slot.Panel.Visible = true;
 
                 // Show container, cancel button, and reposition visible slots
-                uploadSlotsContainer.Visible = true;
-                uploadSlotsContainer.BringToFront();
-                btnCancelAll.Visible = true;
-                btnCancelAll.BringToFront();
+                _uploadSlotsContainer.Visible = true;
+                _uploadSlotsContainer.BringToFront();
+                _btnCancelAll.Visible = true;
+                _btnCancelAll.BringToFront();
                 RepositionUploadSlots();
 
                 return i;
@@ -1232,9 +1233,9 @@ public class BatchGameSelectionForm : Form
     /// </summary>
     public CancellationToken GetSlotCancellationToken(int slotIndex)
     {
-        if (slotIndex is >= 0 and < MAX_UPLOAD_SLOTS && uploadSlots[slotIndex].Cancellation != null)
+        if (slotIndex is >= 0 and < MaxUploadSlots && _uploadSlots[slotIndex].Cancellation != null)
         {
-            return uploadSlots[slotIndex].Cancellation.Token;
+            return _uploadSlots[slotIndex].Cancellation.Token;
         }
 
         return CancellationToken.None;
@@ -1246,7 +1247,7 @@ public class BatchGameSelectionForm : Form
     public void UpdateSlotProgress(int slotIndex, int percent, long uploadedBytes, long totalBytes,
         double bytesPerSecond)
     {
-        if (IsDisposed || slotIndex < 0 || slotIndex >= MAX_UPLOAD_SLOTS)
+        if (IsDisposed || slotIndex < 0 || slotIndex >= MaxUploadSlots)
         {
             return;
         }
@@ -1265,7 +1266,7 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        var slot = uploadSlots[slotIndex];
+        var slot = _uploadSlots[slotIndex];
         if (!slot.InUse)
         {
             return;
@@ -1296,7 +1297,7 @@ public class BatchGameSelectionForm : Form
     /// </summary>
     public void ReleaseUploadSlot(int slotIndex)
     {
-        if (IsDisposed || slotIndex < 0 || slotIndex >= MAX_UPLOAD_SLOTS)
+        if (IsDisposed || slotIndex < 0 || slotIndex >= MaxUploadSlots)
         {
             return;
         }
@@ -1312,7 +1313,7 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        var slot = uploadSlots[slotIndex];
+        var slot = _uploadSlots[slotIndex];
         slot.InUse = false;
         slot.GamePath = null;
         slot.Panel.Visible = false;
@@ -1323,7 +1324,7 @@ public class BatchGameSelectionForm : Form
         RepositionUploadSlots();
 
         bool anyInUse = false;
-        foreach (var s in uploadSlots)
+        foreach (var s in _uploadSlots)
         {
             if (s.InUse)
             {
@@ -1333,8 +1334,8 @@ public class BatchGameSelectionForm : Form
 
         if (!anyInUse)
         {
-            uploadSlotsContainer.Visible = false;
-            btnCancelAll.Visible = false;
+            _uploadSlotsContainer.Visible = false;
+            _btnCancelAll.Visible = false;
         }
     }
 
@@ -1344,7 +1345,7 @@ public class BatchGameSelectionForm : Form
     private void RepositionUploadSlots()
     {
         int y = 0;
-        foreach (var slot in uploadSlots)
+        foreach (var slot in _uploadSlots)
         {
             if (slot.InUse && slot.Panel.Visible)
             {
@@ -1355,7 +1356,7 @@ public class BatchGameSelectionForm : Form
 
         // Resize container to fit active slots
         int containerHeight = Math.Max(y, 38);
-        uploadSlotsContainer.Size = new Size(735, containerHeight);
+        _uploadSlotsContainer.Size = new Size(735, containerHeight);
     }
 
     /// <summary>
@@ -1379,11 +1380,11 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        cancelAllRemaining = false;
-        btnCancelAll.Text = "Cancel All";
-        btnCancelAll.Enabled = true;
+        _cancelAllRemaining = false;
+        _btnCancelAll.Text = "Cancel All";
+        _btnCancelAll.Enabled = true;
 
-        foreach (var slot in uploadSlots)
+        foreach (var slot in _uploadSlots)
         {
             slot.InUse = false;
             slot.Panel.Visible = false;
@@ -1395,19 +1396,19 @@ public class BatchGameSelectionForm : Form
     /// <summary>
     ///     Check if user clicked Cancel All
     /// </summary>
-    public bool ShouldCancelAll() => cancelAllRemaining;
+    public bool ShouldCancelAll() => _cancelAllRemaining;
 
     /// <summary>
     ///     Check if a specific slot was skipped
     /// </summary>
     public bool WasSlotSkipped(int slotIndex)
     {
-        if (slotIndex < 0 || slotIndex >= MAX_UPLOAD_SLOTS)
+        if (slotIndex < 0 || slotIndex >= MaxUploadSlots)
         {
             return false;
         }
 
-        return uploadSlots[slotIndex].Cancellation?.IsCancellationRequested ?? false;
+        return _uploadSlots[slotIndex].Cancellation?.IsCancellationRequested ?? false;
     }
 
     /// <summary>
@@ -1431,12 +1432,12 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        uploadSlotsContainer.Visible = false;
-        btnCancelAll.Visible = false;
-        btnCancelAll.Text = "Cancel All";
-        btnCancelAll.Enabled = true;
-        cancelAllRemaining = false;
-        foreach (var slot in uploadSlots)
+        _uploadSlotsContainer.Visible = false;
+        _btnCancelAll.Visible = false;
+        _btnCancelAll.Text = "Cancel All";
+        _btnCancelAll.Enabled = true;
+        _cancelAllRemaining = false;
+        foreach (var slot in _uploadSlots)
         {
             slot.InUse = false;
             slot.Panel.Visible = false;
@@ -1446,7 +1447,7 @@ public class BatchGameSelectionForm : Form
     /// <summary>
     ///     Shows Copy All buttons after processing completes
     /// </summary>
-    public void ShowCopyAllButton(string phpBBLinks)
+    public void ShowCopyAllButton(string phpBbLinks)
     {
         if (IsDisposed)
         {
@@ -1455,7 +1456,7 @@ public class BatchGameSelectionForm : Form
 
         if (InvokeRequired)
         {
-            try { BeginInvoke(() => ShowCopyAllButton(phpBBLinks)); }
+            try { BeginInvoke(() => ShowCopyAllButton(phpBbLinks)); }
             catch
             {
                 // ignored
@@ -1464,19 +1465,19 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        allLinksPhpBB = phpBBLinks;
+        _allLinksPhpBb = phpBbLinks;
 
         // Build markdown version from finalUrls
         List<string> mdLinks = [];
         List<string> plainLinks = [];
-        foreach (var kvp in finalUrls)
+        foreach (var kvp in _finalUrls)
         {
             string gameName = Path.GetFileName(kvp.Key);
             mdLinks.Add($"[{gameName}]({kvp.Value})");
 
             // Determine if cracked or clean based on details
             string suffix = "(Cracked)";
-            if (crackDetailsMap.TryGetValue(kvp.Key, out SteamAppId.CrackDetails? details))
+            if (_crackDetailsMap.TryGetValue(kvp.Key, out CrackDetails? details))
             {
                 if (details.DllsReplaced.Count == 0 && details.ExesUnpacked.Count == 0)
                 {
@@ -1487,35 +1488,35 @@ public class BatchGameSelectionForm : Form
             plainLinks.Add($"{gameName} {suffix}: {kvp.Value}");
         }
 
-        allLinksMarkdown = string.Join("\n", mdLinks);
-        allLinksPlaintext = string.Join("\n", plainLinks);
+        _allLinksMarkdown = string.Join("\n", mdLinks);
+        _allLinksPlaintext = string.Join("\n", plainLinks);
 
-        if (string.IsNullOrEmpty(allLinksPhpBB) && string.IsNullOrEmpty(allLinksMarkdown))
+        if (string.IsNullOrEmpty(_allLinksPhpBb) && string.IsNullOrEmpty(_allLinksMarkdown))
         {
             return;
         }
 
         // Calculate Y position - same row as Cancel All button
-        int buttonY = btnCancelAll.Top;
+        int buttonY = _btnCancelAll.Top;
 
         // Create Copy for Rin button - same row as Cancel All, anchored bottom-left
-        copyRinBtn = CreateStyledButton("Copy for Rin", new Point(10, buttonY), new Size(100, 28),
+        _copyRinBtn = CreateStyledButton("Copy for Rin", new Point(10, buttonY), new Size(100, 28),
             Color.FromArgb(50, 80, 120));
-        copyRinBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        copyRinBtn.Click += (s, e) =>
+        _copyRinBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        _copyRinBtn.Click += (s, e) =>
         {
-            if (!string.IsNullOrEmpty(allLinksPhpBB))
+            if (!string.IsNullOrEmpty(_allLinksPhpBb))
             {
                 try
                 {
-                    Clipboard.SetText(allLinksPhpBB);
-                    copyRinBtn.Text = "Copied! ✓";
+                    Clipboard.SetText(_allLinksPhpBb);
+                    _copyRinBtn.Text = "Copied! ✓";
                     var timer = new Timer { Interval = 2000 };
                     timer.Tick += (ts, te) =>
                     {
                         timer.Stop();
                         timer.Dispose();
-                        copyRinBtn.Text = "Copy for Rin";
+                        _copyRinBtn.Text = "Copy for Rin";
                     };
                     timer.Start();
                 }
@@ -1525,26 +1526,26 @@ public class BatchGameSelectionForm : Form
                 }
             }
         };
-        Controls.Add(copyRinBtn);
+        Controls.Add(_copyRinBtn);
 
         // Create Copy for Discord button - same row as Cancel All, anchored bottom-left
-        copyDiscordBtn = CreateStyledButton("Copy for Discord", new Point(118, buttonY), new Size(120, 28),
+        _copyDiscordBtn = CreateStyledButton("Copy for Discord", new Point(118, buttonY), new Size(120, 28),
             Color.FromArgb(88, 101, 242));
-        copyDiscordBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        copyDiscordBtn.Click += (s, e) =>
+        _copyDiscordBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        _copyDiscordBtn.Click += (s, e) =>
         {
-            if (!string.IsNullOrEmpty(allLinksMarkdown))
+            if (!string.IsNullOrEmpty(_allLinksMarkdown))
             {
                 try
                 {
-                    Clipboard.SetText(allLinksMarkdown);
-                    copyDiscordBtn.Text = "Copied! ✓";
+                    Clipboard.SetText(_allLinksMarkdown);
+                    _copyDiscordBtn.Text = "Copied! ✓";
                     var timer = new Timer { Interval = 2000 };
                     timer.Tick += (ts, te) =>
                     {
                         timer.Stop();
                         timer.Dispose();
-                        copyDiscordBtn.Text = "Copy for Discord";
+                        _copyDiscordBtn.Text = "Copy for Discord";
                     };
                     timer.Start();
                 }
@@ -1554,26 +1555,26 @@ public class BatchGameSelectionForm : Form
                 }
             }
         };
-        Controls.Add(copyDiscordBtn);
+        Controls.Add(_copyDiscordBtn);
 
         // Create Copy Plaintext button - same row as Cancel All, anchored bottom-left
-        copyPlaintextBtn = CreateStyledButton("Copy Plaintext", new Point(246, buttonY), new Size(110, 28),
+        _copyPlaintextBtn = CreateStyledButton("Copy Plaintext", new Point(246, buttonY), new Size(110, 28),
             Color.FromArgb(60, 60, 70));
-        copyPlaintextBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        copyPlaintextBtn.Click += (s, e) =>
+        _copyPlaintextBtn.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        _copyPlaintextBtn.Click += (s, e) =>
         {
-            if (!string.IsNullOrEmpty(allLinksPlaintext))
+            if (!string.IsNullOrEmpty(_allLinksPlaintext))
             {
                 try
                 {
-                    Clipboard.SetText(allLinksPlaintext);
-                    copyPlaintextBtn.Text = "Copied! ✓";
+                    Clipboard.SetText(_allLinksPlaintext);
+                    _copyPlaintextBtn.Text = "Copied! ✓";
                     var timer = new Timer { Interval = 2000 };
                     timer.Tick += (ts, te) =>
                     {
                         timer.Stop();
                         timer.Dispose();
-                        copyPlaintextBtn.Text = "Copy Plaintext";
+                        _copyPlaintextBtn.Text = "Copy Plaintext";
                     };
                     timer.Start();
                 }
@@ -1583,12 +1584,12 @@ public class BatchGameSelectionForm : Form
                 }
             }
         };
-        Controls.Add(copyPlaintextBtn);
+        Controls.Add(_copyPlaintextBtn);
 
         // Make sure they're on top
-        copyRinBtn.BringToFront();
-        copyDiscordBtn.BringToFront();
-        copyPlaintextBtn.BringToFront();
+        _copyRinBtn.BringToFront();
+        _copyDiscordBtn.BringToFront();
+        _copyPlaintextBtn.BringToFront();
     }
 
     /// <summary>
@@ -1718,7 +1719,7 @@ public class BatchGameSelectionForm : Form
         IsProcessing = processing;
 
         // Disable/enable grid interactions
-        gameGrid.ReadOnly = processing;
+        _gameGrid.ReadOnly = processing;
 
         // Hide count label and buttons during processing
         if (Controls["countLabel"] is Label countLabel)
@@ -1742,7 +1743,7 @@ public class BatchGameSelectionForm : Form
         int zipCount = 0;
         int uploadCount = 0;
 
-        foreach (DataGridViewRow row in gameGrid.Rows)
+        foreach (DataGridViewRow row in _gameGrid.Rows)
         {
             if ((bool)(row.Cells["Crack"].Value ?? false))
             {
@@ -1808,7 +1809,7 @@ public class BatchGameSelectionForm : Form
         {
             List<(string path, string name, string appId, string size, int steamApiCount)> results = [];
 
-            foreach (string path in gamePaths)
+            foreach (string path in _gamePaths)
             {
                 if (!_gameData.ValidateGameFolder(path))
                 {
@@ -1841,39 +1842,39 @@ public class BatchGameSelectionForm : Form
 
         foreach (var game in validGames)
         {
-            int rowIndex = gameGrid.Rows.Add();
+            int rowIndex = _gameGrid.Rows.Add();
             string displayName = game.steamApiCount > 2 ? "⚠️ " + game.name : game.name;
 
             if (game.steamApiCount > 2)
             {
-                gameGrid.Rows[rowIndex].Cells["GameName"].ToolTipText =
+                _gameGrid.Rows[rowIndex].Cells["GameName"].ToolTipText =
                     $"Warning: Found {game.steamApiCount} steam_api DLLs in this folder.\nThis might contain multiple games or have an unusual structure.";
             }
 
-            gameGrid.Rows[rowIndex].Cells["GameName"].Value = displayName;
+            _gameGrid.Rows[rowIndex].Cells["GameName"].Value = displayName;
 
-            detectedAppIds[rowIndex] = game.appId;
-            gameGrid.Rows[rowIndex].Cells["AppId"].Value = string.IsNullOrEmpty(game.appId) ? "?" : game.appId;
+            _detectedAppIds[rowIndex] = game.appId;
+            _gameGrid.Rows[rowIndex].Cells["AppId"].Value = string.IsNullOrEmpty(game.appId) ? "?" : game.appId;
 
             if (string.IsNullOrEmpty(game.appId))
             {
-                gameGrid.Rows[rowIndex].Cells["AppId"].Style.ForeColor = Color.Orange;
-                gameGrid.Rows[rowIndex].Cells["AppId"].Style.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+                _gameGrid.Rows[rowIndex].Cells["AppId"].Style.ForeColor = Color.Orange;
+                _gameGrid.Rows[rowIndex].Cells["AppId"].Style.Font = new Font("Segoe UI", 9, FontStyle.Bold);
             }
 
-            gameGrid.Rows[rowIndex].Cells["Size"].Value = game.size;
-            gameGrid.Rows[rowIndex].Cells["Crack"].Value = true;
-            gameGrid.Rows[rowIndex].Cells["Zip"].Value = false;
-            gameGrid.Rows[rowIndex].Cells["Upload"].Value = false;
-            gameGrid.Rows[rowIndex].Cells["Status"].Value = game.steamApiCount > 2 ? "⚠️ Check structure" : "Pending";
-            gameGrid.Rows[rowIndex].Tag = game.path;
+            _gameGrid.Rows[rowIndex].Cells["Size"].Value = game.size;
+            _gameGrid.Rows[rowIndex].Cells["Crack"].Value = true;
+            _gameGrid.Rows[rowIndex].Cells["Zip"].Value = false;
+            _gameGrid.Rows[rowIndex].Cells["Upload"].Value = false;
+            _gameGrid.Rows[rowIndex].Cells["Status"].Value = game.steamApiCount > 2 ? "⚠️ Check structure" : "Pending";
+            _gameGrid.Rows[rowIndex].Tag = game.path;
         }
 
         // Update subtitle with actual count
         var subtitleLabel = Controls.OfType<Label>().FirstOrDefault(l => l.Text.Contains("games"));
         if (subtitleLabel != null)
         {
-            subtitleLabel.Text = $"Found {gameGrid.Rows.Count} games. Select actions for each:";
+            subtitleLabel.Text = $"Found {_gameGrid.Rows.Count} games. Select actions for each:";
         }
     }
 
@@ -1966,14 +1967,14 @@ public class BatchGameSelectionForm : Form
     /// <summary>
     ///     Store crack details for a game path - called by Form1 after cracking
     /// </summary>
-    public void StoreCrackDetails(string gamePath, SteamAppId.CrackDetails details)
+    public void StoreCrackDetails(string gamePath, CrackDetails details)
     {
         if (string.IsNullOrEmpty(gamePath) || details == null)
         {
             return;
         }
 
-        crackDetailsMap[gamePath] = details;
+        _crackDetailsMap[gamePath] = details;
     }
 
     /// <summary>
@@ -1986,16 +1987,13 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        if (!crackDetailsMap.ContainsKey(gamePath))
+        if (!_crackDetailsMap.ContainsKey(gamePath))
         {
             // Create a minimal CrackDetails if one doesn't exist
-            crackDetailsMap[gamePath] = new SteamAppId.CrackDetails
-            {
-                GameName = Path.GetFileName(gamePath), GamePath = gamePath
-            };
+            _crackDetailsMap[gamePath] = new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
         }
 
-        var details = crackDetailsMap[gamePath];
+        var details = _crackDetailsMap[gamePath];
         details.ZipAttempted = true;
         details.ZipSuccess = success;
         details.ZipPath = zipPath;
@@ -2013,16 +2011,13 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        if (!crackDetailsMap.ContainsKey(gamePath))
+        if (!_crackDetailsMap.ContainsKey(gamePath))
         {
             // Create a minimal CrackDetails if one doesn't exist
-            crackDetailsMap[gamePath] = new SteamAppId.CrackDetails
-            {
-                GameName = Path.GetFileName(gamePath), GamePath = gamePath
-            };
+            _crackDetailsMap[gamePath] = new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
         }
 
-        var details = crackDetailsMap[gamePath];
+        var details = _crackDetailsMap[gamePath];
         details.UploadAttempted = true;
         details.UploadSuccess = success;
         details.UploadUrl = url;
@@ -2051,21 +2046,18 @@ public class BatchGameSelectionForm : Form
             return;
         }
 
-        if (!crackDetailsMap.ContainsKey(gamePath))
+        if (!_crackDetailsMap.ContainsKey(gamePath))
         {
-            crackDetailsMap[gamePath] = new SteamAppId.CrackDetails
-            {
-                GameName = Path.GetFileName(gamePath), GamePath = gamePath
-            };
+            _crackDetailsMap[gamePath] = new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
         }
 
-        crackDetailsMap[gamePath].PyDriveUrl = pydriveUrl;
+        _crackDetailsMap[gamePath].PyDriveUrl = pydriveUrl;
     }
 
     /// <summary>
     ///     Show crack details in a popup dialog
     /// </summary>
-    private void ShowCrackDetails(SteamAppId.CrackDetails details)
+    private void ShowCrackDetails(CrackDetails details)
     {
         if (details == null)
         {
@@ -2295,7 +2287,7 @@ public class BatchGameSelectionForm : Form
         if (e.Button == MouseButtons.Left)
         {
             ReleaseCapture();
-            SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+            SendMessage(Handle, WmNclbuttondown, Htcaption, 0);
         }
     }
 

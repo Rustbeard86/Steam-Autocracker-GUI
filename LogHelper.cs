@@ -82,7 +82,7 @@ public static class LogHelper
     /// <summary>
     ///     Logs an API call result.
     /// </summary>
-    public static void LogAPI(string api, string status)
+    public static void LogApi(string api, string status)
         => Log($"[API] {api}: {status}");
 
     private static void RotateLogFileIfNeeded(string logFile)

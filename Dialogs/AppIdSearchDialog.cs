@@ -1,20 +1,21 @@
 using System.Data;
 using System.Runtime.InteropServices;
-using APPID;
+using APPID.Utilities.Steam;
+using APPID.Utilities.UI;
 
-namespace SteamAutocrackGUI;
+namespace APPID.Dialogs;
 
 /// <summary>
 ///     Dialog for searching and selecting an AppID
 /// </summary>
 public class AppIdSearchDialog : Form
 {
-    private const int WM_NCLBUTTONDOWN = 0xA1;
-    private const int HTCAPTION = 0x2;
-    private DataGridView resultsGrid;
+    private const int WmNclbuttondown = 0xA1;
+    private const int Htcaption = 0x2;
+    private DataGridView _resultsGrid;
 
-    private TextBox searchBox;
-    private DataTable? steamGamesTable;
+    private TextBox _searchBox;
+    private DataTable? _steamGamesTable;
 
     public AppIdSearchDialog(string gameName, string currentAppId)
     {
@@ -25,7 +26,7 @@ public class AppIdSearchDialog : Form
             LoadSteamGamesData();
             if (!string.IsNullOrEmpty(gameName))
             {
-                searchBox.Text = gameName;
+                _searchBox.Text = gameName;
                 PerformSearch(gameName);
             }
         };
@@ -38,7 +39,7 @@ public class AppIdSearchDialog : Form
     private static extern bool ReleaseCapture();
 
     [DllImport("user32.dll")]
-    private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+    private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
 
     private void InitializeForm(string gameName, string currentAppId)
     {
@@ -76,7 +77,7 @@ public class AppIdSearchDialog : Form
         Controls.Add(gameLabel);
 
         // Search box
-        searchBox = new TextBox
+        _searchBox = new TextBox
         {
             Location = new Point(15, 65),
             Size = new Size(330, 25),
@@ -85,15 +86,15 @@ public class AppIdSearchDialog : Form
             BorderStyle = BorderStyle.FixedSingle,
             Font = new Font("Segoe UI", 10)
         };
-        searchBox.KeyDown += (s, e) =>
+        _searchBox.KeyDown += (s, e) =>
         {
             if (e.KeyCode == Keys.Enter)
             {
                 e.SuppressKeyPress = true;
-                PerformSearch(searchBox.Text);
+                PerformSearch(_searchBox.Text);
             }
         };
-        Controls.Add(searchBox);
+        Controls.Add(_searchBox);
 
         // Search button
         var searchBtn = new Button
@@ -108,11 +109,11 @@ public class AppIdSearchDialog : Form
             Cursor = Cursors.Hand
         };
         searchBtn.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-        searchBtn.Click += (s, e) => PerformSearch(searchBox.Text);
+        searchBtn.Click += (s, e) => PerformSearch(_searchBox.Text);
         Controls.Add(searchBtn);
 
         // Results grid
-        resultsGrid = new DataGridView
+        _resultsGrid = new DataGridView
         {
             Location = new Point(15, 100),
             Size = new Size(415, 210),
@@ -132,23 +133,23 @@ public class AppIdSearchDialog : Form
             Font = new Font("Segoe UI", 9)
         };
 
-        resultsGrid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 28, 40);
-        resultsGrid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(150, 200, 255);
-        resultsGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-        resultsGrid.ColumnHeadersHeight = 28;
-        resultsGrid.DefaultCellStyle.BackColor = Color.FromArgb(15, 18, 30);
-        resultsGrid.DefaultCellStyle.ForeColor = Color.FromArgb(220, 255, 255);
-        resultsGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 80, 120);
-        resultsGrid.RowTemplate.Height = 24;
+        _resultsGrid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(25, 28, 40);
+        _resultsGrid.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(150, 200, 255);
+        _resultsGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+        _resultsGrid.ColumnHeadersHeight = 28;
+        _resultsGrid.DefaultCellStyle.BackColor = Color.FromArgb(15, 18, 30);
+        _resultsGrid.DefaultCellStyle.ForeColor = Color.FromArgb(220, 255, 255);
+        _resultsGrid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(40, 80, 120);
+        _resultsGrid.RowTemplate.Height = 24;
 
-        resultsGrid.CellDoubleClick += (s, e) =>
+        _resultsGrid.CellDoubleClick += (s, e) =>
         {
             if (e.RowIndex >= 0)
             {
                 SelectCurrentRow();
             }
         };
-        Controls.Add(resultsGrid);
+        Controls.Add(_resultsGrid);
 
         // Manual AppID entry
         var manualLabel = new Label
@@ -196,7 +197,7 @@ public class AppIdSearchDialog : Form
                 DialogResult = DialogResult.OK;
                 Close();
             }
-            else if (resultsGrid.SelectedRows.Count > 0)
+            else if (_resultsGrid.SelectedRows.Count > 0)
             {
                 SelectCurrentRow();
             }
@@ -235,16 +236,16 @@ public class AppIdSearchDialog : Form
         {
             // Try to load the Steam games table from the main form's data
             var dataGen = new DataTableGeneration();
-            steamGamesTable = dataGen.DataTableToGenerate;
-            resultsGrid.DataSource = steamGamesTable;
+            _steamGamesTable = dataGen.DataTableToGenerate;
+            _resultsGrid.DataSource = _steamGamesTable;
 
             // Configure columns
-            if (resultsGrid.Columns.Count >= 2)
+            if (_resultsGrid.Columns.Count >= 2)
             {
-                resultsGrid.Columns[0].HeaderText = "Name";
-                resultsGrid.Columns[0].Width = 300;
-                resultsGrid.Columns[1].HeaderText = "AppID";
-                resultsGrid.Columns[1].Width = 80;
+                _resultsGrid.Columns[0].HeaderText = "Name";
+                _resultsGrid.Columns[0].Width = 300;
+                _resultsGrid.Columns[1].HeaderText = "AppID";
+                _resultsGrid.Columns[1].Width = 80;
             }
         }
         catch (Exception ex)
@@ -255,7 +256,7 @@ public class AppIdSearchDialog : Form
 
     private void PerformSearch(string searchTerm)
     {
-        if (steamGamesTable is null)
+        if (_steamGamesTable is null)
         {
             return;
         }
@@ -275,8 +276,8 @@ public class AppIdSearchDialog : Form
             }
 
             // Try exact match first
-            steamGamesTable.DefaultView.RowFilter = $"Name LIKE '{clean}'";
-            if (steamGamesTable.DefaultView.Count > 0)
+            _steamGamesTable.DefaultView.RowFilter = $"Name LIKE '{clean}'";
+            if (_steamGamesTable.DefaultView.Count > 0)
             {
                 return;
             }
@@ -286,28 +287,28 @@ public class AppIdSearchDialog : Form
             if (words.Length > 1)
             {
                 string filter = string.Join("%' AND Name LIKE '%", words);
-                steamGamesTable.DefaultView.RowFilter = $"Name LIKE '%{filter}%'";
-                if (steamGamesTable.DefaultView.Count > 0)
+                _steamGamesTable.DefaultView.RowFilter = $"Name LIKE '%{filter}%'";
+                if (_steamGamesTable.DefaultView.Count > 0)
                 {
                     return;
                 }
             }
 
             // Simple contains
-            steamGamesTable.DefaultView.RowFilter = $"Name LIKE '%{clean}%'";
+            _steamGamesTable.DefaultView.RowFilter = $"Name LIKE '%{clean}%'";
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Search error: {ex.Message}");
-            steamGamesTable.DefaultView.RowFilter = "";
+            _steamGamesTable.DefaultView.RowFilter = "";
         }
     }
 
     private void SelectCurrentRow()
     {
-        if (resultsGrid.SelectedRows.Count > 0)
+        if (_resultsGrid.SelectedRows.Count > 0)
         {
-            var row = resultsGrid.SelectedRows[0];
+            var row = _resultsGrid.SelectedRows[0];
             if (row.Cells.Count >= 2)
             {
                 SelectedAppId = row.Cells[1].Value?.ToString();
@@ -334,7 +335,7 @@ public class AppIdSearchDialog : Form
         if (e.Button == MouseButtons.Left)
         {
             ReleaseCapture();
-            SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+            SendMessage(Handle, WmNclbuttondown, Htcaption, 0);
         }
     }
 

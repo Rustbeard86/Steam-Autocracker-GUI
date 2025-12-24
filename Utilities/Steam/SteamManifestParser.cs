@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace SteamAppIdIdentifier;
+namespace APPID.Utilities.Steam;
 
 /// <summary>
 ///     Parses Steam ACF manifest files to automatically detect AppIDs

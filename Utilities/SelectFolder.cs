@@ -1,4 +1,4 @@
-namespace APPID;
+namespace APPID.Utilities;
 
 /// <summary>
 ///     Folder selection dialog wrapper

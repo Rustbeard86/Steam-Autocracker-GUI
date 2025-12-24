@@ -1,4 +1,4 @@
-namespace SteamAppIdIdentifier;
+namespace APPID.Utilities.Cleanup;
 
 public static class CleanFilesVerifier
 {

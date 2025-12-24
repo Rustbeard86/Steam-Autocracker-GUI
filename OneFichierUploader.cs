@@ -1,184 +1,18 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
-using APPID.Utilities;
+using APPID.Utilities.Network;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using SteamAutocrackGUI;
 
-namespace SAC_GUI;
-
-/// <summary>
-///     Custom HttpContent that streams large files without buffering.
-///     This is critical for files > 2GB which would otherwise cause "Stream was too long" errors.
-/// </summary>
-public class LargeFileMultipartContent : HttpContent
-{
-    // Track concurrent uploads for bandwidth limiting
-    private static int _concurrentUploads;
-    private static readonly Lock _uploadCountLock = new();
-    private readonly string _boundary;
-    private readonly string _filePath;
-    private readonly long _fileSize;
-    private readonly byte[] _footerBytes;
-    private readonly byte[] _headerBytes;
-    private readonly IProgress<double> _progressCallback;
-    private readonly IProgress<string> _statusCallback;
-
-    public LargeFileMultipartContent(string filePath, string fileName, string boundary,
-        IProgress<double> progressCallback = null, IProgress<string> statusCallback = null)
-    {
-        _filePath = filePath;
-        _boundary = boundary;
-        _fileSize = new FileInfo(filePath).Length;
-        _progressCallback = progressCallback;
-        _statusCallback = statusCallback;
-
-        // Build header bytes (domain field + file header)
-        var sb = new StringBuilder();
-        sb.Append($"--{boundary}\r\n");
-        sb.Append("Content-Disposition: form-data; name=\"domain\"\r\n\r\n");
-        sb.Append("0\r\n");
-        sb.Append($"--{boundary}\r\n");
-        sb.Append($"Content-Disposition: form-data; name=\"file[]\"; filename=\"{fileName}\"\r\n");
-        sb.Append("Content-Type: application/octet-stream\r\n\r\n");
-        _headerBytes = Encoding.UTF8.GetBytes(sb.ToString());
-
-        // Build footer bytes
-        _footerBytes = Encoding.UTF8.GetBytes($"\r\n--{boundary}--\r\n");
-
-        // Set content type header
-        Headers.ContentType = new MediaTypeHeaderValue("multipart/form-data");
-        Headers.ContentType.Parameters.Add(new NameValueHeaderValue("boundary", boundary));
-    }
-
-    /// <summary>
-    ///     Returns true with pre-calculated length to prevent HttpClient from buffering.
-    ///     This is the KEY to supporting large files - when this returns true, HttpClient
-    ///     sets Content-Length header and streams directly without buffering.
-    /// </summary>
-    protected override bool TryComputeLength(out long length)
-    {
-        length = _headerBytes.Length + _fileSize + _footerBytes.Length;
-        return true;
-    }
-
-    /// <summary>
-    ///     Streams content directly to the network without buffering.
-    /// </summary>
-    protected override async Task SerializeToStreamAsync(Stream stream, TransportContext context)
-    {
-        // Track concurrent uploads
-        lock (_uploadCountLock) { _concurrentUploads++; }
-
-        Debug.WriteLine($"[1FICHIER] Upload started. Concurrent uploads: {_concurrentUploads}");
-
-        try
-        {
-            // Write header
-            await stream.WriteAsync(_headerBytes, 0, _headerBytes.Length);
-
-            // Stream file content with progress reporting
-            await using (var fileStream =
-                         new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920))
-            {
-                var buffer = new byte[81920]; // 80KB buffer
-                long totalWritten = 0;
-                int bytesRead;
-
-                var startTime = DateTime.Now;
-                var lastUpdateTime = DateTime.Now;
-                var lastThrottleTime = DateTime.Now;
-                long lastBytesWritten = 0;
-                long bytesThisSecond = 0;
-
-                while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                {
-                    await stream.WriteAsync(buffer, 0, bytesRead);
-                    totalWritten += bytesRead;
-                    bytesThisSecond += bytesRead;
-
-                    // Bandwidth throttling - check every write
-                    long bandwidthLimit = CompressionSettingsForm.UploadBandwidthLimitBytesPerSecond;
-                    if (bandwidthLimit > 0)
-                    {
-                        int currentUploads;
-                        lock (_uploadCountLock) { currentUploads = _concurrentUploads; }
-
-                        long perUploadLimit = bandwidthLimit / Math.Max(1, currentUploads);
-
-                        var throttleElapsed = (DateTime.Now - lastThrottleTime).TotalSeconds;
-                        if (throttleElapsed > 0)
-                        {
-                            double currentRate = bytesThisSecond / throttleElapsed;
-                            if (currentRate > perUploadLimit)
-                            {
-                                // Calculate how long to sleep to achieve target rate
-                                double targetTime = (double)bytesThisSecond / perUploadLimit;
-                                double sleepMs = (targetTime - throttleElapsed) * 1000;
-                                if (sleepMs > 10)
-                                {
-                                    await Task.Delay((int)Math.Min(sleepMs, 500)); // Cap at 500ms
-                                }
-                            }
-                        }
-
-                        // Reset throttle counter every second
-                        if (throttleElapsed >= 1.0)
-                        {
-                            lastThrottleTime = DateTime.Now;
-                            bytesThisSecond = 0;
-                        }
-                    }
-
-                    // Calculate and report progress/speed every 0.5 seconds
-                    var now = DateTime.Now;
-                    var timeSinceLastUpdate = (now - lastUpdateTime).TotalSeconds;
-
-                    if (timeSinceLastUpdate >= 0.5)
-                    {
-                        var bytesThisInterval = totalWritten - lastBytesWritten;
-                        var speedMBps = bytesThisInterval / (1024.0 * 1024.0) / timeSinceLastUpdate;
-                        var totalElapsed = (now - startTime).TotalSeconds;
-                        var avgSpeedMBps = totalElapsed > 0 ? totalWritten / (1024.0 * 1024.0) / totalElapsed : 0;
-                        var bytesRemaining = _fileSize - totalWritten;
-                        var etaSeconds = avgSpeedMBps > 0 ? bytesRemaining / (1024.0 * 1024.0) / avgSpeedMBps : 0;
-
-                        var statusText =
-                            $"Uploading: {speedMBps:F2} MB/s (Avg: {avgSpeedMBps:F2} MB/s) - ETA: {TimeSpan.FromSeconds(etaSeconds):hh\\:mm\\:ss}";
-                        Debug.WriteLine($"[1FICHIER] {statusText}");
-                        _statusCallback?.Report(statusText);
-
-                        lastUpdateTime = now;
-                        lastBytesWritten = totalWritten;
-                    }
-
-                    // Report progress (0.0 to 1.0)
-                    _progressCallback?.Report((double)totalWritten / _fileSize);
-                }
-
-                Debug.WriteLine($"[1FICHIER] Streamed {totalWritten} bytes to network");
-            }
-
-            // Write footer
-            await stream.WriteAsync(_footerBytes, 0, _footerBytes.Length);
-        }
-        finally
-        {
-            lock (_uploadCountLock) { _concurrentUploads = Math.Max(0, _concurrentUploads - 1); }
-
-            Debug.WriteLine($"[1FICHIER] Upload finished. Concurrent uploads: {_concurrentUploads}");
-        }
-    }
-}
+namespace APPID;
 
 public class OneFichierUploader : IDisposable
 {
-    private const string API_KEY = "PSd6297MACENE2VQD7eNxBWIKrrmTTZb";
-    private const string API_BASE_URL = "https://api.1fichier.com/v1";
-    private readonly HttpClient httpClient;
-    private readonly HttpClient uploadClient; // Separate client for uploads with longer timeout
-    private bool disposed;
+    private const string ApiKey = "PSd6297MACENE2VQD7eNxBWIKrrmTTZb";
+    private const string ApiBaseUrl = "https://api.1fichier.com/v1";
+    private readonly HttpClient _httpClient;
+    private readonly HttpClient _uploadClient; // Separate client for uploads with longer timeout
+    private bool _disposed;
 
     public OneFichierUploader()
     {
@@ -187,19 +21,19 @@ public class OneFichierUploader : IDisposable
         {
             AllowAutoRedirect = false, UseCookies = true, CookieContainer = new CookieContainer()
         };
-        httpClient = new HttpClient(handler);
-        httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {API_KEY}");
-        httpClient.DefaultRequestHeaders.Add("User-Agent", "SACGUI/1.0");
+        _httpClient = new HttpClient(handler);
+        _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
+        _httpClient.DefaultRequestHeaders.Add("User-Agent", "SACGUI/1.0");
 
         // Separate client for uploads - no timeout for large files
         var uploadHandler = new HttpClientHandler
         {
             AllowAutoRedirect = false, UseCookies = true, CookieContainer = new CookieContainer()
         };
-        uploadClient = new HttpClient(uploadHandler);
-        uploadClient.Timeout = Timeout.InfiniteTimeSpan; // Critical for large files
-        uploadClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {API_KEY}");
-        uploadClient.DefaultRequestHeaders.Add("User-Agent", "SACGUI/1.0");
+        _uploadClient = new HttpClient(uploadHandler);
+        _uploadClient.Timeout = Timeout.InfiniteTimeSpan; // Critical for large files
+        _uploadClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
+        _uploadClient.DefaultRequestHeaders.Add("User-Agent", "SACGUI/1.0");
     }
 
     public void Dispose()
@@ -216,8 +50,8 @@ public class OneFichierUploader : IDisposable
             using var client = HttpClientFactory.CreateClient(true);
 
             // Create request with required headers
-            var request = new HttpRequestMessage(HttpMethod.Get, $"{API_BASE_URL}/upload/get_upload_server.cgi");
-            request.Headers.Add("Authorization", $"Bearer {API_KEY}");
+            var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiBaseUrl}/upload/get_upload_server.cgi");
+            request.Headers.Add("Authorization", $"Bearer {ApiKey}");
             request.Content = new StringContent("", Encoding.UTF8, "application/json");
 
             var response = await client.SendAsync(request);
@@ -276,7 +110,7 @@ public class OneFichierUploader : IDisposable
                 new LargeFileMultipartContent(filePath, fileName, boundary, progressCallback, statusCallback);
             // Send request using HttpClient (not HttpWebRequest)
             // HttpClient with our custom content will NOT buffer because TryComputeLength returns true
-            var response = await uploadClient.PostAsync(uploadUrl, content, cancellationToken);
+            var response = await _uploadClient.PostAsync(uploadUrl, content, cancellationToken);
 
             statusCallback?.Report("Upload complete, waiting for server response...");
 
@@ -404,7 +238,7 @@ public class OneFichierUploader : IDisposable
                 var request = new HttpRequestMessage(HttpMethod.Get, endUrl);
                 request.Headers.Add("JSON", "1");
 
-                var response = await httpClient.SendAsync(request);
+                var response = await _httpClient.SendAsync(request);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -489,15 +323,15 @@ public class OneFichierUploader : IDisposable
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!disposed)
+        if (!_disposed)
         {
             if (disposing)
             {
-                httpClient?.Dispose();
-                uploadClient?.Dispose();
+                _httpClient?.Dispose();
+                _uploadClient?.Dispose();
             }
 
-            disposed = true;
+            _disposed = true;
         }
     }
 
