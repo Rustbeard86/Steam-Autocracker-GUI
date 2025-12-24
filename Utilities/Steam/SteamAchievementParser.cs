@@ -61,7 +61,7 @@ namespace APPID.Utilities.Steam
 
                         var achievements = await FetchSteamSchema(baseUrl, appId, apiKey);
 
-                        if (achievements == null || achievements.Count == 0)
+                        if (achievements.Count == 0)
                         {
                             LogHelper.Log($"[ACHIEVEMENTS] No achievements returned from API for AppID: {appId}");
                             return false;
@@ -90,12 +90,12 @@ namespace APPID.Utilities.Steam
 
                             goldbergList.Add(new GoldbergAchievement
                             {
-                                Name = ach.Name,
+                                Description = ach.Description,
                                 DisplayName = ach.DisplayName,
-                                Description = ach.Description ?? string.Empty,
+                                Hidden = ach.Hidden.ToString(),
                                 Icon = iconName,
                                 IconGray = iconGrayName,
-                                Hidden = ach.Hidden
+                                Name = ach.Name
                             });
                         }
 
@@ -106,8 +106,11 @@ namespace APPID.Utilities.Steam
 
                         LogHelper.Log("[ACHIEVEMENTS] All icons downloaded successfully");
 
-                        // Serialize and Save JSON
-                        var options = new JsonSerializerOptions { WriteIndented = true };
+                        // Serialize and Save JSON with proper property order
+                        var options = new JsonSerializerOptions
+                        {
+                            WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.Never
+                        };
                         string jsonOutput = JsonSerializer.Serialize(goldbergList, options);
 
                         await File.WriteAllTextAsync(jsonPath, jsonOutput);
@@ -125,7 +128,7 @@ namespace APPID.Utilities.Steam
                     }
                 }
 
-                private async Task<List<SteamAchievementDef>> FetchSteamSchema(string baseUrl, string appId,
+                private async Task<List<SteamAchievementDef>?> FetchSteamSchema(string baseUrl, string appId,
                     string apiKey)
                 {
                     try
@@ -170,7 +173,10 @@ namespace APPID.Utilities.Steam
                                     LogHelper.Log($"[ACHIEVEMENTS] Error response: {errorBody}");
                                 }
                             }
-                            catch { }
+                            catch
+                            {
+                                // ignored
+                            }
 
                             return null;
                         }
@@ -182,7 +188,7 @@ namespace APPID.Utilities.Steam
 
                         var root = JsonSerializer.Deserialize<SteamRootObject>(json);
 
-                        if (root?.Game?.AvailableGameStats?.Achievements != null)
+                        if (root?.Game.AvailableGameStats.Achievements != null)
                         {
                             int count = root.Game.AvailableGameStats.Achievements.Count;
                             LogHelper.Log($"[ACHIEVEMENTS] Successfully parsed {count} achievement definitions");
@@ -289,17 +295,30 @@ namespace APPID.Utilities.Steam
 
                 private class GoldbergAchievement
                 {
-                    [JsonPropertyName("name")] public string Name { get; set; }
+                    // Order matters for serialization! This matches the expected JSON format
+                    [JsonPropertyOrder(1)]
+                    [JsonPropertyName("description")]
+                    public string Description { get; set; }
 
-                    [JsonPropertyName("displayName")] public string DisplayName { get; set; }
+                    [JsonPropertyOrder(2)]
+                    [JsonPropertyName("displayName")]
+                    public string DisplayName { get; set; }
 
-                    [JsonPropertyName("description")] public string Description { get; set; }
+                    [JsonPropertyOrder(3)]
+                    [JsonPropertyName("hidden")]
+                    public string Hidden { get; set; }
 
-                    [JsonPropertyName("icon")] public string Icon { get; set; }
+                    [JsonPropertyOrder(4)]
+                    [JsonPropertyName("icon")]
+                    public string Icon { get; set; }
 
-                    [JsonPropertyName("icon_gray")] public string IconGray { get; set; }
+                    [JsonPropertyOrder(5)]
+                    [JsonPropertyName("icongray")]
+                    public string IconGray { get; set; }
 
-                    [JsonPropertyName("hidden")] public int Hidden { get; set; }
+                    [JsonPropertyOrder(6)]
+                    [JsonPropertyName("name")]
+                    public string Name { get; set; }
                 }
             }
         }
