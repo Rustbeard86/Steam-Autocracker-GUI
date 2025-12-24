@@ -61,62 +61,65 @@ namespace APPID.Utilities.Steam
 
                         var achievements = await FetchSteamSchema(baseUrl, appId, apiKey);
 
-                        if (achievements.Count == 0)
+                        if (achievements is { Count: 0 })
                         {
                             LogHelper.Log($"[ACHIEVEMENTS] No achievements returned from API for AppID: {appId}");
                             return false;
                         }
 
-                        LogHelper.Log($"[ACHIEVEMENTS] Found {achievements.Count} achievements for AppID: {appId}");
-                        LogHelper.Log($"[ACHIEVEMENTS] Creating output directories at: {settingsDir}");
-
-                        Directory.CreateDirectory(imagesDir);
-
-                        var goldbergList = new List<GoldbergAchievement>();
-
-                        // Parallel download processing can speed this up significantly
-                        var tasks = new List<Task>();
-                        int iconCount = 0;
-
-                        foreach (var ach in achievements)
+                        if (achievements != null)
                         {
-                            string iconName = $"{ach.Name}_unlocked.jpg";
-                            string iconGrayName = $"{ach.Name}_locked.jpg";
+                            LogHelper.Log($"[ACHIEVEMENTS] Found {achievements.Count} achievements for AppID: {appId}");
+                            LogHelper.Log($"[ACHIEVEMENTS] Creating output directories at: {settingsDir}");
 
-                            // Queue image downloads
-                            tasks.Add(DownloadImage(ach.IconUrl, Path.Combine(imagesDir, iconName)));
-                            tasks.Add(DownloadImage(ach.IconGrayUrl, Path.Combine(imagesDir, iconGrayName)));
-                            iconCount += 2;
+                            Directory.CreateDirectory(imagesDir);
 
-                            goldbergList.Add(new GoldbergAchievement
+                            var goldbergList = new List<GoldbergAchievement>();
+
+                            // Parallel download processing can speed this up significantly
+                            var tasks = new List<Task>();
+                            int iconCount = 0;
+
+                            foreach (var ach in achievements)
                             {
-                                Description = ach.Description,
-                                DisplayName = ach.DisplayName,
-                                Hidden = ach.Hidden.ToString(),
-                                Icon = iconName,
-                                IconGray = iconGrayName,
-                                Name = ach.Name
-                            });
+                                string iconName = $"{ach.Name}_unlocked.jpg";
+                                string iconGrayName = $"{ach.Name}_locked.jpg";
+
+                                // Queue image downloads
+                                tasks.Add(DownloadImage(ach.IconUrl, Path.Combine(imagesDir, iconName)));
+                                tasks.Add(DownloadImage(ach.IconGrayUrl, Path.Combine(imagesDir, iconGrayName)));
+                                iconCount += 2;
+
+                                goldbergList.Add(new GoldbergAchievement
+                                {
+                                    Description = ach.Description,
+                                    DisplayName = ach.DisplayName,
+                                    Hidden = ach.Hidden.ToString(),
+                                    Icon = $"achievement_images/{iconName}",
+                                    IconGray = $"achievement_images/{iconGrayName}",
+                                    Name = ach.Name
+                                });
+                            }
+
+                            LogHelper.Log($"[ACHIEVEMENTS] Downloading {iconCount} achievement icons in parallel...");
+
+                            // Wait for all images to download
+                            await Task.WhenAll(tasks);
+
+                            LogHelper.Log("[ACHIEVEMENTS] All icons downloaded successfully");
+
+                            // Serialize and Save JSON with proper property order
+                            var options = new JsonSerializerOptions
+                            {
+                                WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.Never
+                            };
+                            string jsonOutput = JsonSerializer.Serialize(goldbergList, options);
+
+                            await File.WriteAllTextAsync(jsonPath, jsonOutput);
+
+                            LogHelper.Log($"[ACHIEVEMENTS] Successfully generated achievements.json at: {jsonPath}");
+                            LogHelper.Log($"[ACHIEVEMENTS] Total achievements processed: {goldbergList.Count}");
                         }
-
-                        LogHelper.Log($"[ACHIEVEMENTS] Downloading {iconCount} achievement icons in parallel...");
-
-                        // Wait for all images to download
-                        await Task.WhenAll(tasks);
-
-                        LogHelper.Log("[ACHIEVEMENTS] All icons downloaded successfully");
-
-                        // Serialize and Save JSON with proper property order
-                        var options = new JsonSerializerOptions
-                        {
-                            WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.Never
-                        };
-                        string jsonOutput = JsonSerializer.Serialize(goldbergList, options);
-
-                        await File.WriteAllTextAsync(jsonPath, jsonOutput);
-
-                        LogHelper.Log($"[ACHIEVEMENTS] Successfully generated achievements.json at: {jsonPath}");
-                        LogHelper.Log($"[ACHIEVEMENTS] Total achievements processed: {goldbergList.Count}");
 
                         return true;
                     }
