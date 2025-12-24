@@ -31,6 +31,18 @@ namespace APPID;
 
 public partial class SteamAppId : Form
 {
+    [DllImport("user32.dll")]
+    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttribData data);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDesktopWindow();
+
     public SteamAppId()
     {
         // === STEP 1: Initialize Core Services ===
@@ -336,37 +348,6 @@ public partial class SteamAppId : Form
     private static string RemoveSpecialCharacters(string str)
     {
         return Regex.Replace(str, "[^a-zA-Z0-9._0-]+", " ", RegexOptions.Compiled);
-    }
-
-    private static string ImprovedGameNameCleaning(string gameName)
-    {
-        string cleaned = gameName.ToLower().Trim();
-
-        // Remove common gaming suffixes/prefixes that can cause mismatches
-        string[] removeParts =
-        [
-            "definitive edition", "deluxe edition", "gold edition", "complete edition", "enhanced edition",
-            "directors cut", "game of the year", "goty", "remastered", "redux", "ultimate", "premium",
-            "collectors edition", "special edition", "anniversary edition", "standard edition", "base game",
-            "digital deluxe", "legendary edition", "epic edition", "expanded edition"
-        ];
-
-        foreach (string part in removeParts)
-        {
-            cleaned = cleaned.Replace(part, "");
-        }
-
-        // Remove years (4 digits)
-        cleaned = Regex.Replace(cleaned, @"\b(19|20)\d{2}\b", "", RegexOptions.Compiled);
-
-        // Remove platform indicators
-        cleaned = Regex.Replace(cleaned, @"\b(pc|steam|windows|x64|x86)\b", "", RegexOptions.Compiled);
-
-        // Normalize spacing and remove extra characters
-        cleaned = RemoveSpecialCharacters(cleaned);
-        cleaned = Regex.Replace(cleaned, @"\s+", " ", RegexOptions.Compiled).Trim();
-
-        return cleaned;
     }
 
     private void SetSelectedGame(int rowIndex)
@@ -3590,18 +3571,6 @@ oLink3.Save";
 
         return result;
     }
-
-    [DllImport("user32.dll")]
-    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttribData data);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
-
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetDesktopWindow();
 
     public static int CountSteamApiDlls(string gamePath)
     {
