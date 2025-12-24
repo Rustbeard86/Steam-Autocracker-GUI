@@ -7,7 +7,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using APPID.Dialogs;
 using APPID.Models;
 using APPID.Properties;
@@ -18,7 +17,6 @@ using APPID.Utilities.Http;
 using APPID.Utilities.Steam;
 using APPID.Utilities.Steam.SteamTools.SteamTools;
 using APPID.Utilities.UI;
-using Newtonsoft.Json.Linq;
 using BatchGameItem = APPID.Models.BatchGameItem;
 using Clipboard = System.Windows.Forms.Clipboard;
 using DataFormats = System.Windows.Forms.DataFormats;
@@ -31,42 +29,26 @@ namespace APPID;
 
 public partial class SteamAppId : Form
 {
-    [DllImport("user32.dll")]
-    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttribData data);
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
-
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetDesktopWindow();
-
     public SteamAppId()
     {
-        IFileSystemService fileSystem =
-            // === STEP 1: Initialize Core Services ===
-            new FileSystemService();
+        // === STEP 1: Initialize Core Services ===
+        _fileSystem = new FileSystemService();
         _settings = new SettingsService();
-        _gameDetection = new GameDetectionService(_fileSystem);
-        _manifestParsing = new ManifestParsingService(_fileSystem);
         _urlConversion = new UrlConversionService();
         _stringUtility = new StringUtilityService();
         _iniFileService = new IniFileService(BinPath);
         _dlcService = new DlcService();
         _dialogService = new DialogService();
-        _gameDetection = new GameDetectionService(fileSystem);
-        _manifestParsing = new ManifestParsingService(fileSystem);
-        IUrlConversionService urlConversion = new UrlConversionService();
+        _gameDetection = new GameDetectionService(_fileSystem);
+        _manifestParsing = new ManifestParsingService(_fileSystem);
 
         // === STEP 2: Initialize Batch Processing Service (Before Coordinator) ===
         IBatchProcessingService batchProcessingService = new BatchProcessingService(
             new CrackingService(BinPath),
             new CompressionService(BinPath),
             new UploadService(),
-            urlConversion,
-            fileSystem
+            _urlConversion,
+            _fileSystem
         );
 
         // === STEP 3: Initialize Batch Coordinator (After Batch Processing) ===
@@ -200,6 +182,18 @@ public partial class SteamAppId : Form
     private CrackDetails CurrentCrackDetails { get; set; }
 
     private List<CrackDetails> CrackHistory { get; } = [];
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttribData data);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetDesktopWindow();
 
     public event EventHandler<string> CrackStatusChanged;
 
@@ -1853,7 +1847,7 @@ oLink3.Save";
                 startCrackPic.Visible = true;
 
                 // Skip the search entirely
-               IsFirstClickAfterSelection = false;
+                IsFirstClickAfterSelection = false;
                 IsInitialFolderSearch = false;
 
                 // Auto-crack if enabled
@@ -1887,7 +1881,7 @@ oLink3.Save";
                     Color.LightSkyBlue);
 
                 // Trigger the search
-               IsFirstClickAfterSelection = true; // Set before changing text
+                IsFirstClickAfterSelection = true; // Set before changing text
                 IsInitialFolderSearch = true; // This is the initial search from folder
                 searchTextBox.Text = _gameDirName;
             }
@@ -2076,7 +2070,7 @@ oLink3.Save";
 
                     // Skip the search entirely
                     IsInitialFolderSearch = false;
-                   IsFirstClickAfterSelection = false;
+                    IsFirstClickAfterSelection = false;
 
                     // Auto-crack if enabled
                     if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
@@ -2110,7 +2104,7 @@ oLink3.Save";
                     // Trigger the search
                     IsInitialFolderSearch = true; // This is the initial search
                     searchTextBox.Text = _gameDirName;
-                   IsFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
+                    IsFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
                 }
 
                 // Stop label5 timer when game dir is selected
@@ -2119,7 +2113,7 @@ oLink3.Save";
 
                 IsInitialFolderSearch = true; // This is the initial search
                 searchTextBox.Text = _gameDirName;
-               IsFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
+                IsFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
                 _settings.LastDir = _parentOfSelection;
                 AppSettings.Default.Save();
             }
@@ -3104,7 +3098,7 @@ oLink3.Save";
             // If cancelled, reset to Zip Dir
             if (compressionCancelled)
             {
-                _crackButtonManager.SetZipButtonState("Zip Dir", null);
+                _crackButtonManager.SetZipButtonState("Zip Dir");
                 // ...
             }
             else if (!string.IsNullOrEmpty(zipPath) && File.Exists(zipPath))
@@ -3114,7 +3108,7 @@ oLink3.Save";
             }
             else
             {
-                _crackButtonManager.SetZipButtonState("Zip Dir", null);
+                _crackButtonManager.SetZipButtonState("Zip Dir");
                 _crackButtonManager.ShowCrackButtons();
             }
         }
@@ -3637,6 +3631,8 @@ oLink3.Save";
     private static Timer T1;
 
     // === Core Services (Dependency Injection) ===
+    private readonly IFileSystemService _fileSystem;
+    private readonly IUrlConversionService _urlConversion;
     private readonly IGameDetectionService _gameDetection;
     private readonly IManifestParsingService _manifestParsing;
     private readonly ISettingsService _settings;
@@ -3677,8 +3673,8 @@ oLink3.Save";
     private bool Isnumeric;
 
     // === UI Managers (NEW) ===
-    private CrackButtonManager _crackButtonManager;
-    private SearchStateManager _searchStateManager;
+    private readonly CrackButtonManager _crackButtonManager;
+    private readonly SearchStateManager _searchStateManager;
 
     #endregion
 }
