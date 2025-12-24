@@ -128,8 +128,7 @@ namespace SteamAppIdIdentifier
             parentForm = parent;
 
             // Initialize services - use provided or create defaults
-            var fileSystem = new APPID.Services.FileSystemService();
-            _gameData = gameData ?? new APPID.Services.BatchGameDataService(fileSystem);
+            _gameData = gameData ?? new APPID.Services.BatchGameDataService(new APPID.Services.FileSystemService());
             _formatting = formatting ?? new APPID.Services.FormattingService();
 
             // Set dark background BEFORE InitializeComponent to prevent white flash
