@@ -1,10 +1,12 @@
 using System.Text.RegularExpressions;
 using APPID.Services.Interfaces;
+using APPID.Utilities.Steam;
 
 namespace APPID.Services;
 
 /// <summary>
 ///     Implementation of manifest parsing service for Steam ACF files.
+///     Delegates to SteamManifestParser for actual parsing logic.
 /// </summary>
 public sealed class ManifestParsingService(IFileSystemService fileSystem) : IManifestParsingService
 {
@@ -115,6 +117,43 @@ public sealed class ManifestParsingService(IFileSystemService fileSystem) : IMan
         }
 
         return paths;
+    }
+
+    public (string appId, string gameName, long sizeOnDisk)? GetAppIdFromManifest(string droppedPath)
+    {
+        // Delegate to static SteamManifestParser for now
+        return SteamManifestParser.GetAppIdFromManifest(droppedPath);
+    }
+
+    public (string gameName, string appId, long sizeOnDisk, string buildId, long lastUpdated,
+        Dictionary<string, (string manifest, long size)> depots)? GetFullManifestInfo(string gameInstallPath)
+    {
+        // Delegate to static SteamManifestParser for now
+        return SteamManifestParser.GetFullManifestInfo(gameInstallPath);
+    }
+
+    public List<(string appId, string gameName, string installPath)> FindAllInstalledGames()
+    {
+        // Delegate to static SteamManifestParser for now
+        return SteamManifestParser.FindAllInstalledGames();
+    }
+
+    public string? GetAppIdFromManifestFile(string acfFilePath)
+    {
+        // Delegate to static SteamManifestParser for now
+        return SteamManifestParser.GetAppIdFromManifestFile(acfFilePath);
+    }
+
+    public bool VerifyGameSize(string gamePath, long manifestSize, long toleranceBytes = 10485760)
+    {
+        // Delegate to static SteamManifestParser for now
+        return SteamManifestParser.VerifyGameSize(gamePath, manifestSize, toleranceBytes);
+    }
+
+    public string DetectGamePlatform(string gamePath)
+    {
+        // Delegate to static SteamManifestParser for now
+        return SteamManifestParser.DetectGamePlatform(gamePath);
     }
 
     private static Dictionary<string, string> ParseAcfFile(string content)

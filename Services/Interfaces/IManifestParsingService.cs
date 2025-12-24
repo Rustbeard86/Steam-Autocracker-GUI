@@ -24,6 +24,50 @@ public interface IManifestParsingService
     /// </summary>
     /// <returns>A list of Steam library folder paths.</returns>
     List<string> DetectSteamLibraryFolders();
+
+    /// <summary>
+    ///     Attempts to find AppID from Steam manifest files when a folder is dropped.
+    /// </summary>
+    /// <param name="droppedPath">The path that was dropped onto the application.</param>
+    /// <returns>Tuple of (AppID, GameName, SizeOnDisk) or null if not found.</returns>
+    (string appId, string gameName, long sizeOnDisk)? GetAppIdFromManifest(string droppedPath);
+
+    /// <summary>
+    ///     Gets full manifest info including build ID, depots, and timestamps.
+    /// </summary>
+    /// <param name="gameInstallPath">The game installation path.</param>
+    /// <returns>Full manifest information or null if not found.</returns>
+    (string gameName, string appId, long sizeOnDisk, string buildId, long lastUpdated,
+        Dictionary<string, (string manifest, long size)> depots)? GetFullManifestInfo(string gameInstallPath);
+
+    /// <summary>
+    ///     Finds all installed Steam games by scanning manifest files.
+    /// </summary>
+    /// <returns>List of tuples containing (AppID, GameName, InstallPath) for each game.</returns>
+    List<(string appId, string gameName, string installPath)> FindAllInstalledGames();
+
+    /// <summary>
+    ///     Gets AppID directly from a known manifest file path.
+    /// </summary>
+    /// <param name="acfFilePath">Path to the .acf manifest file.</param>
+    /// <returns>The AppID, or null if not found.</returns>
+    string? GetAppIdFromManifestFile(string acfFilePath);
+
+    /// <summary>
+    ///     Verifies if the actual folder size matches the manifest size (within tolerance).
+    /// </summary>
+    /// <param name="gamePath">The game installation path.</param>
+    /// <param name="manifestSize">The size from the manifest.</param>
+    /// <param name="toleranceBytes">Tolerance in bytes (default 10MB).</param>
+    /// <returns>True if sizes match within tolerance.</returns>
+    bool VerifyGameSize(string gamePath, long manifestSize, long toleranceBytes = 10485760);
+
+    /// <summary>
+    ///     Detects if game is 64-bit or 32-bit based on executable files.
+    /// </summary>
+    /// <param name="gamePath">The game installation path.</param>
+    /// <returns>"Win64" or "Win32" based on detected architecture.</returns>
+    string DetectGamePlatform(string gamePath);
 }
 
 /// <summary>

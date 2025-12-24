@@ -1820,11 +1820,11 @@ oLink3.Save";
             OpenDir.Visible = false;
             OpenDir.SendToBack();
             ZipToShare.Visible = false;
-            _parentOfSelection = Directory.GetParent(_gameDir).FullName;
+            _parentOfSelection = Directory.GetParent(_gameDir)?.FullName;
             _gameDirName = Path.GetFileName(_gameDir);
 
             // Try to get AppID from Steam manifest files
-            var manifestInfo = SteamManifestParser.GetAppIdFromManifest(_gameDir);
+            var manifestInfo = _manifestParsing.GetAppIdFromManifest(_gameDir);
             if (manifestInfo.HasValue)
             {
                 // We found the AppID from manifest!
@@ -2042,11 +2042,11 @@ oLink3.Save";
                 // Hide OpenDir and ZipToShare when new directory selected
                 OpenDir.Visible = false;
                 ZipToShare.Visible = false;
-                _parentOfSelection = Directory.GetParent(_gameDir).FullName;
+                _parentOfSelection = Directory.GetParent(_gameDir)?.FullName;
                 _gameDirName = Path.GetFileName(_gameDir);
 
                 // Try to get AppID from Steam manifest files
-                var manifestInfo = SteamManifestParser.GetAppIdFromManifest(_gameDir);
+                var manifestInfo = _manifestParsing.GetAppIdFromManifest(_gameDir);
                 if (manifestInfo.HasValue)
                 {
                     // We found the AppID from manifest!
@@ -2284,7 +2284,7 @@ oLink3.Save";
 
             // Try to get build ID from manifest for filename
             string buildSuffix = "";
-            var manifestInfo = SteamManifestParser.GetFullManifestInfo(gamePath);
+            var manifestInfo = _manifestParsing.GetFullManifestInfo(gamePath);
             if (manifestInfo.HasValue && !string.IsNullOrEmpty(manifestInfo.Value.buildId))
             {
                 buildSuffix = $" (Build {manifestInfo.Value.buildId})";
@@ -3658,7 +3658,7 @@ oLink3.Save";
 
     // === UI State & Controls ===
     private Timer _label5Timer;
-    private string _parentOfSelection;
+    private string? _parentOfSelection;
     private Timer _resinstruccZipTimer;
 
     // === Share & Upload Components ===
