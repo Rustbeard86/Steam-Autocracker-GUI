@@ -53,7 +53,8 @@ internal static class Updater
         string url = $"https://api.github.com/repos/{user}/{repo}/releases";
         try
         {
-            using var client = HttpClientFactory.CreateClient();
+            // Use Insecure client singleton for SSL bypass + User-Agent already configured
+            var client = HttpClientFactory.Insecure;
 
             var response = await client.GetAsync(url);
             if (!response.IsSuccessStatusCode)
@@ -138,7 +139,8 @@ internal static class Updater
         const string url = "https://api.github.com/repos/Detanup01/gbe_fork/releases/latest";
         try
         {
-            using var client = HttpClientFactory.CreateClient();
+            // Use Insecure client singleton for SSL bypass + User-Agent already configured
+            var client = HttpClientFactory.Insecure;
 
             var response = await client.GetAsync(url);
             if (!response.IsSuccessStatusCode)

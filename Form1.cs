@@ -45,8 +45,9 @@ public partial class SteamAppId : Form
 
     public SteamAppId()
     {
-        // === STEP 1: Initialize Core Services ===
-        _fileSystem = new FileSystemService();
+        IFileSystemService fileSystem =
+            // === STEP 1: Initialize Core Services ===
+            new FileSystemService();
         _settings = new SettingsService();
         _gameDetection = new GameDetectionService(_fileSystem);
         _manifestParsing = new ManifestParsingService(_fileSystem);
@@ -55,20 +56,28 @@ public partial class SteamAppId : Form
         _iniFileService = new IniFileService(BinPath);
         _dlcService = new DlcService();
         _dialogService = new DialogService();
+        _gameDetection = new GameDetectionService(fileSystem);
+        _manifestParsing = new ManifestParsingService(fileSystem);
+        IUrlConversionService urlConversion = new UrlConversionService();
 
         // === STEP 2: Initialize Batch Processing Service (Before Coordinator) ===
-        _batchProcessingService = new BatchProcessingService(
+        IBatchProcessingService batchProcessingService = new BatchProcessingService(
             new CrackingService(BinPath),
             new CompressionService(BinPath),
             new UploadService(),
-            _urlConversion,
-            _fileSystem
+            urlConversion,
+            fileSystem
         );
 
         // === STEP 3: Initialize Batch Coordinator (After Batch Processing) ===
-        _batchCoordinator = new BatchCoordinatorService(_batchProcessingService);
+        _batchCoordinator = new BatchCoordinatorService(batchProcessingService);
 
         // === STEP 4: Load Critical Settings (Before InitializeComponent) ===
+        // === STEP 4: Configure Network Security ===
+        // The HttpClientFactory already handles SSL bypass internally via CreateClient(bypassCertificateValidation: true)
+        // Remove this line entirely - network security is handled per-request via HttpClientFactory.Insecure
+
+        // === STEP 5: Load Critical Settings (Before InitializeComponent) ===
         AutoCrackEnabled = _settings.AutoCrack;
         Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {AutoCrackEnabled} from Settings");
 
@@ -116,23 +125,23 @@ public partial class SteamAppId : Form
         _searchStateManager = new SearchStateManager(
             searchTextBox, mainPanel, btnManualEntry, resinstruccZip, startCrackPic);
 
-        _windowDragHandler = new WindowDragHandler(this);
-        _windowDragHandler.AttachToControl(this);
+        var windowDragHandler = new WindowDragHandler(this);
+        windowDragHandler.AttachToControl(this);
 
         if (titleBar != null)
         {
-            _windowDragHandler.AttachToControl(titleBar);
+            windowDragHandler.AttachToControl(titleBar);
         }
 
         // Also attach to any child controls in the title bar that aren't interactive (labels, etc.)
         if (lblTitle != null)
         {
-            _windowDragHandler.AttachToControl(lblTitle);
+            windowDragHandler.AttachToControl(lblTitle);
         }
 
         if (mainPanel != null)
         {
-            _windowDragHandler.AttachToControl(mainPanel);
+            windowDragHandler.AttachToControl(mainPanel);
         }
 
         // === Apply Visual Effects ===
@@ -3608,10 +3617,7 @@ oLink3.Save";
     #region Class Vars
 
     // === Windows API Constants ===
-    private const int DwmwaWindowCornerPreference = 33;
     private const int DwmwcpRound = 2;
-    private const int WcaAccentPolicy = 19;
-    private const int AccentEnableAcrylicblurbehind = 4;
     private const int WsMinimizebox = 0x20000;
     private const int CsDblclks = 0x8;
 
@@ -3631,13 +3637,10 @@ oLink3.Save";
     private static Timer T1;
 
     // === Core Services (Dependency Injection) ===
-    private readonly IBatchProcessingService _batchProcessingService;
-    private readonly IFileSystemService _fileSystem;
     private readonly IGameDetectionService _gameDetection;
     private readonly IManifestParsingService _manifestParsing;
     private readonly ISettingsService _settings;
     private readonly IStatusUpdateService _statusService;
-    private readonly IUrlConversionService _urlConversion;
     private readonly IBatchCoordinatorService _batchCoordinator;
     private readonly IStringUtilityService _stringUtility;
     private readonly IIniFileService _iniFileService;
@@ -3666,7 +3669,7 @@ oLink3.Save";
     private EnhancedShareWindow _shareWindow;
     private bool _textChanged;
     private CancellationTokenSource _zipCancellationTokenSource;
-    private bool AutoCrackEnabled = true;
+    private bool AutoCrackEnabled;
     private bool Cracking;
     private DataTableGeneration DataTableGeneration;
     private bool EnableLanMultiplayer;
@@ -3676,7 +3679,6 @@ oLink3.Save";
     // === UI Managers (NEW) ===
     private CrackButtonManager _crackButtonManager;
     private SearchStateManager _searchStateManager;
-    private WindowDragHandler _windowDragHandler;
 
     #endregion
 }
