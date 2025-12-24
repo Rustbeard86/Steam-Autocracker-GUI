@@ -49,6 +49,13 @@ public partial class SteamAppId : Form
             // === STEP 1: Initialize Core Services ===
             new FileSystemService();
         _settings = new SettingsService();
+        _gameDetection = new GameDetectionService(_fileSystem);
+        _manifestParsing = new ManifestParsingService(_fileSystem);
+        _urlConversion = new UrlConversionService();
+        _stringUtility = new StringUtilityService();
+        _iniFileService = new IniFileService(BinPath);
+        _dlcService = new DlcService();
+        _dialogService = new DialogService();
         _gameDetection = new GameDetectionService(fileSystem);
         _manifestParsing = new ManifestParsingService(fileSystem);
         IUrlConversionService urlConversion = new UrlConversionService();
@@ -65,6 +72,7 @@ public partial class SteamAppId : Form
         // === STEP 3: Initialize Batch Coordinator (After Batch Processing) ===
         _batchCoordinator = new BatchCoordinatorService(batchProcessingService);
 
+        // === STEP 4: Load Critical Settings (Before InitializeComponent) ===
         // === STEP 4: Configure Network Security ===
         // The HttpClientFactory already handles SSL bypass internally via CreateClient(bypassCertificateValidation: true)
         // Remove this line entirely - network security is handled per-request via HttpClientFactory.Insecure
@@ -73,21 +81,21 @@ public partial class SteamAppId : Form
         AutoCrackEnabled = _settings.AutoCrack;
         Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {AutoCrackEnabled} from Settings");
 
-        // === STEP 6: Initialize Data Table ===
+        // === STEP 5: Initialize Data Table ===
         DataTableGeneration = new DataTableGeneration();
         Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
 
-        // === STEP 7: Initialize Windows Forms Components ===
+        // === STEP 6: Initialize Windows Forms Components ===
         InitializeComponent();
 
-        // === STEP 8: Initialize Remaining Services (Require UI Components) ===
+        // === STEP 7: Initialize Remaining Services (Require UI Components) ===
         _statusService = new StatusUpdateService(this, StatusLabel, currDIrText);
         _gameSearch = new GameSearchService();
 
-        // === STEP 9: Initialize Timers (After UI components exist) ===
+        // === STEP 8: Initialize Timers (After UI components exist) ===
         InitializeTimers();
 
-        // === STEP 10: Apply UI State from Settings ===
+        // === STEP 9: Apply UI State from Settings ===
         // Auto-crack toggle
         if (AutoCrackEnabled)
         {
@@ -142,7 +150,7 @@ public partial class SteamAppId : Form
         ApplyRoundedCornersToButton(ZipToShare);
         ApplyRoundedCornersToButton(btnManualEntry);
 
-        // === STEP 11: Configure Window Behavior ===
+        // === STEP 10: Configure Window Behavior ===
         // Force taskbar refresh after form is fully loaded
         Shown += (s, e) =>
         {
@@ -159,7 +167,7 @@ public partial class SteamAppId : Form
             timer.Start();
         };
 
-        // === STEP 12: Initialize Batch Progress Indicator ===
+        // === STEP 11: Initialize Batch Progress Indicator ===
         InitializeBatchIndicator();
     }
 
@@ -373,7 +381,8 @@ public partial class SteamAppId : Form
 
     private static string RemoveSpecialCharacters(string str)
     {
-        return Regex.Replace(str, "[^a-zA-Z0-9._0-]+", " ", RegexOptions.Compiled);
+        // Delegate to string utility service
+        return Program.Form?._stringUtility?.RemoveSpecialCharacters(str) ?? str;
     }
 
     private void SetSelectedGame(int rowIndex)
@@ -486,35 +495,16 @@ public partial class SteamAppId : Form
             lanMultiplayerCheckBox.Visible = false;
         }
 
-        // Start update check in background without blocking
-        _ = Task.Run(async () =>
+        Tit("Checking for Internet... ", Color.LightSkyBlue);
+        bool check = await Updater.CheckForNetAsync();
+        if (check)
         {
-            try
-            {
-                Tit("Checking for Internet... ", Color.LightSkyBlue);
-                // No ServicePointManager needed - Updater should use HttpClientFactory.Insecure internally
-                bool check = await Updater.CheckForNetAsync();
-
-                if (check)
-                {
-                    Tit("Checking for updates", Color.LightSkyBlue);
-
-                    // Run updates in parallel instead of sequentially
-                    await Task.WhenAll(
-                        Updater.CheckGitHubNewerVersion("atom0s", "Steamless"),
-                        Updater.UpdateGoldBergAsync()
-                    );
-
-                    await Task.Delay(1500);
-                    Tit("Click folder && select game's parent directory.", Color.Cyan);
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[UPDATE] Background update check failed: {ex.Message}");
-                // Optionally show a subtle notification instead of blocking
-            }
-        });
+            Tit("Checking for updates", Color.LightSkyBlue);
+            await Updater.CheckGitHubNewerVersion("atom0s", "Steamless");
+            await Updater.UpdateGoldBergAsync();
+            await Task.Delay(1500);
+            Tit("Click folder && select game's parent directory.", Color.Cyan);
+        }
 
         T1 = new Timer();
         T1.Tick += t1_Tick;
@@ -604,7 +594,8 @@ public partial class SteamAppId : Form
 
     private static string SplitCamelCase(string input)
     {
-        return Regex.Replace(input, "([A-Z])", " $1", RegexOptions.Compiled).Trim();
+        // Delegate to string utility service
+        return Program.Form?._stringUtility?.SplitCamelCase(input) ?? input;
     }
 
     private void btnSearch_Click(object sender, EventArgs e)
@@ -988,34 +979,8 @@ public partial class SteamAppId : Form
 
     private void CopyDirectory(string sourceDir, string targetDir)
     {
-        // Ensure paths end with separator for proper replacement
-        if (!sourceDir.EndsWith(Path.DirectorySeparatorChar.ToString()))
-        {
-            sourceDir += Path.DirectorySeparatorChar;
-        }
-
-        if (!targetDir.EndsWith(Path.DirectorySeparatorChar.ToString()))
-        {
-            targetDir += Path.DirectorySeparatorChar;
-        }
-
-        // Create target directory if it doesn't exist
-        Directory.CreateDirectory(targetDir);
-
-        // Create all directories
-        foreach (string dirPath in Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories))
-        {
-            string relativePath = dirPath.Substring(sourceDir.Length);
-            Directory.CreateDirectory(Path.Combine(targetDir, relativePath));
-        }
-
-        // Copy all files
-        foreach (string filePath in Directory.GetFiles(sourceDir, "*.*", SearchOption.AllDirectories))
-        {
-            string relativePath = filePath.Substring(sourceDir.Length);
-            string targetPath = Path.Combine(targetDir, relativePath);
-            File.Copy(filePath, targetPath, true);
-        }
+        // Delegate to file system service
+        _fileSystem.CopyDirectory(sourceDir, targetDir);
     }
 
     private async Task<bool> HandlePermissionError()
@@ -1774,87 +1739,14 @@ oLink3.Save";
 
     private void IniFileEdit(string args)
     {
-        var iniProcess = new Process();
-        iniProcess.StartInfo.CreateNoWindow = true;
-        iniProcess.StartInfo.UseShellExecute = false;
-        iniProcess.StartInfo.FileName = $"{BinPath}\\ALI213\\inifile.exe";
-
-        iniProcess.StartInfo.Arguments = args;
-        iniProcess.Start();
-        iniProcess.WaitForExit();
+        // Delegate to INI file service
+        _iniFileService.EditIniFile(args);
     }
 
     private async Task FetchDlcInfoAsync(string appId, string outputFolder)
     {
-        using var httpClient = new HttpClient();
-        httpClient.Timeout = TimeSpan.FromSeconds(30);
-
-        try
-        {
-            // Get app details from Steam Store API
-            var response =
-                await httpClient.GetStringAsync($"https://store.steampowered.com/api/appdetails?appids={appId}");
-            var json = JObject.Parse(response);
-
-            var appData = json[appId]?["data"];
-            if (appData == null || json[appId]?["success"]?.Value<bool>() != true)
-            {
-                Tit("No DLC info available for this game", Color.Yellow);
-                return;
-            }
-
-            if (appData["dlc"] is not JArray dlcArray || dlcArray.Count == 0)
-            {
-                Tit("No DLCs found for this game", Color.Yellow);
-                return;
-            }
-
-            Tit($"Found {dlcArray.Count} DLCs, fetching names...", Color.Cyan);
-
-            var dlcLines = new List<string>();
-            int successCount = 0;
-
-            foreach (var dlcId in dlcArray)
-            {
-                try
-                {
-                    var dlcResponse =
-                        await httpClient.GetStringAsync(
-                            $"https://store.steampowered.com/api/appdetails?appids={dlcId}");
-                    var dlcJson = JObject.Parse(dlcResponse);
-
-                    var dlcData = dlcJson[dlcId.ToString()]?["data"];
-                    if (dlcData != null && dlcJson[dlcId.ToString()]?["success"]?.Value<bool>() == true)
-                    {
-                        string dlcName = dlcData["name"]?.Value<string>() ?? "Unknown";
-                        dlcLines.Add($"{dlcId}={dlcName}");
-                        successCount++;
-                    }
-
-                    // Rate limit to avoid Steam throttling
-                    await Task.Delay(100);
-                }
-                catch
-                {
-                    // Skip DLCs that fail to fetch
-                    dlcLines.Add($"{dlcId}=DLC_{dlcId}");
-                }
-            }
-
-            // Write DLC.txt
-            string dlcPath = Path.Combine(outputFolder, "DLC.txt");
-            File.WriteAllLines(dlcPath, dlcLines);
-
-            Tit($"Saved {successCount}/{dlcArray.Count} DLC entries!", Color.Green);
-        }
-        catch (TaskCanceledException)
-        {
-            throw new Exception("Request timed out");
-        }
-        catch (HttpRequestException ex)
-        {
-            throw new Exception($"Network error: {ex.Message}");
-        }
+        // Delegate to DLC service with status callback
+        await _dlcService.FetchDlcInfoAsync(appId, outputFolder, Tit);
     }
 
     private void pictureBox2_Click(object sender, EventArgs e)
@@ -3456,152 +3348,14 @@ oLink3.Save";
 
     private bool ShowStyledConfirmation(string title, string message, string path, string yesText, string noText)
     {
-        bool result = false;
-
-        using var dialog = new Form();
-        dialog.Text = title;
-        dialog.Size = new Size(500, 280);
-        dialog.StartPosition = FormStartPosition.CenterParent;
-        dialog.FormBorderStyle = FormBorderStyle.None;
-        dialog.BackColor = Color.FromArgb(25, 28, 40);
-        dialog.ForeColor = Color.White;
-        dialog.ShowInTaskbar = false;
-
-        // Add a subtle border
-        dialog.Paint += (s, e) =>
-        {
-            using var pen = new Pen(Color.FromArgb(60, 65, 80), 2);
-            e.Graphics.DrawRectangle(pen, 0, 0, dialog.Width - 1, dialog.Height - 1);
-        };
-
-        // Title bar with icon
-        var titleLabel = new Label
-        {
-            Text = "⚠️ " + title,
-            Font = new Font("Segoe UI", 14, FontStyle.Bold),
-            ForeColor = Color.FromArgb(255, 200, 100),
-            AutoSize = false,
-            Size = new Size(480, 35),
-            Location = new Point(15, 15),
-            TextAlign = ContentAlignment.MiddleLeft
-        };
-
-        // Message
-        var messageLabel = new Label
-        {
-            Text = message,
-            Font = new Font("Segoe UI", 10),
-            ForeColor = Color.White,
-            AutoSize = false,
-            Size = new Size(470, 50),
-            Location = new Point(15, 55)
-        };
-
-        // Path display with dark background
-        var pathPanel = new Panel
-        {
-            BackColor = Color.FromArgb(15, 18, 25), Size = new Size(470, 45), Location = new Point(15, 110)
-        };
-
-        var pathLabel = new Label
-        {
-            Text = path,
-            Font = new Font("Consolas", 9),
-            ForeColor = Color.FromArgb(150, 180, 255),
-            AutoSize = false,
-            Size = new Size(460, 35),
-            Location = new Point(5, 5),
-            TextAlign = ContentAlignment.MiddleLeft
-        };
-        pathPanel.Controls.Add(pathLabel);
-
-        // Question
-        var questionLabel = new Label
-        {
-            Text = "Is this actually a single game's directory?",
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            ForeColor = Color.White,
-            AutoSize = false,
-            Size = new Size(470, 25),
-            Location = new Point(15, 165),
-            TextAlign = ContentAlignment.MiddleCenter
-        };
-
-        // Yes button (primary - green tint)
-        var yesBtn = new Button
-        {
-            Text = yesText,
-            Size = new Size(200, 40),
-            Location = new Point(35, 200),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(40, 80, 60),
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 10, FontStyle.Bold),
-            Cursor = Cursors.Hand
-        };
-        yesBtn.FlatAppearance.BorderColor = Color.FromArgb(60, 120, 80);
-        yesBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 100, 70);
-        yesBtn.Click += (s, e) =>
-        {
-            result = true;
-            dialog.Close();
-        };
-
-        // No button (secondary - purple tint)
-        var noBtn = new Button
-        {
-            Text = noText,
-            Size = new Size(200, 40),
-            Location = new Point(265, 200),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(60, 40, 80),
-            ForeColor = Color.White,
-            Font = new Font("Segoe UI", 10, FontStyle.Bold),
-            Cursor = Cursors.Hand
-        };
-        noBtn.FlatAppearance.BorderColor = Color.FromArgb(100, 60, 140);
-        noBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(80, 50, 110);
-        noBtn.Click += (s, e) =>
-        {
-            result = false;
-            dialog.Close();
-        };
-
-        // Allow dragging the dialog
-        bool dragging = false;
-        Point dragStart = Point.Empty;
-        dialog.MouseDown += (s, e) =>
-        {
-            dragging = true;
-            dragStart = e.Location;
-        };
-        dialog.MouseMove += (s, e) =>
-        {
-            if (dragging)
-            {
-                dialog.Location = new Point(dialog.Location.X + e.X - dragStart.X,
-                    dialog.Location.Y + e.Y - dragStart.Y);
-            }
-        };
-        dialog.MouseUp += (s, e) => { dragging = false; };
-
-        dialog.Controls.AddRange(titleLabel, messageLabel, pathPanel, questionLabel, yesBtn, noBtn);
-        dialog.ShowDialog(this);
-
-        return result;
+        // Delegate to dialog service
+        return _dialogService.ShowStyledConfirmation(this, title, message, path, yesText, noText);
     }
 
     public static int CountSteamApiDlls(string gamePath)
     {
-        try
-        {
-            var count = Directory.GetFiles(gamePath, "steam_api*.dll", SearchOption.AllDirectories)
-                .Count(f => !f.EndsWith(".bak", StringComparison.OrdinalIgnoreCase) &&
-                            (f.EndsWith("steam_api.dll", StringComparison.OrdinalIgnoreCase) ||
-                             f.EndsWith("steam_api64.dll", StringComparison.OrdinalIgnoreCase)));
-            return count;
-        }
-        catch { return 0; }
+        // Delegate to file system service
+        return Program.Form?._fileSystem?.CountSteamApiDlls(gamePath) ?? 0;
     }
 
     private bool IsGameFolder(string path)
@@ -3888,6 +3642,10 @@ oLink3.Save";
     private readonly ISettingsService _settings;
     private readonly IStatusUpdateService _statusService;
     private readonly IBatchCoordinatorService _batchCoordinator;
+    private readonly IStringUtilityService _stringUtility;
+    private readonly IIniFileService _iniFileService;
+    private readonly IDlcService _dlcService;
+    private readonly IDialogService _dialogService;
 
     // === Batch Processing Components ===
     private BatchGameSelectionForm _activeBatchForm;
