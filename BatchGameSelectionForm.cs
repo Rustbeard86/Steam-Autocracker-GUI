@@ -1191,7 +1191,7 @@ public class BatchGameSelectionForm : Form
                 slot.Cancellation = new CancellationTokenSource();
 
                 slot.LblGame.Text = gameName;
-                slot.LblSize.Text = $"0 / {FormatFileSize(totalBytes)}";
+                slot.LblSize.Text = $"0 / {_gameData.FormatFileSize(totalBytes)}";
                 slot.LblSpeed.Text = "";
                 slot.LblEta.Text = "";
                 slot.ProgressBar.Value = 0;
@@ -1256,11 +1256,11 @@ public class BatchGameSelectionForm : Form
 
         slot.ProgressBar.Value = Math.Min(percent, 100);
         slot.ProgressBar.Invalidate();
-        slot.LblSize.Text = $"{FormatFileSize(uploadedBytes)} / {FormatFileSize(totalBytes)}";
+        slot.LblSize.Text = $"{_gameData.FormatFileSize(uploadedBytes)} / {_gameData.FormatFileSize(totalBytes)}";
 
         if (bytesPerSecond > 0)
         {
-            slot.LblSpeed.Text = $"{FormatFileSize((long)bytesPerSecond)}/s";
+            slot.LblSpeed.Text = $"{_gameData.FormatFileSize((long)bytesPerSecond)}/s";
             long remainingBytes = totalBytes - uploadedBytes;
             if (remainingBytes > 0)
             {

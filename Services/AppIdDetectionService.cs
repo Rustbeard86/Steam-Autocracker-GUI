@@ -30,11 +30,22 @@ public sealed class AppIdDetectionService : IAppIdDetectionService
             // Normalize path
             gamePath = gamePath.TrimEnd('\\', '/');
 
-            // Try manifest first
-            var manifestInfo = SteamManifestParser.GetAppIdFromManifest(gamePath);
-            if (manifestInfo.HasValue)
+            // Try manifest first - walk up directory tree to find steamapps folder
+            string? steamappsPath = FindSteamappsPath(gamePath);
+            if (steamappsPath != null)
             {
-                return manifestInfo.Value.appId;
+                string gameFolderName = Path.GetFileName(gamePath);
+                var manifestFiles = _manifestParsing.FindManifestFiles(steamappsPath);
+                
+                foreach (var manifestPath in manifestFiles)
+                {
+                    var manifestInfo = _manifestParsing.ParseManifest(manifestPath);
+                    if (manifestInfo != null && 
+                        string.Equals(manifestInfo.InstallDir, gameFolderName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return manifestInfo.AppId;
+                    }
+                }
             }
 
             // Try steam_appid.txt in game folder
@@ -59,26 +70,7 @@ public sealed class AppIdDetectionService : IAppIdDetectionService
                 }
             }
 
-            // Try to find appmanifest directly by scanning steamapps folder
-            string? steamappsPath = null;
-            var dir = new DirectoryInfo(gamePath);
-            while (dir != null)
-            {
-                if (dir.Name.Equals("steamapps", StringComparison.OrdinalIgnoreCase))
-                {
-                    steamappsPath = dir.FullName;
-                    break;
-                }
-
-                if (dir.Name.Equals("common", StringComparison.OrdinalIgnoreCase) && dir.Parent != null)
-                {
-                    steamappsPath = dir.Parent.FullName;
-                    break;
-                }
-
-                dir = dir.Parent;
-            }
-
+            // Try to find appmanifest directly by scanning steamapps folder (backup method)
             if (steamappsPath != null)
             {
                 string gameFolderName = Path.GetFileName(gamePath);
@@ -119,6 +111,31 @@ public sealed class AppIdDetectionService : IAppIdDetectionService
             }
         }
         catch { }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Walks up the directory tree from the game path to find the steamapps folder.
+    /// </summary>
+    private string? FindSteamappsPath(string gamePath)
+    {
+        var dir = new DirectoryInfo(gamePath);
+        
+        while (dir != null)
+        {
+            if (dir.Name.Equals("steamapps", StringComparison.OrdinalIgnoreCase))
+            {
+                return dir.FullName;
+            }
+
+            if (dir.Name.Equals("common", StringComparison.OrdinalIgnoreCase) && dir.Parent != null)
+            {
+                return dir.Parent.FullName;
+            }
+
+            dir = dir.Parent;
+        }
 
         return null;
     }
