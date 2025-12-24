@@ -19,61 +19,62 @@ using APPID.Utilities.Steam;
 using APPID.Utilities.Steam.SteamTools.SteamTools;
 using APPID.Utilities.UI;
 using Newtonsoft.Json.Linq;
-using Clipboard = System.Windows.Forms.Clipboard;
-using DataFormats = System.Windows.Forms.DataFormats;
-using DragDropEffects = System.Windows.Forms.DragDropEffects;
-using Timer = System.Windows.Forms.Timer;
 using BatchGameItem = APPID.Models.BatchGameItem;
 using BatchProcessingSettings = APPID.Models.BatchProcessingSettings;
 using BatchProgress = APPID.Models.BatchProgress;
+using Clipboard = System.Windows.Forms.Clipboard;
+using DataFormats = System.Windows.Forms.DataFormats;
+using DragDropEffects = System.Windows.Forms.DragDropEffects;
+using Font = System.Drawing.Font;
+using Image = System.Drawing.Image;
+using Timer = System.Windows.Forms.Timer;
 
 namespace APPID;
 
 public partial class SteamAppId : Form
 {
-    // Exe directory - use this for all paths
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwcpRound = 2;
+    private const int WcaAccentPolicy = 19;
+    private const int AccentEnableAcrylicblurbehind = 4;
+    private const int WsMinimizebox = 0x20000;
+    private const int CsDblclks = 0x8;
     private static readonly string ExeDir =
         Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
-
     private static readonly string BinPath = Path.Combine(ExeDir, "_bin");
     private static int CurrentCell;
     private static string Appname = "";
-    private static string Appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    private static readonly string Appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
     private static bool VrlExists;
     internal static string CurrentAppId;
     private static bool SearchPause;
     private static bool BackPressed;
     private static Timer T1;
     private readonly IBatchProcessingService _batchProcessingService;
-
-    // Services for SOLID architecture
     private readonly IFileSystemService _fileSystem;
     private readonly IGameDetectionService _gameDetection;
     private readonly IManifestParsingService _manifestParsing;
     private readonly ISettingsService _settings;
-
     private readonly IStatusUpdateService _statusService;
     private readonly IUrlConversionService _urlConversion;
+    private BatchGameSelectionForm _activeBatchForm;
+    private Image _batchIconBase;
+    private PictureBox _batchIndicator;
+    private ToolTip _batchIndicatorTooltip;
     private string _gameDir;
     private string _gameDirName;
-    private bool _isFirstClickAfterSelection; // Track first click after folder/file selection
-    private bool _isInitialFolderSearch; // Track if this is the FIRST search after folder selection
+    private bool _isFirstClickAfterSelection;
+    private bool _isInitialFolderSearch;
     private Timer _label5Timer;
-
-    // Custom title bar drag functionality
     private Point _mouseDownPoint = Point.Empty;
-
     private string _parentOfSelection;
     private Timer _resinstruccZipTimer;
-
     private EnhancedShareWindow _shareWindow;
-    private bool _suppressStatusUpdates; // Flag to suppress Tit/Tat when cracking from share window
+    private bool _suppressStatusUpdates;
     private bool _textChanged;
-
     private CancellationTokenSource _zipCancellationTokenSource;
-    private bool AutoCrackEnabled = true; // Default to ON
+    private bool AutoCrackEnabled = true;
     private bool Cracking;
-
     private DataTableGeneration DataTableGeneration;
     private bool EnableLanMultiplayer;
     private bool Goldy;
@@ -184,6 +185,21 @@ public partial class SteamAppId : Form
             }
         }
     }
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            CreateParams cp = base.CreateParams;
+            cp.Style |= WsMinimizebox;
+            cp.ClassStyle |= CsDblclks;
+            return cp;
+        }
+    }
+
+    public CrackDetails CurrentCrackDetails { get; private set; }
+
+    public List<CrackDetails> CrackHistory { get; } = [];
 
     public event EventHandler<string> CrackStatusChanged;
 
@@ -2808,8 +2824,18 @@ oLink3.Save";
         try
         {
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string prefix = isCracked ? "[CRACKED]" : "[CLEAN]";
-            string zipName = $"{prefix} {gameName}.{format.ToLower()}";
+
+            // Try to get build ID from manifest for filename
+            string buildSuffix = "";
+            var manifestInfo = SteamManifestParser.GetFullManifestInfo(gamePath);
+            if (manifestInfo.HasValue && !string.IsNullOrEmpty(manifestInfo.Value.buildId))
+            {
+                buildSuffix = $" (Build {manifestInfo.Value.buildId})";
+            }
+
+            string crackStatus = isCracked ? "Cracked" : "Clean";
+            string ext = format.ToLower() == "7z" ? ".7z" : ".zip";
+            string zipName = $"[SACGUI] {gameName} - {crackStatus}{buildSuffix}{ext}";
             string zipPath = Path.Combine(desktopPath, zipName);
 
             if (parentForm.IsHandleCreated)
@@ -4029,91 +4055,17 @@ oLink3.Save";
         return result;
     }
 
-    // Progress handler for upload tracking
-    private class ProgressMessageHandler : HttpClientHandler
-    {
-        public event EventHandler<HttpProgressEventArgs> HttpSendProgress;
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            // For now, just send without progress tracking
-            // Full implementation would require tracking the request stream
-            var response = await base.SendAsync(request, cancellationToken);
-
-            // Simulate progress complete
-            HttpSendProgress?.Invoke(this, new HttpProgressEventArgs(0, 100, 100));
-
-            return response;
-        }
-    }
-
-    public class HttpProgressEventArgs(int progressPercentage, long bytesTransferred, long? totalBytes)
-        : EventArgs
-    {
-        public long BytesTransferred { get; } = bytesTransferred;
-        public long? TotalBytes { get; } = totalBytes;
-        public int ProgressPercentage { get; } = progressPercentage;
-    }
-
     [DllImport("user32.dll")]
     private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttribData data);
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
-    private const int DwmwaWindowCornerPreference = 33;
-    private const int DwmwcpRound = 2;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct WindowCompositionAttribData
-    {
-        public int Attribute;
-        public IntPtr Data;
-        public int SizeOfData;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct AccentPolicy
-    {
-        public int AccentState;
-        public int AccentFlags;
-        public int GradientColor;
-        public int AnimationId;
-    }
-
-    private const int WcaAccentPolicy = 19;
-    private const int AccentEnableAcrylicblurbehind = 4;
-
-    // Fix borderless form taskbar
-    private const int WsMinimizebox = 0x20000;
-    private const int CsDblclks = 0x8;
-
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetDesktopWindow();
-
-    protected override CreateParams CreateParams
-    {
-        get
-        {
-            CreateParams cp = base.CreateParams;
-            cp.Style |= WsMinimizebox;
-            cp.ClassStyle |= CsDblclks;
-            return cp;
-        }
-    }
-
-    public CrackDetails CurrentCrackDetails { get; private set; }
-
-    public List<CrackDetails> CrackHistory { get; } = [];
-
-    private PictureBox _batchIndicator;
-    private BatchGameSelectionForm _activeBatchForm;
-    private Image _batchIconBase;
-    private ToolTip _batchIndicatorTooltip;
 
     public static int CountSteamApiDlls(string gamePath)
     {
@@ -4502,11 +4454,52 @@ oLink3.Save";
         // Show summary
         Tit($"Batch complete! {result.GetSummary()}", Color.LightGreen);
 
-        // Show copy all button with upload URLs
+        // Show copy all button with upload URLs (enhanced cs.rin.ru format with manifest info)
         if (result.UploadResults.Count > 0)
         {
-            string allLinks = string.Join("\n", result.UploadResults.Select(r =>
-                $"[url={r.FinalUrl}]{r.GameName}[/url]"));
+            var linksWithManifestInfo = new List<string>();
+
+            foreach (var upload in result.UploadResults)
+            {
+                // Find the corresponding BatchGameItem to get manifest info
+                var gameItem = games.FirstOrDefault(g => g.Name == upload.GameName);
+
+                if (gameItem != null && !string.IsNullOrEmpty(gameItem.BuildId))
+                {
+                    // Format version date from Unix timestamp
+                    string versionDate = "Unknown";
+                    if (gameItem.LastUpdated > 0)
+                    {
+                        var dt = DateTimeOffset.FromUnixTimeSeconds(gameItem.LastUpdated).UtcDateTime;
+                        versionDate = $"{dt:MMM dd, yyyy - HH:mm:ss} UTC [Build {gameItem.BuildId}]";
+                    }
+
+                    // Build depot list
+                    var depotLines = new List<string>();
+                    foreach (var depot in gameItem.InstalledDepots)
+                    {
+                        depotLines.Add($"{depot.Key} [Manifest {depot.Value.manifest}]");
+                    }
+
+                    string depotsText = depotLines.Count > 0 ? string.Join("\n", depotLines) : "No depot info";
+
+                    // Full phpBB format for cs.rin.ru
+                    string formattedLink =
+                        $"[url={upload.FinalUrl}][color=white][b]{gameItem.Name} [{gameItem.Platform}] [Branch: {gameItem.Branch}] (Clean Steam Files)[/b][/color][/url]\n" +
+                        $"[size=85][color=white][b]Version:[/b] [i]{versionDate}[/i][/color][/size]\n\n" +
+                        $"[spoiler=\"[color=white]Depots & Manifests[/color]\"][code=text]{depotsText}[/code][/spoiler]" +
+                        $"[color=white][b]Uploaded version:[/b] [i]{versionDate}[/i][/color]";
+
+                    linksWithManifestInfo.Add(formattedLink);
+                }
+                else
+                {
+                    // Fallback to simple format if no manifest info
+                    linksWithManifestInfo.Add($"[url={upload.FinalUrl}]{upload.GameName}[/url]");
+                }
+            }
+
+            string allLinks = string.Join("\n\n", linksWithManifestInfo);
             batchForm.ShowCopyAllButton(allLinks);
         }
 
@@ -4617,5 +4610,49 @@ oLink3.Save";
 
         Console.WriteLine($"[CONVERT] FAILED after {maxRetries} attempts, will use 1fichier link");
         return null; // Conversion failed, will use 1fichier link
+    }
+
+    // Progress handler for upload tracking
+    private class ProgressMessageHandler : HttpClientHandler
+    {
+        public event EventHandler<HttpProgressEventArgs> HttpSendProgress;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            // For now, just send without progress tracking
+            // Full implementation would require tracking the request stream
+            var response = await base.SendAsync(request, cancellationToken);
+
+            // Simulate progress complete
+            HttpSendProgress?.Invoke(this, new HttpProgressEventArgs(0, 100, 100));
+
+            return response;
+        }
+    }
+
+    public class HttpProgressEventArgs(int progressPercentage, long bytesTransferred, long? totalBytes)
+        : EventArgs
+    {
+        public long BytesTransferred { get; } = bytesTransferred;
+        public long? TotalBytes { get; } = totalBytes;
+        public int ProgressPercentage { get; } = progressPercentage;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowCompositionAttribData
+    {
+        public int Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct AccentPolicy
+    {
+        public int AccentState;
+        public int AccentFlags;
+        public int GradientColor;
+        public int AnimationId;
     }
 }

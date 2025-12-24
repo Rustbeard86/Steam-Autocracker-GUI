@@ -277,4 +277,158 @@ public static class SteamManifestParser
 
         return paths;
     }
+
+    /// <summary>
+    ///     Gets full manifest info including build ID, depots, and timestamps for cs.rin.ru format
+    /// </summary>
+    public static (string gameName, string appId, long sizeOnDisk, string buildId, long lastUpdated,
+        Dictionary<string, (string manifest, long size)> depots)? GetFullManifestInfo(string gameInstallPath)
+    {
+        var basicInfo = GetAppIdFromManifest(gameInstallPath);
+        if (!basicInfo.HasValue)
+        {
+            return null;
+        }
+
+        var (appId, gameName, sizeOnDisk) = basicInfo.Value;
+
+        // Find the manifest file again to get extended info
+        string steamappsPath = GetSteamappsPath(gameInstallPath);
+        if (string.IsNullOrEmpty(steamappsPath))
+        {
+            return null;
+        }
+
+        string gameFolderName = Path.GetFileName(gameInstallPath.TrimEnd('\\', '/'));
+        var acfFiles = Directory.GetFiles(steamappsPath, "appmanifest_*.acf");
+
+        foreach (var acfFile in acfFiles)
+        {
+            try
+            {
+                string content = File.ReadAllText(acfFile);
+                var manifest = ParseAcfFile(content);
+
+                if (manifest.TryGetValue("installdir", out var installDir) &&
+                    string.Equals(installDir, gameFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Extract build ID and timestamp
+                    string buildId = manifest.GetValueOrDefault("buildid", "0");
+                    long lastUpdated = 0;
+                    if (manifest.TryGetValue("LastUpdated", out var lastUpdatedStr))
+                    {
+                        long.TryParse(lastUpdatedStr, out lastUpdated);
+                    }
+
+                    // Parse installed depots
+                    var depots = ParseInstalledDepots(content);
+
+                    return (gameName, appId, sizeOnDisk, buildId, lastUpdated, depots);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MANIFEST] Error parsing full info from {acfFile}: {ex.Message}");
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    ///     Parses the InstalledDepots section from ACF content
+    /// </summary>
+    private static Dictionary<string, (string manifest, long size)> ParseInstalledDepots(string acfContent)
+    {
+        var depots = new Dictionary<string, (string manifest, long size)>();
+
+        try
+        {
+            // Find the InstalledDepots section
+            var depotsSectionMatch = Regex.Match(acfContent, @"""InstalledDepots""\s*\{([\s\S]*?)\n\t\}",
+                RegexOptions.Multiline);
+            if (!depotsSectionMatch.Success)
+            {
+                return depots;
+            }
+
+            string depotsSection = depotsSectionMatch.Groups[1].Value;
+
+            // Parse each depot entry: "depotId" { "manifest" "manifestId" "size" "sizeBytes" }
+            var depotMatches = Regex.Matches(depotsSection,
+                @"""(\d+)""\s*\{[^}]*""manifest""\s+""(\d+)""[^}]*""size""\s+""(\d+)""", RegexOptions.Multiline);
+
+            foreach (Match match in depotMatches)
+            {
+                if (match.Groups.Count >= 4)
+                {
+                    string depotId = match.Groups[1].Value;
+                    string manifestId = match.Groups[2].Value;
+                    long size = 0;
+                    long.TryParse(match.Groups[3].Value, out size);
+
+                    depots[depotId] = (manifestId, size);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[MANIFEST] Error parsing depots: {ex.Message}");
+        }
+
+        return depots;
+    }
+
+    /// <summary>
+    ///     Detects if game is 64-bit or 32-bit based on executable files
+    /// </summary>
+    public static string DetectGamePlatform(string gamePath)
+    {
+        try
+        {
+            // Look for exe files
+            var exeFiles = Directory.GetFiles(gamePath, "*.exe", SearchOption.AllDirectories);
+            foreach (var exeFile in exeFiles)
+            {
+                try
+                {
+                    // Read PE header to determine architecture
+                    using var fs = new FileStream(exeFile, FileMode.Open, FileAccess.Read);
+                    using var br = new BinaryReader(fs);
+
+                    // Check for MZ header
+                    if (br.ReadUInt16() != 0x5A4D)
+                    {
+                        continue; // "MZ"
+                    }
+
+                    fs.Seek(0x3C, SeekOrigin.Begin);
+                    int peOffset = br.ReadInt32();
+                    fs.Seek(peOffset, SeekOrigin.Begin);
+
+                    // Check PE signature
+                    if (br.ReadUInt32() != 0x00004550)
+                    {
+                        continue; // "PE\0\0"
+                    }
+
+                    // Read machine type
+                    ushort machineType = br.ReadUInt16();
+                    if (machineType == 0x8664)
+                    {
+                        return "Win64"; // AMD64
+                    }
+
+                    if (machineType == 0x014C)
+                    {
+                        return "Win32"; // i386
+                    }
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        return "Win64"; // Default to Win64
+    }
 }
