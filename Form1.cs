@@ -51,26 +51,8 @@ public partial class SteamAppId : Form
         _gameDetection = new GameDetectionService(_fileSystem);
         _manifestParsing = new ManifestParsingService(_fileSystem);
         _urlConversion = new UrlConversionService();
-        _batchCoordinator = new BatchCoordinatorService(_batchProcessingService);
 
-        // === STEP 2: Configure Network Security ===
-        ServicePointManager.ServerCertificateValidationCallback =
-            (s, certificate, chain, sslPolicyErrors) => true;
-
-        // === STEP 3: Load Critical Settings (Before InitializeComponent) ===
-        AutoCrackEnabled = _settings.AutoCrack;
-        Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {AutoCrackEnabled} from Settings");
-
-        // === STEP 4: Initialize Data Table ===
-        DataTableGeneration = new DataTableGeneration();
-        Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
-
-        // === STEP 5: Initialize Windows Forms Components ===
-        InitializeComponent();
-
-        // === STEP 6: Initialize Remaining Services (Require UI Components) ===
-        _statusService = new StatusUpdateService(this, StatusLabel, currDIrText);
-        _gameSearch = new GameSearchService();
+        // === STEP 2: Initialize Batch Processing Service (Before Coordinator) ===
         _batchProcessingService = new BatchProcessingService(
             new CrackingService(BinPath),
             new CompressionService(BinPath),
@@ -79,7 +61,32 @@ public partial class SteamAppId : Form
             _fileSystem
         );
 
-        // === STEP 7: Apply UI State from Settings ===
+        // === STEP 3: Initialize Batch Coordinator (After Batch Processing) ===
+        _batchCoordinator = new BatchCoordinatorService(_batchProcessingService);
+
+        // === STEP 4: Configure Network Security ===
+        ServicePointManager.ServerCertificateValidationCallback =
+            (s, certificate, chain, sslPolicyErrors) => true;
+
+        // === STEP 5: Load Critical Settings (Before InitializeComponent) ===
+        AutoCrackEnabled = _settings.AutoCrack;
+        Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {AutoCrackEnabled} from Settings");
+
+        // === STEP 6: Initialize Data Table ===
+        DataTableGeneration = new DataTableGeneration();
+        Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
+
+        // === STEP 7: Initialize Windows Forms Components ===
+        InitializeComponent();
+
+        // === STEP 8: Initialize Remaining Services (Require UI Components) ===
+        _statusService = new StatusUpdateService(this, StatusLabel, currDIrText);
+        _gameSearch = new GameSearchService();
+
+        // === STEP 9: Initialize Timers (After UI components exist) ===
+        InitializeTimers();
+
+        // === STEP 10: Apply UI State from Settings ===
         // Auto-crack toggle
         if (AutoCrackEnabled)
         {
@@ -102,10 +109,7 @@ public partial class SteamAppId : Form
             pin.BringToFront();
         }
 
-        // === STEP 8: Initialize Timers ===
-        InitializeTimers();
-
-        // === STEP 9: Initialize UI Managers ===
+        // === Initialize UI Managers ===
         _crackButtonManager = new CrackButtonManager(
             ZipToShare, OpenDir, UploadZipButton, currDIrText, mainPanel);
 
@@ -114,12 +118,24 @@ public partial class SteamAppId : Form
 
         _windowDragHandler = new WindowDragHandler(this);
         _windowDragHandler.AttachToControl(this);
+
+        if (titleBar != null)
+        {
+            _windowDragHandler.AttachToControl(titleBar);
+        }
+
+        // Also attach to any child controls in the title bar that aren't interactive (labels, etc.)
+        if (lblTitle != null)
+        {
+            _windowDragHandler.AttachToControl(lblTitle);
+        }
+
         if (mainPanel != null)
         {
             _windowDragHandler.AttachToControl(mainPanel);
         }
 
-        // === STEP 10: Apply Visual Effects ===
+        // === Apply Visual Effects ===
         Load += (s, e) => ApplyAcrylicEffect();
         ApplyRoundedCornersToButton(OpenDir);
         ApplyRoundedCornersToButton(ZipToShare);
@@ -301,14 +317,57 @@ public partial class SteamAppId : Form
 
     private static void Tit(string message, Color color)
     {
-        // Keep for backward compatibility, delegate to service
-        Program.Form?._statusService?.UpdateStatus(message, color);
+        // Keep for backward compatibility, delegate to service with null check
+        if (Program.Form?._statusService != null)
+        {
+            Program.Form._statusService.UpdateStatus(message, color);
+        }
+        else
+        {
+            // Fallback: Update StatusLabel directly if service not ready
+            if (Program.Form?.StatusLabel != null && Program.Form.StatusLabel.IsHandleCreated)
+            {
+                try
+                {
+                    Program.Form.StatusLabel.Invoke(() =>
+                    {
+                        Program.Form.StatusLabel.Text = message;
+                        Program.Form.StatusLabel.ForeColor = color;
+                    });
+                }
+                catch
+                {
+                    Debug.WriteLine($"[TIT] Failed to update status: {message}");
+                }
+            }
+        }
     }
 
     private static void Tat(string message)
     {
-        // Keep for backward compatibility, delegate to service
-        Program.Form?._statusService?.UpdateCurrentText(message);
+        // Keep for backward compatibility, delegate to service with null check
+        if (Program.Form?._statusService != null)
+        {
+            Program.Form._statusService.UpdateCurrentText(message);
+        }
+        else
+        {
+            // Fallback: Update currDIrText directly if service not ready
+            if (Program.Form?.currDIrText != null && Program.Form.currDIrText.IsHandleCreated)
+            {
+                try
+                {
+                    Program.Form.currDIrText.Invoke(() =>
+                    {
+                        Program.Form.currDIrText.Text = message;
+                    });
+                }
+                catch
+                {
+                    Debug.WriteLine($"[TAT] Failed to update text: {message}");
+                }
+            }
+        }
     }
 
     private static string RemoveSpecialCharacters(string str)
