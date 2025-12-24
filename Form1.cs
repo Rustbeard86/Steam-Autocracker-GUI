@@ -3171,7 +3171,7 @@ oLink3.Save";
                 if (nameIndex != -1)
                 {
                     nameIndex += 8; // Length of "name":"
-                    int endIndex = json.IndexOf("\"", nameIndex, StringComparison.Ordinal);
+                    int endIndex = json.IndexOf('"', nameIndex);
                     if (endIndex != -1)
                     {
                         Appname = json.Substring(nameIndex, endIndex - nameIndex);
