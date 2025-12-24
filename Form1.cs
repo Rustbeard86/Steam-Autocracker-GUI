@@ -105,11 +105,18 @@ public partial class SteamAppId : Form
         // === STEP 8: Initialize Timers ===
         InitializeTimers();
 
-        // === STEP 9: Configure Form Dragging ===
-        MouseDown += TitleBar_MouseDown;
+        // === STEP 9: Initialize UI Managers ===
+        _crackButtonManager = new CrackButtonManager(
+            ZipToShare, OpenDir, UploadZipButton, currDIrText, mainPanel);
+
+        _searchStateManager = new SearchStateManager(
+            searchTextBox, mainPanel, btnManualEntry, resinstruccZip, startCrackPic);
+
+        _windowDragHandler = new WindowDragHandler(this);
+        _windowDragHandler.AttachToControl(this);
         if (mainPanel != null)
         {
-            mainPanel.MouseDown += TitleBar_MouseDown;
+            _windowDragHandler.AttachToControl(mainPanel);
         }
 
         // === STEP 10: Apply Visual Effects ===
@@ -255,47 +262,6 @@ public partial class SteamAppId : Form
 
         // 2.3 style - just opacity
         Opacity = 0.95;
-    }
-
-    private void TitleBar_MouseDown(object sender, MouseEventArgs e)
-    {
-        if (e.Button == MouseButtons.Left)
-        {
-            // Don't drag if clicking on DataGridView (allows column resizing)
-            var clickedControl = GetChildAtPoint(PointToClient(Cursor.Position));
-            if (clickedControl is DataGridView)
-            {
-                return;
-            }
-
-            _mouseDownPoint = new Point(e.X, e.Y);
-            Cursor = Cursors.SizeAll;
-
-            var titleBarControl = sender as Control;
-            titleBarControl.MouseMove += TitleBar_MouseMove;
-            titleBarControl.MouseUp += TitleBar_MouseUp;
-        }
-    }
-
-    private void TitleBar_MouseMove(object sender, MouseEventArgs e)
-    {
-        if (e.Button == MouseButtons.Left && _mouseDownPoint != Point.Empty)
-        {
-            Location = new Point(
-                Location.X + e.X - _mouseDownPoint.X,
-                Location.Y + e.Y - _mouseDownPoint.Y
-            );
-        }
-    }
-
-    private void TitleBar_MouseUp(object sender, MouseEventArgs e)
-    {
-        Cursor = Cursors.Default;
-        _mouseDownPoint = Point.Empty;
-
-        var titleBarControl = sender as Control;
-        titleBarControl.MouseMove -= TitleBar_MouseMove;
-        titleBarControl.MouseUp -= TitleBar_MouseUp;
     }
 
     private void BtnClose_Click(object sender, EventArgs e)
@@ -870,7 +836,7 @@ public partial class SteamAppId : Form
 
             case SearchMatchQuality.ExactMatch:
             case SearchMatchQuality.SingleMatch:
-                if (_isInitialFolderSearch)
+                if (IsInitialFolderSearch)
                 {
                     // Auto-select on initial folder detection
                     SetSelectedGame(0);
@@ -891,7 +857,7 @@ public partial class SteamAppId : Form
         }
 
         // Clear initial search flag after first search
-        _isInitialFolderSearch = false;
+        IsInitialFolderSearch = false;
     }
 
     private void dataGridView1_RowHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
@@ -1828,7 +1794,7 @@ oLink3.Save";
             _gameDir = folderSelectDialog.FileName;
 
             // Hide crack buttons when starting new game selection
-            HideCrackButtons();
+            _crackButtonManager.HideCrackButtons();
 
             // Always remember parent folder for next time
             try
@@ -1918,8 +1884,8 @@ oLink3.Save";
                 startCrackPic.Visible = true;
 
                 // Skip the search entirely
-                _isFirstClickAfterSelection = false;
-                _isInitialFolderSearch = false;
+               IsFirstClickAfterSelection = false;
+                IsInitialFolderSearch = false;
 
                 // Auto-crack if enabled
                 if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
@@ -1952,8 +1918,8 @@ oLink3.Save";
                     Color.LightSkyBlue);
 
                 // Trigger the search
-                _isFirstClickAfterSelection = true; // Set before changing text
-                _isInitialFolderSearch = true; // This is the initial search from folder
+               IsFirstClickAfterSelection = true; // Set before changing text
+                IsInitialFolderSearch = true; // This is the initial search from folder
                 searchTextBox.Text = _gameDirName;
             }
 
@@ -1989,7 +1955,7 @@ oLink3.Save";
                 Tit("Crack complete!\nSelect another game directory to keep the party going!", Color.LightSkyBlue);
 
                 // Show both buttons centered below game name
-                ShowCrackButtons();
+                _crackButtonManager.ShowCrackButtons();
             }
             else
             {
@@ -1998,7 +1964,7 @@ oLink3.Save";
                 Tit("Click folder & select game's parent directory.", Color.Cyan);
 
                 // Show only Open Dir button centered
-                ShowCrackButtons(false);
+                _crackButtonManager.ShowCrackButtons(false);
             }
 
             startCrackPic.Visible = false;
@@ -2140,8 +2106,8 @@ oLink3.Save";
                     startCrackPic.Visible = true;
 
                     // Skip the search entirely
-                    _isInitialFolderSearch = false;
-                    _isFirstClickAfterSelection = false;
+                    IsInitialFolderSearch = false;
+                   IsFirstClickAfterSelection = false;
 
                     // Auto-crack if enabled
                     if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
@@ -2173,18 +2139,18 @@ oLink3.Save";
                         Color.LightSkyBlue);
 
                     // Trigger the search
-                    _isInitialFolderSearch = true; // This is the initial search
+                    IsInitialFolderSearch = true; // This is the initial search
                     searchTextBox.Text = _gameDirName;
-                    _isFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
+                   IsFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
                 }
 
                 // Stop label5 timer when game dir is selected
                 _label5Timer.Stop();
                 label5.Visible = false;
 
-                _isInitialFolderSearch = true; // This is the initial search
+                IsInitialFolderSearch = true; // This is the initial search
                 searchTextBox.Text = _gameDirName;
-                _isFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
+               IsFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
                 _settings.LastDir = _parentOfSelection;
                 AppSettings.Default.Save();
             }
@@ -2835,7 +2801,7 @@ oLink3.Save";
                 {
                     ZipToShare.Enabled = true;
                     // Keep both buttons visible and centered if user cancels
-                    ShowCrackButtons();
+                    _crackButtonManager.ShowCrackButtons();
                     return;
                 }
 
@@ -2918,14 +2884,11 @@ oLink3.Save";
                         return;
                     }
 
-                    // NOW change button to Cancel with orange glow (compression is actually starting)
+                    // NOW change button to Cancel with orange glow
                     Invoke(() =>
                     {
                         ZipToShare.Enabled = true;
-                        ZipToShare.Text = "Cancel";
-                        ZipToShare.FlatAppearance.BorderColor = Color.FromArgb(255, 150, 0);
-                        ZipToShare.FlatAppearance.BorderSize = 2;
-                        ZipToShare.ForeColor = Color.FromArgb(255, 180, 100);
+                        _crackButtonManager.SetCancelState();
                     });
 
                     // Use 7za.exe from _bin folder
@@ -3166,40 +3129,24 @@ oLink3.Save";
         {
             ZipToShare.Enabled = true;
 
-            // Reset button appearance (remove orange glow)
-            ZipToShare.FlatAppearance.BorderColor = Color.FromArgb(55, 55, 60);
-            ZipToShare.FlatAppearance.BorderSize = 1;
-            ZipToShare.ForeColor = Color.FromArgb(220, 220, 225);
+            // Reset button appearance
+            _crackButtonManager.ResetButtonAppearance();
 
             // If cancelled, reset to Zip Dir
             if (compressionCancelled)
             {
-                ZipToShare.Text = "Zip Dir";
-                ZipToShare.Tag = null;
-                // Delete partial zip file if it exists
-                if (!string.IsNullOrEmpty(zipPath) && File.Exists(zipPath))
-                {
-                    try { File.Delete(zipPath); }
-                    catch { }
-                }
+                _crackButtonManager.SetZipButtonState("Zip Dir", null);
+                // ...
             }
-            // Only change to "Show Zip" if the file actually exists
             else if (!string.IsNullOrEmpty(zipPath) && File.Exists(zipPath))
             {
-                ZipToShare.Text = "Show Zip";
-                ZipToShare.Tag = zipPath;
-
-                // Show Upload button on top of Zip button after successful zip
-                ShowUploadButton();
+                _crackButtonManager.SetZipButtonState("Show Zip", zipPath);
+                _crackButtonManager.ShowUploadButton();
             }
             else
             {
-                // Compression failed, keep it as Zip Dir
-                ZipToShare.Text = "Zip Dir";
-                ZipToShare.Tag = null;
-
-                // Keep both buttons visible and centered after failed zip
-                ShowCrackButtons();
+                _crackButtonManager.SetZipButtonState("Zip Dir", null);
+                _crackButtonManager.ShowCrackButtons();
             }
         }
     }
@@ -3369,12 +3316,7 @@ oLink3.Save";
 
     private void searchTextBox_MouseClick(object sender, MouseEventArgs e)
     {
-        // Only clear on FIRST click after folder/file selection
-        if (_isFirstClickAfterSelection)
-        {
-            searchTextBox.Clear();
-            _isFirstClickAfterSelection = false; // Reset flag
-        }
+        _searchStateManager.HandleFirstClick();
     }
 
     private void ShareButton_Click(object sender, EventArgs e)
@@ -3701,7 +3643,7 @@ oLink3.Save";
         }
     }
 
-    public void ShowBatchIndicator()
+    private void ShowBatchIndicator()
     {
         if (InvokeRequired)
         {
@@ -3734,7 +3676,7 @@ oLink3.Save";
         }
     }
 
-    public void HideBatchIndicator()
+    private void HideBatchIndicator()
     {
         if (InvokeRequired)
         {
@@ -3757,93 +3699,6 @@ oLink3.Save";
         if (arrowBatchConversionLabel != null)
         {
             arrowBatchConversionLabel.Visible = false;
-        }
-    }
-
-    private void ShowCrackButtons(bool showZip = true)
-    {
-        if (InvokeRequired)
-        {
-            try { BeginInvoke(() => ShowCrackButtons(showZip)); }
-            catch { }
-
-            return;
-        }
-
-        // Position buttons centered below currDIrText
-        int gap = 10;
-        int buttonY = currDIrText.Bottom + 6;
-        int totalWidth = showZip ? ZipToShare.Width + gap + OpenDir.Width : OpenDir.Width;
-        int startX = (mainPanel.ClientSize.Width - totalWidth) / 2;
-
-        if (showZip)
-        {
-            ZipToShare.Location = new Point(startX, buttonY);
-            ZipToShare.Visible = true;
-            ZipToShare.Text = "Zip Dir";
-            ZipToShare.BringToFront();
-
-            OpenDir.Location = new Point(startX + ZipToShare.Width + gap, buttonY);
-        }
-        else
-        {
-            OpenDir.Location = new Point(startX, buttonY);
-            ZipToShare.Visible = false;
-        }
-
-        OpenDir.Visible = true;
-        OpenDir.BringToFront();
-
-        // Hide upload button when showing crack buttons (new crack cycle)
-        if (UploadZipButton != null)
-        {
-            UploadZipButton.Visible = false;
-        }
-    }
-
-    private void HideCrackButtons()
-    {
-        if (InvokeRequired)
-        {
-            try { BeginInvoke(HideCrackButtons); }
-            catch { }
-
-            return;
-        }
-
-        if (ZipToShare != null)
-        {
-            ZipToShare.Visible = false;
-        }
-
-        if (OpenDir != null)
-        {
-            OpenDir.Visible = false;
-        }
-
-        if (UploadZipButton != null)
-        {
-            UploadZipButton.Visible = false;
-        }
-    }
-
-    private void ShowUploadButton()
-    {
-        if (InvokeRequired)
-        {
-            try { BeginInvoke(ShowUploadButton); }
-            catch { }
-
-            return;
-        }
-
-        if (UploadZipButton != null && ZipToShare != null)
-        {
-            // Position Upload button exactly where Zip button is
-            UploadZipButton.Location = ZipToShare.Location;
-            UploadZipButton.Size = ZipToShare.Size;
-            UploadZipButton.Visible = true;
-            UploadZipButton.BringToFront();
         }
     }
 
@@ -3973,12 +3828,11 @@ oLink3.Save";
     private string _gameDir;
     private string _gameDirName;
     private readonly IGameSearchService _gameSearch;
-    private bool _isFirstClickAfterSelection;
-    private bool _isInitialFolderSearch;
+    private bool IsFirstClickAfterSelection;
+    private bool IsInitialFolderSearch;
 
     // === UI State & Controls ===
     private Timer _label5Timer;
-    private Point _mouseDownPoint = Point.Empty;
     private string _parentOfSelection;
     private Timer _resinstruccZipTimer;
 
@@ -3992,6 +3846,11 @@ oLink3.Save";
     private bool EnableLanMultiplayer;
     private bool Goldy;
     private bool Isnumeric;
+
+    // === UI Managers (NEW) ===
+    private CrackButtonManager _crackButtonManager;
+    private SearchStateManager _searchStateManager;
+    private WindowDragHandler _windowDragHandler;
 
     #endregion
 }

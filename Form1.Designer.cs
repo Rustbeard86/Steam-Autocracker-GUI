@@ -555,7 +555,6 @@ namespace APPID
             titleBar.Controls.Add(btnClose);
             resources.ApplyResources(titleBar, "titleBar");
             titleBar.Name = "titleBar";
-            titleBar.MouseDown += TitleBar_MouseDown;
             // 
             // lblTitle
             // 
@@ -563,7 +562,6 @@ namespace APPID
             lblTitle.BackColor = System.Drawing.Color.Transparent;
             lblTitle.ForeColor = System.Drawing.Color.FromArgb(200, 200, 210);
             lblTitle.Name = "lblTitle";
-            lblTitle.MouseDown += TitleBar_MouseDown;
             // 
             // btnMinimize
             // 
