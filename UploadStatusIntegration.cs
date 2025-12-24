@@ -31,8 +31,7 @@ public static class UploadStatusManager
             var row = grid.Rows[rowIndex];
 
             // Change button to show success with copy icon
-            var cell = row.Cells["UploadStatus"] as DataGridViewButtonCell;
-            if (cell != null)
+            if (row.Cells["UploadStatus"] is DataGridViewButtonCell cell)
             {
                 cell.Value = "✅ Uploaded! 📋";
                 cell.Style.BackColor = Color.FromArgb(0, 100, 0);

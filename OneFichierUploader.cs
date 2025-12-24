@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
+using APPID.Utilities;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SteamAutocrackGUI;
@@ -15,7 +16,7 @@ public class LargeFileMultipartContent : HttpContent
 {
     // Track concurrent uploads for bandwidth limiting
     private static int _concurrentUploads;
-    private static readonly object _uploadCountLock = new();
+    private static readonly Lock _uploadCountLock = new();
     private readonly string _boundary;
     private readonly string _filePath;
     private readonly long _fileSize;
@@ -78,7 +79,8 @@ public class LargeFileMultipartContent : HttpContent
             await stream.WriteAsync(_headerBytes, 0, _headerBytes.Length);
 
             // Stream file content with progress reporting
-            using (var fileStream = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920))
+            await using (var fileStream =
+                         new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920))
             {
                 var buffer = new byte[81920]; // 80KB buffer
                 long totalWritten = 0;
@@ -210,29 +212,28 @@ public class OneFichierUploader : IDisposable
     {
         try
         {
-            // Use WebRequest for more control over headers (1fichier needs Content-Type on GET)
-            var request = (HttpWebRequest)WebRequest.Create($"{API_BASE_URL}/upload/get_upload_server.cgi");
-            request.Method = "GET";
+            // Use HttpClient instead of obsolete WebRequest
+            using var client = HttpClientFactory.CreateClient(true);
+
+            // Create request with required headers
+            var request = new HttpRequestMessage(HttpMethod.Get, $"{API_BASE_URL}/upload/get_upload_server.cgi");
             request.Headers.Add("Authorization", $"Bearer {API_KEY}");
-            request.ContentType = "application/json";
+            request.Content = new StringContent("", Encoding.UTF8, "application/json");
 
-            using (var response = (HttpWebResponse)await request.GetResponseAsync())
-            using (var stream = response.GetResponseStream())
-            using (var reader = new StreamReader(stream))
+            var response = await client.SendAsync(request);
+            var json = await response.Content.ReadAsStringAsync();
+
+            Debug.WriteLine($"[1FICHIER] Response Status: {response.StatusCode}");
+            Debug.WriteLine($"[1FICHIER] Response: {json}");
+
+            if (response.IsSuccessStatusCode)
             {
-                var json = await reader.ReadToEndAsync();
-                Debug.WriteLine($"[1FICHIER] Response Status: {response.StatusCode}");
-                Debug.WriteLine($"[1FICHIER] Response: {json}");
-
-                if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    var serverInfo = JsonConvert.DeserializeObject<UploadServerInfo>(json);
-                    Debug.WriteLine($"[1FICHIER] Got upload server: {serverInfo.Url}, ID: {serverInfo.Id}");
-                    return serverInfo;
-                }
-
-                throw new Exception($"Failed to get upload server: {response.StatusCode}. Response: {json}");
+                var serverInfo = JsonConvert.DeserializeObject<UploadServerInfo>(json);
+                Debug.WriteLine($"[1FICHIER] Got upload server: {serverInfo.Url}, ID: {serverInfo.Id}");
+                return serverInfo;
             }
+
+            throw new Exception($"Failed to get upload server: {response.StatusCode}. Response: {json}");
         }
         catch (Exception ex)
         {
@@ -271,114 +272,112 @@ public class OneFichierUploader : IDisposable
             string boundary = "----WebKitFormBoundary" + Guid.NewGuid().ToString("N");
 
             // Use custom HttpContent that streams without buffering
-            using (var content =
-                   new LargeFileMultipartContent(filePath, fileName, boundary, progressCallback, statusCallback))
+            using var content =
+                new LargeFileMultipartContent(filePath, fileName, boundary, progressCallback, statusCallback);
+            // Send request using HttpClient (not HttpWebRequest)
+            // HttpClient with our custom content will NOT buffer because TryComputeLength returns true
+            var response = await uploadClient.PostAsync(uploadUrl, content, cancellationToken);
+
+            statusCallback?.Report("Upload complete, waiting for server response...");
+
+            Debug.WriteLine($"[1FICHIER] Upload response status: {response.StatusCode}");
+
+            // Log response headers
+            Debug.WriteLine("[1FICHIER] Response headers:");
+            foreach (var header in response.Headers)
             {
-                // Send request using HttpClient (not HttpWebRequest)
-                // HttpClient with our custom content will NOT buffer because TryComputeLength returns true
-                var response = await uploadClient.PostAsync(uploadUrl, content, cancellationToken);
-
-                statusCallback?.Report("Upload complete, waiting for server response...");
-
-                Debug.WriteLine($"[1FICHIER] Upload response status: {response.StatusCode}");
-
-                // Log response headers
-                Debug.WriteLine("[1FICHIER] Response headers:");
-                foreach (var header in response.Headers)
-                {
-                    Debug.WriteLine($"[1FICHIER]   {header.Key}: {string.Join(", ", header.Value)}");
-                }
-
-                // Handle redirect (302/301)
-                if (response.StatusCode == HttpStatusCode.Redirect ||
-                    response.StatusCode == HttpStatusCode.Found ||
-                    response.StatusCode == HttpStatusCode.MovedPermanently)
-                {
-                    var location = response.Headers.Location?.ToString();
-                    Debug.WriteLine($"[1FICHIER] Upload complete! Redirected to: {location}");
-
-                    // Extract upload ID from location
-                    string uploadId = null;
-                    if (!string.IsNullOrEmpty(location) && location.Contains("xid="))
-                    {
-                        var xidStart = location.IndexOf("xid=") + 4;
-                        var xidEnd = location.IndexOf("&", xidStart);
-                        if (xidEnd == -1)
-                        {
-                            xidEnd = location.Length;
-                        }
-
-                        uploadId = location.Substring(xidStart, xidEnd - xidStart);
-                    }
-
-                    if (!string.IsNullOrEmpty(uploadId))
-                    {
-                        // Step 3: Get download links
-                        var downloadInfo = await GetDownloadLinksAsync(serverInfo.Url, uploadId, statusCallback);
-
-                        progressCallback?.Report(1.0); // Complete
-
-                        return new UploadResult
-                        {
-                            DownloadUrl = downloadInfo?.DownloadUrl,
-                            FileName = fileName,
-                            FileSize = fileSize,
-                            UploadId = uploadId
-                        };
-                    }
-                }
-                else if (response.StatusCode == HttpStatusCode.OK)
-                {
-                    // Sometimes 1fichier returns 200 OK with the file URL in the response
-                    var responseContent = await response.Content.ReadAsStringAsync();
-
-                    Debug.WriteLine(
-                        $"[1FICHIER] Response body preview: {responseContent.Substring(0, Math.Min(500, responseContent.Length))}");
-
-                    // Check if response contains a file URL
-                    var urlMatch = Regex.Match(responseContent, @"https://1fichier\.com/\?[\w]+");
-                    if (urlMatch.Success)
-                    {
-                        var downloadUrl = urlMatch.Value;
-                        Debug.WriteLine($"[1FICHIER] Found download URL in response: {downloadUrl}");
-
-                        progressCallback?.Report(1.0); // Complete
-
-                        return new UploadResult
-                        {
-                            DownloadUrl = downloadUrl, FileName = fileName, FileSize = fileSize, UploadId = ""
-                        };
-                    }
-
-                    // Try to extract file ID from HTML
-                    var fileIdMatch = Regex.Match(responseContent, @"https://1fichier\.com/\?(\w+)");
-                    if (fileIdMatch.Success && fileIdMatch.Groups.Count > 1)
-                    {
-                        var fileId = fileIdMatch.Groups[1].Value;
-                        var downloadUrl = $"https://1fichier.com/?{fileId}";
-                        Debug.WriteLine($"[1FICHIER] Extracted file ID from HTML: {fileId}");
-
-                        progressCallback?.Report(1.0); // Complete
-
-                        return new UploadResult
-                        {
-                            DownloadUrl = downloadUrl, FileName = fileName, FileSize = fileSize, UploadId = fileId
-                        };
-                    }
-
-                    // Check for French error message
-                    if (responseContent.Contains("Pas de fichier"))
-                    {
-                        throw new Exception("Upload failed: No file was received by server");
-                    }
-
-                    throw new Exception("Upload succeeded but couldn't extract download URL from response");
-                }
-
-                // Handle error response
-                var errorContent = await response.Content.ReadAsStringAsync();
-                throw new Exception($"Unexpected response: {response.StatusCode}, Content: {errorContent}");
+                Debug.WriteLine($"[1FICHIER]   {header.Key}: {string.Join(", ", header.Value)}");
             }
+
+            // Handle redirect (302/301)
+            if (response.StatusCode == HttpStatusCode.Redirect ||
+                response.StatusCode == HttpStatusCode.Found ||
+                response.StatusCode == HttpStatusCode.MovedPermanently)
+            {
+                var location = response.Headers.Location?.ToString();
+                Debug.WriteLine($"[1FICHIER] Upload complete! Redirected to: {location}");
+
+                // Extract upload ID from location
+                string uploadId = null;
+                if (!string.IsNullOrEmpty(location) && location.Contains("xid="))
+                {
+                    var xidStart = location.IndexOf("xid=", StringComparison.Ordinal) + 4;
+                    var xidEnd = location.IndexOf("&", xidStart, StringComparison.Ordinal);
+                    if (xidEnd == -1)
+                    {
+                        xidEnd = location.Length;
+                    }
+
+                    uploadId = location.Substring(xidStart, xidEnd - xidStart);
+                }
+
+                if (!string.IsNullOrEmpty(uploadId))
+                {
+                    // Step 3: Get download links
+                    var downloadInfo = await GetDownloadLinksAsync(serverInfo.Url, uploadId, statusCallback);
+
+                    progressCallback?.Report(1.0); // Complete
+
+                    return new UploadResult
+                    {
+                        DownloadUrl = downloadInfo?.DownloadUrl,
+                        FileName = fileName,
+                        FileSize = fileSize,
+                        UploadId = uploadId
+                    };
+                }
+            }
+            else if (response.StatusCode == HttpStatusCode.OK)
+            {
+                // Sometimes 1fichier returns 200 OK with the file URL in the response
+                var responseContent = await response.Content.ReadAsStringAsync();
+
+                Debug.WriteLine(
+                    $"[1FICHIER] Response body preview: {responseContent.Substring(0, Math.Min(500, responseContent.Length))}");
+
+                // Check if response contains a file URL
+                var urlMatch = Regex.Match(responseContent, @"https://1fichier\.com/\?[\w]+");
+                if (urlMatch.Success)
+                {
+                    var downloadUrl = urlMatch.Value;
+                    Debug.WriteLine($"[1FICHIER] Found download URL in response: {downloadUrl}");
+
+                    progressCallback?.Report(1.0); // Complete
+
+                    return new UploadResult
+                    {
+                        DownloadUrl = downloadUrl, FileName = fileName, FileSize = fileSize, UploadId = ""
+                    };
+                }
+
+                // Try to extract file ID from HTML
+                var fileIdMatch = Regex.Match(responseContent, @"https://1fichier\.com/\?(\w+)");
+                if (fileIdMatch is { Success: true, Groups.Count: > 1 })
+                {
+                    var fileId = fileIdMatch.Groups[1].Value;
+                    var downloadUrl = $"https://1fichier.com/?{fileId}";
+                    Debug.WriteLine($"[1FICHIER] Extracted file ID from HTML: {fileId}");
+
+                    progressCallback?.Report(1.0); // Complete
+
+                    return new UploadResult
+                    {
+                        DownloadUrl = downloadUrl, FileName = fileName, FileSize = fileSize, UploadId = fileId
+                    };
+                }
+
+                // Check for French error message
+                if (responseContent.Contains("Pas de fichier"))
+                {
+                    throw new Exception("Upload failed: No file was received by server");
+                }
+
+                throw new Exception("Upload succeeded but couldn't extract download URL from response");
+            }
+
+            // Handle error response
+            var errorContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Unexpected response: {response.StatusCode}, Content: {errorContent}");
         }
         catch (Exception ex)
         {

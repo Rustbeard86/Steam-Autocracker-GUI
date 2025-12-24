@@ -196,12 +196,12 @@ public partial class CompressionSettingsForm : Form
         // Enable transparency support
         typeof(Button).InvokeMember("DoubleBuffered",
             BindingFlags.SetProperty | BindingFlags.Instance | BindingFlags.NonPublic,
-            null, btn, new object[] { true });
+            null, btn, [true]);
 
         // Disable focus cues to prevent orange highlighting
         typeof(Button).InvokeMember("SetStyle",
             BindingFlags.InvokeMethod | BindingFlags.Instance | BindingFlags.NonPublic,
-            null, btn, new object[] { ControlStyles.Selectable, false });
+            null, btn, [ControlStyles.Selectable, false]);
 
         // Paint event for rounded corners
         btn.Paint += (sender, e) =>
@@ -365,10 +365,8 @@ public partial class CompressionSettingsForm : Form
         {
             int x = trackStart + (i * trackWidth / 10);
             int alpha = i == 0 || i == 5 || i == 10 ? 60 : 25;
-            using (var tickBrush = new SolidBrush(Color.FromArgb(alpha, 192, 255, 255)))
-            {
-                g.FillRectangle(tickBrush, x - 1, trackY + 8, 2, 4);
-            }
+            using var tickBrush = new SolidBrush(Color.FromArgb(alpha, 192, 255, 255));
+            g.FillRectangle(tickBrush, x - 1, trackY + 8, 2, 4);
         }
 
         // Glass handle
@@ -377,10 +375,8 @@ public partial class CompressionSettingsForm : Form
         // Soft outer glow
         for (int i = 20; i > 0; i--)
         {
-            using (var glowBrush = new SolidBrush(Color.FromArgb(2, 192, 255, 255)))
-            {
-                g.FillEllipse(glowBrush, handleX - i / 2, trackY - i / 2, i, i);
-            }
+            using var glowBrush = new SolidBrush(Color.FromArgb(2, 192, 255, 255));
+            g.FillEllipse(glowBrush, handleX - i / 2, trackY - i / 2, i, i);
         }
 
         // Glass handle body
@@ -409,7 +405,7 @@ public partial class CompressionSettingsForm : Form
             using (var highlightBrush = new PathGradientBrush(handlePath))
             {
                 highlightBrush.CenterColor = Color.FromArgb(60, 255, 255, 255);
-                highlightBrush.SurroundColors = new[] { Color.Transparent };
+                highlightBrush.SurroundColors = [Color.Transparent];
                 highlightBrush.FocusScales = new PointF(0.3f, 0.3f);
                 g.FillEllipse(highlightBrush, handleX - 5, trackY - 6, 10, 10);
             }

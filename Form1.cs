@@ -185,12 +185,12 @@ public partial class SteamAppId : Form
         // Enable transparency support
         typeof(Button).InvokeMember("DoubleBuffered",
             BindingFlags.SetProperty | BindingFlags.Instance | BindingFlags.NonPublic,
-            null, btn, new object[] { true });
+            null, btn, [true]);
 
         // Disable focus cues to prevent orange highlighting
         typeof(Button).InvokeMember("SetStyle",
             BindingFlags.InvokeMethod | BindingFlags.Instance | BindingFlags.NonPublic,
-            null, btn, new object[] { ControlStyles.Selectable, false });
+            null, btn, [ControlStyles.Selectable, false]);
 
         // Paint event for rounded corners
         btn.Paint += (sender, e) =>
@@ -423,12 +423,12 @@ public partial class SteamAppId : Form
 
         // Remove common gaming suffixes/prefixes that can cause mismatches
         string[] removeParts =
-        {
+        [
             "definitive edition", "deluxe edition", "gold edition", "complete edition", "enhanced edition",
             "directors cut", "game of the year", "goty", "remastered", "redux", "ultimate", "premium",
             "collectors edition", "special edition", "anniversary edition", "standard edition", "base game",
             "digital deluxe", "legendary edition", "epic edition", "expanded edition"
-        };
+        ];
 
         foreach (string part in removeParts)
         {
@@ -538,7 +538,7 @@ public partial class SteamAppId : Form
         }
 
         // Level 5: Try individual words for partial matches
-        string[] words = improvedClean.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+        string[] words = improvedClean.Split([' '], StringSplitOptions.RemoveEmptyEntries);
         if (words.Length > 1)
         {
             // Try matching with the longest word first
@@ -577,7 +577,7 @@ public partial class SteamAppId : Form
         {
             batchProgressIcon.Click += (s, ev) =>
             {
-                if (activeBatchForm != null && !activeBatchForm.IsDisposed)
+                if (activeBatchForm is { IsDisposed: false })
                 {
                     activeBatchForm.Show();
                     activeBatchForm.WindowState = FormWindowState.Normal;
@@ -595,7 +595,7 @@ public partial class SteamAppId : Form
             batchProgressLabel.BringToFront(); // Make sure label is on top of icon
             batchProgressLabel.Click += (s, ev) =>
             {
-                if (activeBatchForm != null && !activeBatchForm.IsDisposed)
+                if (activeBatchForm is { IsDisposed: false })
                 {
                     activeBatchForm.Show();
                     activeBatchForm.WindowState = FormWindowState.Normal;
@@ -668,7 +668,6 @@ public partial class SteamAppId : Form
             VRLExists = true;
         }
 
-        string args3;
         dataGridView1.DataSource = dataTableGeneration.DataTableToGenerate;
         dataGridView1.MultiSelect = false;
         string args2 = "";
@@ -679,7 +678,7 @@ public partial class SteamAppId : Form
         {
             foreach (string args1 in Program.CommandLineArgs ?? [])
             {
-                args3 = RemoveSpecialCharacters(args1);
+                string args3 = RemoveSpecialCharacters(args1);
                 args2 += args3 + " ";
             }
 
@@ -923,13 +922,13 @@ public partial class SteamAppId : Form
     {
         try
         {
-            if (e.Modifiers == Keys.LShiftKey && e.KeyCode == Keys.Oem4)
+            if (e is { Modifiers: Keys.LShiftKey, KeyCode: Keys.Oem4 })
             {
                 searchTextBox.Text = $"${searchTextBox.Text}";
                 searchTextBox.SelectionStart = searchTextBox.Text.Length + 1;
             }
 
-            if (e.Modifiers == Keys.Control && e.KeyCode == Keys.A)
+            if (e is { Modifiers: Keys.Control, KeyCode: Keys.A })
             {
                 searchTextBox.SelectAll();
                 e.SuppressKeyPress = true;
@@ -990,7 +989,7 @@ public partial class SteamAppId : Form
             {
                 BackPressed = true;
             }
-            else if (e.KeyCode == Keys.Control && e.KeyCode == Keys.I)
+            else if (e is { Modifiers: Keys.Control, KeyCode: Keys.I })
             {
                 ManAppPanel.Visible = true;
                 ManAppBox.Focus();
@@ -1011,7 +1010,10 @@ public partial class SteamAppId : Form
                 t1.Stop();
             }
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
     }
 
     public static void t1_Tick(object sender, EventArgs e)
@@ -1079,7 +1081,7 @@ public partial class SteamAppId : Form
                     // Found exact match! Apply filter to show only this
                     string exactName = exactMatches.First().Field<string>("Name");
                     ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                        string.Format("Name = '{0}'", exactName.Replace("'", "''"));
+                        $"Name = '{exactName.Replace("'", "''")}'";
                     goto SearchComplete;
                 }
 
@@ -1103,7 +1105,7 @@ public partial class SteamAppId : Form
                         if (string.Equals(bestMatchName, searchText, StringComparison.OrdinalIgnoreCase))
                         {
                             ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                                string.Format("Name = '{0}'", bestMatchName.Replace("'", "''"));
+                                $"Name = '{bestMatchName.Replace("'", "''")}'";
                             goto SearchComplete;
                         }
 
@@ -1122,7 +1124,7 @@ public partial class SteamAppId : Form
                             {
                                 string baseGameName = baseGameMatches.First().Field<string>("Name");
                                 ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                                    string.Format("Name = '{0}'", baseGameName.Replace("'", "''"));
+                                    $"Name = '{baseGameName.Replace("'", "''")}'";
                                 goto SearchComplete;
                             }
                         }
@@ -1139,7 +1141,7 @@ public partial class SteamAppId : Form
                 {
                     string exactName = normalizedMatches.First().Field<string>("Name");
                     ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                        string.Format("Name = '{0}'", exactName.Replace("'", "''"));
+                        $"Name = '{exactName.Replace("'", "''")}'";
                     goto SearchComplete;
                 }
 
@@ -1172,7 +1174,7 @@ public partial class SteamAppId : Form
                     {
                         string exactName = cleanMatches.First().Field<string>("Name");
                         ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                            string.Format("Name = '{0}'", exactName.Replace("'", "''"));
+                            $"Name = '{exactName.Replace("'", "''")}'";
                         goto SearchComplete;
                     }
                 }
@@ -1266,7 +1268,7 @@ public partial class SteamAppId : Form
                             // If still no match, try individual significant words
                             if (dataGridView1.Rows.Count == 0)
                             {
-                                string[] words = improvedClean.Split(new[] { ' ' },
+                                string[] words = improvedClean.Split([' '],
                                     StringSplitOptions.RemoveEmptyEntries);
                                 if (words.Length > 1)
                                 {
@@ -1775,15 +1777,17 @@ public partial class SteamAppId : Form
 
                     string exeparent = Directory.GetParent(file).FullName;
                     var x2 = new Process();
-                    var pro = new ProcessStartInfo();
-                    pro.WindowStyle = ProcessWindowStyle.Hidden;
-                    pro.UseShellExecute = false;
-                    pro.CreateNoWindow = true;
-                    pro.RedirectStandardError = true;
-                    pro.RedirectStandardOutput = true;
-                    pro.WorkingDirectory = parentdir;
-                    pro.FileName = steamlessPath;
-                    pro.Arguments = $"\"{file}\"";
+                    var pro = new ProcessStartInfo
+                    {
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardError = true,
+                        RedirectStandardOutput = true,
+                        WorkingDirectory = parentdir,
+                        FileName = steamlessPath,
+                        Arguments = $"\"{file}\""
+                    };
 
                     Debug.WriteLine("[CRACK] Starting Steamless process");
                     Debug.WriteLine($"[CRACK] Working Directory: {parentdir}");
@@ -2059,13 +2063,13 @@ oLink3.Save";
                     // Generate interfaces file if the tool exists (required for gbe_fork)
                     // Try different possible locations and names for the generate_interfaces tool
                     string generateInterfacesPath = "";
-                    string[] possiblePaths = new[]
-                    {
+                    string[] possiblePaths =
+                    [
                         $"{BinPath}\\Goldberg\\generate_interfaces_x64.exe",
                         $"{BinPath}\\Goldberg\\generate_interfaces_x32.exe",
                         $"{BinPath}\\generate_interfaces_x64.exe", $"{BinPath}\\generate_interfaces_x32.exe",
                         $"{BinPath}\\Goldberg\\generate_interfaces_file.exe", $"{BinPath}\\generate_interfaces.exe"
-                    };
+                    ];
 
                     foreach (string path in possiblePaths)
                     {
@@ -2227,77 +2231,74 @@ oLink3.Save";
 
     private async Task FetchDLCInfoAsync(string appId, string outputFolder)
     {
-        using (var httpClient = new HttpClient())
+        using var httpClient = new HttpClient();
+        httpClient.Timeout = TimeSpan.FromSeconds(30);
+
+        try
         {
-            httpClient.Timeout = TimeSpan.FromSeconds(30);
+            // Get app details from Steam Store API
+            var response =
+                await httpClient.GetStringAsync($"https://store.steampowered.com/api/appdetails?appids={appId}");
+            var json = JObject.Parse(response);
 
-            try
+            var appData = json[appId]?["data"];
+            if (appData == null || json[appId]?["success"]?.Value<bool>() != true)
             {
-                // Get app details from Steam Store API
-                var response =
-                    await httpClient.GetStringAsync($"https://store.steampowered.com/api/appdetails?appids={appId}");
-                var json = JObject.Parse(response);
+                Tit("No DLC info available for this game", Color.Yellow);
+                return;
+            }
 
-                var appData = json[appId]?["data"];
-                if (appData == null || json[appId]?["success"]?.Value<bool>() != true)
+            if (appData["dlc"] is not JArray dlcArray || dlcArray.Count == 0)
+            {
+                Tit("No DLCs found for this game", Color.Yellow);
+                return;
+            }
+
+            Tit($"Found {dlcArray.Count} DLCs, fetching names...", Color.Cyan);
+
+            var dlcLines = new List<string>();
+            int successCount = 0;
+
+            foreach (var dlcId in dlcArray)
+            {
+                try
                 {
-                    Tit("No DLC info available for this game", Color.Yellow);
-                    return;
-                }
+                    var dlcResponse =
+                        await httpClient.GetStringAsync(
+                            $"https://store.steampowered.com/api/appdetails?appids={dlcId}");
+                    var dlcJson = JObject.Parse(dlcResponse);
 
-                var dlcArray = appData["dlc"] as JArray;
-                if (dlcArray == null || dlcArray.Count == 0)
-                {
-                    Tit("No DLCs found for this game", Color.Yellow);
-                    return;
-                }
-
-                Tit($"Found {dlcArray.Count} DLCs, fetching names...", Color.Cyan);
-
-                var dlcLines = new List<string>();
-                int successCount = 0;
-
-                foreach (var dlcId in dlcArray)
-                {
-                    try
+                    var dlcData = dlcJson[dlcId.ToString()]?["data"];
+                    if (dlcData != null && dlcJson[dlcId.ToString()]?["success"]?.Value<bool>() == true)
                     {
-                        var dlcResponse =
-                            await httpClient.GetStringAsync(
-                                $"https://store.steampowered.com/api/appdetails?appids={dlcId}");
-                        var dlcJson = JObject.Parse(dlcResponse);
-
-                        var dlcData = dlcJson[dlcId.ToString()]?["data"];
-                        if (dlcData != null && dlcJson[dlcId.ToString()]?["success"]?.Value<bool>() == true)
-                        {
-                            string dlcName = dlcData["name"]?.Value<string>() ?? "Unknown";
-                            dlcLines.Add($"{dlcId}={dlcName}");
-                            successCount++;
-                        }
-
-                        // Rate limit to avoid Steam throttling
-                        await Task.Delay(100);
+                        string dlcName = dlcData["name"]?.Value<string>() ?? "Unknown";
+                        dlcLines.Add($"{dlcId}={dlcName}");
+                        successCount++;
                     }
-                    catch
-                    {
-                        // Skip DLCs that fail to fetch
-                        dlcLines.Add($"{dlcId}=DLC_{dlcId}");
-                    }
+
+                    // Rate limit to avoid Steam throttling
+                    await Task.Delay(100);
                 }
+                catch
+                {
+                    // Skip DLCs that fail to fetch
+                    dlcLines.Add($"{dlcId}=DLC_{dlcId}");
+                }
+            }
 
-                // Write DLC.txt
-                string dlcPath = Path.Combine(outputFolder, "DLC.txt");
-                File.WriteAllLines(dlcPath, dlcLines);
+            // Write DLC.txt
+            string dlcPath = Path.Combine(outputFolder, "DLC.txt");
+            File.WriteAllLines(dlcPath, dlcLines);
 
-                Tit($"Saved {successCount}/{dlcArray.Count} DLC entries!", Color.Green);
-            }
-            catch (TaskCanceledException)
-            {
-                throw new Exception("Request timed out");
-            }
-            catch (HttpRequestException ex)
-            {
-                throw new Exception($"Network error: {ex.Message}");
-            }
+            Tit($"Saved {successCount}/{dlcArray.Count} DLC entries!", Color.Green);
+        }
+        catch (TaskCanceledException)
+        {
+            throw new Exception("Request timed out");
+        }
+        catch (HttpRequestException ex)
+        {
+            throw new Exception($"Network error: {ex.Message}");
         }
     }
 
@@ -2309,8 +2310,7 @@ oLink3.Save";
 
     private void pictureBox2_Click(object sender, EventArgs e)
     {
-        var folderSelectDialog = new FolderSelectDialog();
-        folderSelectDialog.Title = "Select the game's main folder.";
+        var folderSelectDialog = new FolderSelectDialog { Title = "Select the game's main folder." };
 
         if (_settings.LastDir.Length > 0)
         {
@@ -2702,7 +2702,7 @@ oLink3.Save";
         AppSettings.Default.Save();
 
         // Unpin share window too if it's open
-        if (shareWindow != null && !shareWindow.IsDisposed)
+        if (shareWindow is { IsDisposed: false })
         {
             shareWindow.TopMost = false;
         }
@@ -2716,7 +2716,7 @@ oLink3.Save";
         AppSettings.Default.Save();
 
         // Pin share window too if it's open
-        if (shareWindow != null && !shareWindow.IsDisposed)
+        if (shareWindow is { IsDisposed: false })
         {
             shareWindow.TopMost = true;
         }
@@ -2764,14 +2764,12 @@ oLink3.Save";
             else
             {
                 // Show compression dialog even without a completed crack for testing
-                using (var compressionForm = new CompressionSettingsForm())
-                {
-                    compressionForm.Owner = this;
-                    compressionForm.StartPosition = FormStartPosition.CenterParent;
-                    compressionForm.TopMost = true;
-                    compressionForm.BringToFront();
-                    compressionForm.ShowDialog(this);
-                }
+                using var compressionForm = new CompressionSettingsForm();
+                compressionForm.Owner = this;
+                compressionForm.StartPosition = FormStartPosition.CenterParent;
+                compressionForm.TopMost = true;
+                compressionForm.BringToFront();
+                compressionForm.ShowDialog(this);
             }
 
             return true;
@@ -2984,35 +2982,33 @@ oLink3.Save";
                 CreateNoWindow = true
             };
 
-            using (var process = Process.Start(processInfo))
+            using var process = Process.Start(processInfo);
+            // Read output asynchronously to capture progress
+            process.OutputDataReceived += (sender, e) =>
             {
-                // Read output asynchronously to capture progress
-                process.OutputDataReceived += (sender, e) =>
+                if (!string.IsNullOrEmpty(e.Data))
                 {
-                    if (!string.IsNullOrEmpty(e.Data))
+                    // 7-Zip outputs progress like "5%" or " 42%"
+                    var match = Regex.Match(e.Data, @"(\d+)%");
+                    if (match.Success)
                     {
-                        // 7-Zip outputs progress like "5%" or " 42%"
-                        var match = Regex.Match(e.Data, @"(\d+)%");
-                        if (match.Success)
+                        int percentage = int.Parse(match.Groups[1].Value);
+                        try
                         {
-                            int percentage = int.Parse(match.Groups[1].Value);
-                            try
+                            // Update the RGB text with actual progress
+                            Invoke(() =>
                             {
-                                // Update the RGB text with actual progress
-                                Invoke(() =>
-                                {
-                                    Tit($"Compressing... {percentage}%", Color.Cyan);
-                                });
-                            }
-                            catch { }
+                                Tit($"Compressing... {percentage}%", Color.Cyan);
+                            });
                         }
+                        catch { }
                     }
-                };
+                }
+            };
 
-                process.BeginOutputReadLine();
-                await Task.Run(() => process.WaitForExit());
-                return process.ExitCode == 0;
-            }
+            process.BeginOutputReadLine();
+            await Task.Run(() => process.WaitForExit());
+            return process.ExitCode == 0;
         }
         catch (Exception ex)
         {
@@ -3046,141 +3042,129 @@ oLink3.Save";
             }
 
             Debug.WriteLine("[UPLOAD] Creating HttpClient...");
-            using (var client = new HttpClient())
+            using var client = new HttpClient();
+            // SACGUI backend configuration - no auth headers needed
+            Debug.WriteLine("[UPLOAD] Configuring client for SACGUI...");
+            client.Timeout = TimeSpan.FromHours(2); // Allow for large files
+            Debug.WriteLine("[UPLOAD] Timeout set to 2 hours");
+
+            var fileInfo = new FileInfo(filePath);
+            long fileSize = fileInfo.Length;
+
+            // Use multipart form for upload
+            Debug.WriteLine("[UPLOAD] Creating multipart form content...");
+            using var content = new MultipartFormDataContent();
+            // Read file in chunks to avoid memory issues with large files
+            Debug.WriteLine("[UPLOAD] Opening file stream...");
+            await using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            Debug.WriteLine("[UPLOAD] File stream opened successfully");
+
+            // Check file size before upload
+            var uploadFileInfo = new FileInfo(filePath);
+            var fileSizeMB = uploadFileInfo.Length / (1024.0 * 1024.0);
+            Debug.WriteLine($"[UPLOAD] File size: {fileSizeMB:F2} MB");
+
+            if (fileSizeMB > 500)
             {
-                // SACGUI backend configuration - no auth headers needed
-                Debug.WriteLine("[UPLOAD] Configuring client for SACGUI...");
-                client.Timeout = TimeSpan.FromHours(2); // Allow for large files
-                Debug.WriteLine("[UPLOAD] Timeout set to 2 hours");
+                Debug.WriteLine("[UPLOAD] WARNING: File is larger than 500MB, may exceed server limits!");
 
-                var fileInfo = new FileInfo(filePath);
-                long fileSize = fileInfo.Length;
-
-                // Use multipart form for upload
-                Debug.WriteLine("[UPLOAD] Creating multipart form content...");
-                using (var content = new MultipartFormDataContent())
+                // Show warning to user
+                if (parentForm.IsHandleCreated)
                 {
-                    // Read file in chunks to avoid memory issues with large files
-                    Debug.WriteLine("[UPLOAD] Opening file stream...");
-                    using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read))
+                    parentForm.Invoke(() =>
                     {
-                        Debug.WriteLine("[UPLOAD] File stream opened successfully");
-
-                        // Check file size before upload
-                        var uploadFileInfo = new FileInfo(filePath);
-                        var fileSizeMB = uploadFileInfo.Length / (1024.0 * 1024.0);
-                        Debug.WriteLine($"[UPLOAD] File size: {fileSizeMB:F2} MB");
-
-                        if (fileSizeMB > 500)
-                        {
-                            Debug.WriteLine("[UPLOAD] WARNING: File is larger than 500MB, may exceed server limits!");
-
-                            // Show warning to user
-                            if (parentForm.IsHandleCreated)
-                            {
-                                parentForm.Invoke(() =>
-                                {
-                                    MessageBox.Show(
-                                        $"File is {fileSizeMB:F0}MB. The server may reject files over 500MB.\n\nConsider using higher compression settings.",
-                                        "Large File Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                                });
-                            }
-                        }
-
-                        var fileContent = new StreamContent(fileStream);
-                        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-                        content.Add(fileContent, "file", Path.GetFileName(filePath));
-
-                        // Add required form fields for SACGUI
-                        content.Add(new StringContent("anonymous"), "hwid"); // Anonymous sharing
-                        content.Add(new StringContent("SACGUI-2.3"), "version");
-
-                        // Extract game name from filename (remove prefix and extension)
-                        string fileName = Path.GetFileNameWithoutExtension(filePath);
-                        string gameName = fileName.Replace("[CRACKED] ", "").Replace("[CLEAN] ", "")
-                            .Replace("[SACGUI] ", "");
-                        content.Add(new StringContent(gameName), "game_name");
-
-                        // Get client IP - use local IP for now
-                        string clientIp = "127.0.0.1";
-                        try
-                        {
-                            using (var ipClient = new HttpClient())
-                            {
-                                ipClient.Timeout = TimeSpan.FromSeconds(5);
-                                var ipResponse = await ipClient.GetStringAsync("https://api.ipify.org");
-                                if (!string.IsNullOrEmpty(ipResponse))
-                                {
-                                    clientIp = ipResponse.Trim();
-                                }
-                            }
-                        }
-                        catch { }
-
-                        content.Add(new StringContent(clientIp), "client_ip");
-                        Debug.WriteLine("[UPLOAD] Added Version: SACGUI-2.3");
-                        Debug.WriteLine($"[UPLOAD] Added Game Name: {gameName}");
-                        Debug.WriteLine($"[UPLOAD] Added Client IP: {clientIp}");
-
-                        // Upload with progress tracking
-                        var progressHandler = new ProgressMessageHandler();
-                        progressHandler.HttpSendProgress += (s, e) =>
-                        {
-                            int percentage = (int)(e.BytesTransferred * 100 / fileSize);
-                            if (parentForm.IsHandleCreated)
-                            {
-                                parentForm.Invoke(() =>
-                                {
-                                    Tit($"Uploading... {percentage}%", Color.Magenta);
-                                });
-                            }
-                        };
-
-                        using (var progressClient = new HttpClient(progressHandler))
-                        {
-                            // Set timeout and user agent
-                            progressClient.Timeout = TimeSpan.FromHours(2);
-                            progressClient.DefaultRequestHeaders.Add("User-Agent", "SACGUI-Uploader/2.3");
-
-                            // Use 1fichier upload
-                            Debug.WriteLine("[UPLOAD] Using 1fichier for file upload");
-                            Debug.WriteLine("[UPLOAD] Request starting...");
-
-                            // Create progress handler for 1fichier upload
-                            var progress = new Progress<double>(value =>
-                            {
-                                int percentage = (int)(value * 100);
-                                if (parentForm.IsHandleCreated)
-                                {
-                                    parentForm.Invoke(() =>
-                                    {
-                                        Tit($"Uploading to 1fichier... {percentage}%", Color.Magenta);
-                                    });
-                                }
-                            });
-
-                            // Use 1fichier uploader
-                            using (var uploader = new OneFichierUploader())
-                            {
-                                var uploadResult = await uploader.UploadFileAsync(filePath, progress);
-
-                                Debug.WriteLine("[UPLOAD] 1fichier upload successful!");
-
-                                if (!string.IsNullOrEmpty(uploadResult.DownloadUrl))
-                                {
-                                    string shareUrl = uploadResult.DownloadUrl;
-                                    Debug.WriteLine($"[UPLOAD] Download URL: {shareUrl}");
-                                    Debug.WriteLine($"[UPLOAD] Extracted share URL: {shareUrl}");
-                                    return shareUrl;
-                                }
-
-                                Debug.WriteLine("[UPLOAD] WARNING: Upload succeeded but no URL was returned");
-                                throw new Exception("Upload succeeded but no download URL was returned");
-                            }
-                        }
-                    }
+                        MessageBox.Show(
+                            $"File is {fileSizeMB:F0}MB. The server may reject files over 500MB.\n\nConsider using higher compression settings.",
+                            "Large File Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    });
                 }
             }
+
+            var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            content.Add(fileContent, "file", Path.GetFileName(filePath));
+
+            // Add required form fields for SACGUI
+            content.Add(new StringContent("anonymous"), "hwid"); // Anonymous sharing
+            content.Add(new StringContent("SACGUI-2.3"), "version");
+
+            // Extract game name from filename (remove prefix and extension)
+            string fileName = Path.GetFileNameWithoutExtension(filePath);
+            string gameName = fileName.Replace("[CRACKED] ", "").Replace("[CLEAN] ", "")
+                .Replace("[SACGUI] ", "");
+            content.Add(new StringContent(gameName), "game_name");
+
+            // Get client IP - use local IP for now
+            string clientIp = "127.0.0.1";
+            try
+            {
+                using var ipClient = new HttpClient();
+                ipClient.Timeout = TimeSpan.FromSeconds(5);
+                var ipResponse = await ipClient.GetStringAsync("https://api.ipify.org");
+                if (!string.IsNullOrEmpty(ipResponse))
+                {
+                    clientIp = ipResponse.Trim();
+                }
+            }
+            catch { }
+
+            content.Add(new StringContent(clientIp), "client_ip");
+            Debug.WriteLine("[UPLOAD] Added Version: SACGUI-2.3");
+            Debug.WriteLine($"[UPLOAD] Added Game Name: {gameName}");
+            Debug.WriteLine($"[UPLOAD] Added Client IP: {clientIp}");
+
+            // Upload with progress tracking
+            var progressHandler = new ProgressMessageHandler();
+            progressHandler.HttpSendProgress += (s, e) =>
+            {
+                int percentage = (int)(e.BytesTransferred * 100 / fileSize);
+                if (parentForm.IsHandleCreated)
+                {
+                    parentForm.Invoke(() =>
+                    {
+                        Tit($"Uploading... {percentage}%", Color.Magenta);
+                    });
+                }
+            };
+
+            using var progressClient = new HttpClient(progressHandler);
+            // Set timeout and user agent
+            progressClient.Timeout = TimeSpan.FromHours(2);
+            progressClient.DefaultRequestHeaders.Add("User-Agent", "SACGUI-Uploader/2.3");
+
+            // Use 1fichier upload
+            Debug.WriteLine("[UPLOAD] Using 1fichier for file upload");
+            Debug.WriteLine("[UPLOAD] Request starting...");
+
+            // Create progress handler for 1fichier upload
+            var progress = new Progress<double>(value =>
+            {
+                int percentage = (int)(value * 100);
+                if (parentForm.IsHandleCreated)
+                {
+                    parentForm.Invoke(() =>
+                    {
+                        Tit($"Uploading to 1fichier... {percentage}%", Color.Magenta);
+                    });
+                }
+            });
+
+            // Use 1fichier uploader
+            using var uploader = new OneFichierUploader();
+            var uploadResult = await uploader.UploadFileAsync(filePath, progress);
+
+            Debug.WriteLine("[UPLOAD] 1fichier upload successful!");
+
+            if (!string.IsNullOrEmpty(uploadResult.DownloadUrl))
+            {
+                string shareUrl = uploadResult.DownloadUrl;
+                Debug.WriteLine($"[UPLOAD] Download URL: {shareUrl}");
+                Debug.WriteLine($"[UPLOAD] Extracted share URL: {shareUrl}");
+                return shareUrl;
+            }
+
+            Debug.WriteLine("[UPLOAD] WARNING: Upload succeeded but no URL was returned");
+            throw new Exception("Upload succeeded but no download URL was returned");
         }
         catch (HttpRequestException httpEx)
         {
@@ -3327,31 +3311,29 @@ oLink3.Save";
             if (!skipDialog || string.IsNullOrEmpty(compressionType))
             {
                 // Use the custom CompressionSettingsForm
-                using (var compressionForm = new CompressionSettingsForm())
+                using var compressionForm = new CompressionSettingsForm();
+                compressionForm.Owner = this;
+                compressionForm.StartPosition = FormStartPosition.CenterParent;
+                compressionForm.TopMost = true;
+                compressionForm.BringToFront();
+                if (compressionForm.ShowDialog(this) != DialogResult.OK)
                 {
-                    compressionForm.Owner = this;
-                    compressionForm.StartPosition = FormStartPosition.CenterParent;
-                    compressionForm.TopMost = true;
-                    compressionForm.BringToFront();
-                    if (compressionForm.ShowDialog(this) != DialogResult.OK)
-                    {
-                        ZipToShare.Enabled = true;
-                        // Keep both buttons visible and centered if user cancels
-                        ShowCrackButtons();
-                        return;
-                    }
+                    ZipToShare.Enabled = true;
+                    // Keep both buttons visible and centered if user cancels
+                    ShowCrackButtons();
+                    return;
+                }
 
-                    compressionType = compressionForm.SelectedFormat;
-                    compressionLevelStr = compressionForm.SelectedLevel;
+                compressionType = compressionForm.SelectedFormat;
+                compressionLevelStr = compressionForm.SelectedLevel;
 
-                    // Save preferences if requested
-                    if (compressionForm.RememberChoice)
-                    {
-                        AppSettings.Default.ZipFormat = compressionType;
-                        AppSettings.Default.ZipLevel = compressionLevelStr;
-                        AppSettings.Default.ZipDontAsk = true;
-                        AppSettings.Default.Save();
-                    }
+                // Save preferences if requested
+                if (compressionForm.RememberChoice)
+                {
+                    AppSettings.Default.ZipFormat = compressionType;
+                    AppSettings.Default.ZipLevel = compressionLevelStr;
+                    AppSettings.Default.ZipDontAsk = true;
+                    AppSettings.Default.Save();
                 }
             }
 
@@ -3404,7 +3386,7 @@ oLink3.Save";
             zipPath = Path.Combine(desktopPath, zipName);
 
             // HSL to RGB converter for smooth color transitions
-            Func<double, double, double, Color> HSLToRGB = (h, s, l) =>
+            Color HslToRgb(double h, double s, double l)
             {
                 h = h / 360.0;
                 double r, g, b;
@@ -3415,7 +3397,7 @@ oLink3.Save";
                 }
                 else
                 {
-                    Func<double, double, double, double> HueToRGB = (pVal, qVal, t) =>
+                    double HueToRgb(double pVal, double qVal, double t)
                     {
                         if (t < 0)
                         {
@@ -3443,22 +3425,22 @@ oLink3.Save";
                         }
 
                         return pVal;
-                    };
+                    }
 
                     var qHsl = l < 0.5 ? l * (1 + s) : l + s - l * s;
                     var pHsl = 2 * l - qHsl;
-                    r = HueToRGB(pHsl, qHsl, h + 1.0 / 3);
-                    g = HueToRGB(pHsl, qHsl, h);
-                    b = HueToRGB(pHsl, qHsl, h - 1.0 / 3);
+                    r = HueToRgb(pHsl, qHsl, h + 1.0 / 3);
+                    g = HueToRgb(pHsl, qHsl, h);
+                    b = HueToRgb(pHsl, qHsl, h - 1.0 / 3);
                 }
 
                 return Color.FromArgb((int)(r * 255), (int)(g * 255), (int)(b * 255));
-            };
+            }
 
             if (use7z)
             {
                 // Show initial progress
-                Tit($"Starting 7z compression (level {levelNum})...", HSLToRGB(0, 1.0, 0.75));
+                Tit($"Starting 7z compression (level {levelNum})...", HslToRgb(0, 1.0, 0.75));
 
                 // Use 7zip with selected compression level
                 await Task.Run(async () =>
@@ -3496,10 +3478,8 @@ oLink3.Save";
                         ulong availRAM = 1024; // Default 1GB if detection fails
                         try
                         {
-                            using (var pc = new PerformanceCounter("Memory", "Available MBytes"))
-                            {
-                                availRAM = (ulong)pc.NextValue();
-                            }
+                            using var pc = new PerformanceCounter("Memory", "Available MBytes");
+                            availRAM = (ulong)pc.NextValue();
                         }
                         catch
                         {
@@ -3575,89 +3555,85 @@ oLink3.Save";
                         CreateNoWindow = true
                     };
 
-                    using (var p = Process.Start(psi))
+                    using var p = Process.Start(psi);
+                    string lastProgressText = $"Compressing with 7z (level {levelNum})...";
+
+                    // Read stderr asynchronously for progress
+                    var stderrTask = Task.Run(() =>
                     {
-                        string lastProgressText = $"Compressing with 7z (level {levelNum})...";
-
-                        // Read stderr asynchronously for progress
-                        var stderrTask = Task.Run(() =>
+                        while (p.StandardError.ReadLine() is { } line)
                         {
-                            string line;
-                            while ((line = p.StandardError.ReadLine()) != null)
-                            {
-                                Debug.WriteLine($"[7Z STDERR] {line}");
+                            Debug.WriteLine($"[7Z STDERR] {line}");
 
-                                // Parse percentage from 7z output if available
-                                var percentMatch = Regex.Match(line, @"(\d+)%");
-                                if (percentMatch.Success)
+                            // Parse percentage from 7z output if available
+                            var percentMatch = Regex.Match(line, @"(\d+)%");
+                            if (percentMatch.Success)
+                            {
+                                lastProgressText = $"Compressing with 7z... {percentMatch.Groups[1].Value}%";
+
+                                // Smooth HSL cycling for pastel colors
+                                colorHue = (colorHue + 3) % 360;
+                                Color currentColor = HslToRgb(colorHue, 1.0, 0.75);
+
+                                Invoke(() =>
                                 {
-                                    lastProgressText = $"Compressing with 7z... {percentMatch.Groups[1].Value}%";
-
-                                    // Smooth HSL cycling for pastel colors
-                                    colorHue = (colorHue + 3) % 360;
-                                    Color currentColor = HSLToRGB(colorHue, 1.0, 0.75);
-
-                                    Invoke(() =>
-                                    {
-                                        Tit(lastProgressText, currentColor);
-                                    });
-                                }
+                                    Tit(lastProgressText, currentColor);
+                                });
                             }
-                        });
+                        }
+                    });
 
-                        // Check stdout for progress too
-                        var stdoutTask = Task.Run(() =>
+                    // Check stdout for progress too
+                    var stdoutTask = Task.Run(() =>
+                    {
+                        while (p.StandardOutput.ReadLine() is { } line)
                         {
-                            string line;
-                            while ((line = p.StandardOutput.ReadLine()) != null)
-                            {
-                                Debug.WriteLine($"[7Z STDOUT] {line}");
+                            Debug.WriteLine($"[7Z STDOUT] {line}");
 
-                                // Parse percentage from stdout as well
-                                var percentMatch = Regex.Match(line, @"(\d+)%");
-                                if (percentMatch.Success)
+                            // Parse percentage from stdout as well
+                            var percentMatch = Regex.Match(line, @"(\d+)%");
+                            if (percentMatch.Success)
+                            {
+                                lastProgressText = $"Compressing with 7z... {percentMatch.Groups[1].Value}%";
+
+                                // Smooth HSL cycling for pastel colors
+                                colorHue = (colorHue + 3) % 360;
+                                Color currentColor = HslToRgb(colorHue, 1.0, 0.75);
+
+                                Invoke(() =>
                                 {
-                                    lastProgressText = $"Compressing with 7z... {percentMatch.Groups[1].Value}%";
-
-                                    // Smooth HSL cycling for pastel colors
-                                    colorHue = (colorHue + 3) % 360;
-                                    Color currentColor = HSLToRGB(colorHue, 1.0, 0.75);
-
-                                    Invoke(() =>
-                                    {
-                                        Tit(lastProgressText, currentColor);
-                                    });
-                                }
+                                    Tit(lastProgressText, currentColor);
+                                });
                             }
-                        });
+                        }
+                    });
 
-                        // Wait for process with cancellation support and show progress
-                        while (!p.HasExited)
+                    // Wait for process with cancellation support and show progress
+                    while (!p.HasExited)
+                    {
+                        if (zipCancellationTokenSource.Token.IsCancellationRequested)
                         {
-                            if (zipCancellationTokenSource.Token.IsCancellationRequested)
-                            {
-                                p.Kill();
-                                compressionCancelled = true;
-                                break;
-                            }
-
-                            // Show smooth HSL progress even without percentage
-                            colorHue = (colorHue + 3) % 360;
-                            Color currentColor = HSLToRGB(colorHue, 1.0, 0.75);
-                            Invoke(() =>
-                            {
-                                Tit(lastProgressText, currentColor);
-                            });
-
-                            await Task.Delay(50);
+                            p.Kill();
+                            compressionCancelled = true;
+                            break;
                         }
 
-                        if (!compressionCancelled)
+                        // Show smooth HSL progress even without percentage
+                        colorHue = (colorHue + 3) % 360;
+                        Color currentColor = HslToRgb(colorHue, 1.0, 0.75);
+                        Invoke(() =>
                         {
-                            p.WaitForExit();
-                            await stderrTask;
-                            await stdoutTask;
-                        }
+                            Tit(lastProgressText, currentColor);
+                        });
+
+                        await Task.Delay(50);
+                    }
+
+                    if (!compressionCancelled)
+                    {
+                        p.WaitForExit();
+                        await stderrTask;
+                        await stdoutTask;
                     }
                 });
             }
@@ -3671,38 +3647,36 @@ oLink3.Save";
                     int currentFile = 0;
                     double colorHue = 0;
 
-                    using (var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+                    await using var archive = ZipFile.Open(zipPath, ZipArchiveMode.Create);
+                    foreach (string file in allFiles)
                     {
-                        foreach (string file in allFiles)
+                        currentFile++;
+                        int percentage = currentFile * 100 / totalFiles;
+
+                        // Smooth HSL cycling
+                        colorHue = (colorHue + 3) % 360;
+                        Color currentColor = HslToRgb(colorHue, 1.0, 0.75);
+
+                        Invoke(() =>
                         {
-                            currentFile++;
-                            int percentage = currentFile * 100 / totalFiles;
+                            string compressionText = compressionLevel == CompressionLevel.NoCompression
+                                ? "Zipping (fast)..."
+                                : "Compressing...";
+                            Tit($"{compressionText} {percentage}%", currentColor);
+                        });
 
-                            // Smooth HSL cycling
-                            colorHue = (colorHue + 3) % 360;
-                            Color currentColor = HSLToRGB(colorHue, 1.0, 0.75);
+                        string relativePath = file.Replace(gameDir + Path.DirectorySeparatorChar, "");
+                        var entry = archive.CreateEntry(Path.Combine(gameName, relativePath), compressionLevel);
+                        await using (var entryStream = entry.Open())
+                        await using (var fileStream = File.OpenRead(file))
+                        {
+                            fileStream.CopyTo(entryStream);
+                        }
 
-                            Invoke(() =>
-                            {
-                                string compressionText = compressionLevel == CompressionLevel.NoCompression
-                                    ? "Zipping (fast)..."
-                                    : "Compressing...";
-                                Tit($"{compressionText} {percentage}%", currentColor);
-                            });
-
-                            string relativePath = file.Replace(gameDir + Path.DirectorySeparatorChar, "");
-                            var entry = archive.CreateEntry(Path.Combine(gameName, relativePath), compressionLevel);
-                            using (var entryStream = entry.Open())
-                            using (var fileStream = File.OpenRead(file))
-                            {
-                                fileStream.CopyTo(entryStream);
-                            }
-
-                            // Update color every 500ms or every 10 files, whichever comes first
-                            if (currentFile % 10 == 0)
-                            {
-                                await Task.Delay(50);
-                            }
+                        // Update color every 500ms or every 10 files, whichever comes first
+                        if (currentFile % 10 == 0)
+                        {
+                            await Task.Delay(50);
                         }
                     }
                 });
@@ -3713,7 +3687,7 @@ oLink3.Save";
             for (int i = 0; i < 10; i++)
             {
                 finalHue = (finalHue + 36) % 360;
-                Tit($"Saved to Desktop: {zipName}", HSLToRGB(finalHue, 1.0, 0.75));
+                Tit($"Saved to Desktop: {zipName}", HslToRgb(finalHue, 1.0, 0.75));
                 await Task.Delay(100);
             }
 
@@ -3768,10 +3742,8 @@ oLink3.Save";
     private void ManAppPanel_Paint(object sender, PaintEventArgs e)
     {
         // Draw modern border with subtle glow
-        using (var borderPen = new Pen(Color.FromArgb(180, 100, 150, 200), 2))
-        {
-            e.Graphics.DrawRectangle(borderPen, 0, 0, ManAppPanel.Width - 1, ManAppPanel.Height - 1);
-        }
+        using var borderPen = new Pen(Color.FromArgb(180, 100, 150, 200), 2);
+        e.Graphics.DrawRectangle(borderPen, 0, 0, ManAppPanel.Width - 1, ManAppPanel.Height - 1);
     }
 
     private void ManAppBtn_Click(object sender, EventArgs e)
@@ -3834,25 +3806,23 @@ oLink3.Save";
     {
         try
         {
-            using (var client = new WebClient())
-            {
-                string url = $"https://store.steampowered.com/api/appdetails?appids={appId}";
-                string json = await client.DownloadStringTaskAsync(url);
+            using var client = new WebClient();
+            string url = $"https://store.steampowered.com/api/appdetails?appids={appId}";
+            string json = await client.DownloadStringTaskAsync(url);
 
-                // Simple JSON parsing without external libraries
-                if (json.Contains($"\"{appId}\":{{\"success\":true"))
+            // Simple JSON parsing without external libraries
+            if (json.Contains($"\"{appId}\":{{\"success\":true"))
+            {
+                int nameIndex = json.IndexOf("\"name\":\"", StringComparison.Ordinal);
+                if (nameIndex != -1)
                 {
-                    int nameIndex = json.IndexOf("\"name\":\"");
-                    if (nameIndex != -1)
+                    nameIndex += 8; // Length of "name":"
+                    int endIndex = json.IndexOf("\"", nameIndex, StringComparison.Ordinal);
+                    if (endIndex != -1)
                     {
-                        nameIndex += 8; // Length of "name":"
-                        int endIndex = json.IndexOf("\"", nameIndex);
-                        if (endIndex != -1)
-                        {
-                            APPNAME = json.Substring(nameIndex, endIndex - nameIndex);
-                            Tat($"{APPNAME} ({appId})");
-                            return;
-                        }
+                        APPNAME = json.Substring(nameIndex, endIndex - nameIndex);
+                        Tat($"{APPNAME} ({appId})");
+                        return;
                     }
                 }
             }
@@ -3949,7 +3919,7 @@ oLink3.Save";
         ActiveControl = null;
 
         // Prevent multiple share windows - reuse existing one
-        if (shareWindow != null && !shareWindow.IsDisposed)
+        if (shareWindow is { IsDisposed: false })
         {
             shareWindow.BringToFront();
             shareWindow.Activate();
@@ -3961,8 +3931,7 @@ oLink3.Save";
         shareWindow.FormClosed += (s, args) =>
         {
             // Reposition main form to center on where child was
-            var childForm = s as Form;
-            if (childForm != null)
+            if (s is Form childForm)
             {
                 int newX = childForm.Location.X + (childForm.Width - Width) / 2;
                 int newY = childForm.Location.Y + (childForm.Height - Height) / 2;
@@ -3995,7 +3964,7 @@ oLink3.Save";
     private void ShareWindow_Resize(object sender, EventArgs e)
     {
         // When share window is restored, restore main window too
-        if (shareWindow != null && shareWindow.WindowState == FormWindowState.Normal &&
+        if (shareWindow is { WindowState: FormWindowState.Normal } &&
             WindowState == FormWindowState.Minimized)
         {
             WindowState = FormWindowState.Normal;
@@ -4020,139 +3989,135 @@ oLink3.Save";
     {
         bool result = false;
 
-        using (var dialog = new Form())
+        using var dialog = new Form();
+        dialog.Text = title;
+        dialog.Size = new Size(500, 280);
+        dialog.StartPosition = FormStartPosition.CenterParent;
+        dialog.FormBorderStyle = FormBorderStyle.None;
+        dialog.BackColor = Color.FromArgb(25, 28, 40);
+        dialog.ForeColor = Color.White;
+        dialog.ShowInTaskbar = false;
+
+        // Add a subtle border
+        dialog.Paint += (s, e) =>
         {
-            dialog.Text = title;
-            dialog.Size = new Size(500, 280);
-            dialog.StartPosition = FormStartPosition.CenterParent;
-            dialog.FormBorderStyle = FormBorderStyle.None;
-            dialog.BackColor = Color.FromArgb(25, 28, 40);
-            dialog.ForeColor = Color.White;
-            dialog.ShowInTaskbar = false;
+            using var pen = new Pen(Color.FromArgb(60, 65, 80), 2);
+            e.Graphics.DrawRectangle(pen, 0, 0, dialog.Width - 1, dialog.Height - 1);
+        };
 
-            // Add a subtle border
-            dialog.Paint += (s, e) =>
-            {
-                using (var pen = new Pen(Color.FromArgb(60, 65, 80), 2))
-                {
-                    e.Graphics.DrawRectangle(pen, 0, 0, dialog.Width - 1, dialog.Height - 1);
-                }
-            };
+        // Title bar with icon
+        var titleLabel = new Label
+        {
+            Text = "⚠️ " + title,
+            Font = new Font("Segoe UI", 14, FontStyle.Bold),
+            ForeColor = Color.FromArgb(255, 200, 100),
+            AutoSize = false,
+            Size = new Size(480, 35),
+            Location = new Point(15, 15),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
 
-            // Title bar with icon
-            var titleLabel = new Label
-            {
-                Text = "⚠️ " + title,
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
-                ForeColor = Color.FromArgb(255, 200, 100),
-                AutoSize = false,
-                Size = new Size(480, 35),
-                Location = new Point(15, 15),
-                TextAlign = ContentAlignment.MiddleLeft
-            };
+        // Message
+        var messageLabel = new Label
+        {
+            Text = message,
+            Font = new Font("Segoe UI", 10),
+            ForeColor = Color.White,
+            AutoSize = false,
+            Size = new Size(470, 50),
+            Location = new Point(15, 55)
+        };
 
-            // Message
-            var messageLabel = new Label
-            {
-                Text = message,
-                Font = new Font("Segoe UI", 10),
-                ForeColor = Color.White,
-                AutoSize = false,
-                Size = new Size(470, 50),
-                Location = new Point(15, 55)
-            };
+        // Path display with dark background
+        var pathPanel = new Panel
+        {
+            BackColor = Color.FromArgb(15, 18, 25), Size = new Size(470, 45), Location = new Point(15, 110)
+        };
 
-            // Path display with dark background
-            var pathPanel = new Panel
-            {
-                BackColor = Color.FromArgb(15, 18, 25), Size = new Size(470, 45), Location = new Point(15, 110)
-            };
+        var pathLabel = new Label
+        {
+            Text = path,
+            Font = new Font("Consolas", 9),
+            ForeColor = Color.FromArgb(150, 180, 255),
+            AutoSize = false,
+            Size = new Size(460, 35),
+            Location = new Point(5, 5),
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        pathPanel.Controls.Add(pathLabel);
 
-            var pathLabel = new Label
-            {
-                Text = path,
-                Font = new Font("Consolas", 9),
-                ForeColor = Color.FromArgb(150, 180, 255),
-                AutoSize = false,
-                Size = new Size(460, 35),
-                Location = new Point(5, 5),
-                TextAlign = ContentAlignment.MiddleLeft
-            };
-            pathPanel.Controls.Add(pathLabel);
+        // Question
+        var questionLabel = new Label
+        {
+            Text = "Is this actually a single game's directory?",
+            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize = false,
+            Size = new Size(470, 25),
+            Location = new Point(15, 165),
+            TextAlign = ContentAlignment.MiddleCenter
+        };
 
-            // Question
-            var questionLabel = new Label
-            {
-                Text = "Is this actually a single game's directory?",
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                ForeColor = Color.White,
-                AutoSize = false,
-                Size = new Size(470, 25),
-                Location = new Point(15, 165),
-                TextAlign = ContentAlignment.MiddleCenter
-            };
+        // Yes button (primary - green tint)
+        var yesBtn = new Button
+        {
+            Text = yesText,
+            Size = new Size(200, 40),
+            Location = new Point(35, 200),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(40, 80, 60),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
+        yesBtn.FlatAppearance.BorderColor = Color.FromArgb(60, 120, 80);
+        yesBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 100, 70);
+        yesBtn.Click += (s, e) =>
+        {
+            result = true;
+            dialog.Close();
+        };
 
-            // Yes button (primary - green tint)
-            var yesBtn = new Button
-            {
-                Text = yesText,
-                Size = new Size(200, 40),
-                Location = new Point(35, 200),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(40, 80, 60),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            yesBtn.FlatAppearance.BorderColor = Color.FromArgb(60, 120, 80);
-            yesBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 100, 70);
-            yesBtn.Click += (s, e) =>
-            {
-                result = true;
-                dialog.Close();
-            };
+        // No button (secondary - purple tint)
+        var noBtn = new Button
+        {
+            Text = noText,
+            Size = new Size(200, 40),
+            Location = new Point(265, 200),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = Color.FromArgb(60, 40, 80),
+            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            Cursor = Cursors.Hand
+        };
+        noBtn.FlatAppearance.BorderColor = Color.FromArgb(100, 60, 140);
+        noBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(80, 50, 110);
+        noBtn.Click += (s, e) =>
+        {
+            result = false;
+            dialog.Close();
+        };
 
-            // No button (secondary - purple tint)
-            var noBtn = new Button
+        // Allow dragging the dialog
+        bool dragging = false;
+        Point dragStart = Point.Empty;
+        dialog.MouseDown += (s, e) =>
+        {
+            dragging = true;
+            dragStart = e.Location;
+        };
+        dialog.MouseMove += (s, e) =>
+        {
+            if (dragging)
             {
-                Text = noText,
-                Size = new Size(200, 40),
-                Location = new Point(265, 200),
-                FlatStyle = FlatStyle.Flat,
-                BackColor = Color.FromArgb(60, 40, 80),
-                ForeColor = Color.White,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            noBtn.FlatAppearance.BorderColor = Color.FromArgb(100, 60, 140);
-            noBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(80, 50, 110);
-            noBtn.Click += (s, e) =>
-            {
-                result = false;
-                dialog.Close();
-            };
+                dialog.Location = new Point(dialog.Location.X + e.X - dragStart.X,
+                    dialog.Location.Y + e.Y - dragStart.Y);
+            }
+        };
+        dialog.MouseUp += (s, e) => { dragging = false; };
 
-            // Allow dragging the dialog
-            bool dragging = false;
-            Point dragStart = Point.Empty;
-            dialog.MouseDown += (s, e) =>
-            {
-                dragging = true;
-                dragStart = e.Location;
-            };
-            dialog.MouseMove += (s, e) =>
-            {
-                if (dragging)
-                {
-                    dialog.Location = new Point(dialog.Location.X + e.X - dragStart.X,
-                        dialog.Location.Y + e.Y - dragStart.Y);
-                }
-            };
-            dialog.MouseUp += (s, e) => { dragging = false; };
-
-            dialog.Controls.AddRange(titleLabel, messageLabel, pathPanel, questionLabel, yesBtn, noBtn);
-            dialog.ShowDialog(this);
-        }
+        dialog.Controls.AddRange(titleLabel, messageLabel, pathPanel, questionLabel, yesBtn, noBtn);
+        dialog.ShowDialog(this);
 
         return result;
     }
@@ -4176,18 +4141,12 @@ oLink3.Save";
         }
     }
 
-    public class HttpProgressEventArgs : EventArgs
+    public class HttpProgressEventArgs(int progressPercentage, long bytesTransferred, long? totalBytes)
+        : EventArgs
     {
-        public HttpProgressEventArgs(int progressPercentage, long bytesTransferred, long? totalBytes)
-        {
-            ProgressPercentage = progressPercentage;
-            BytesTransferred = bytesTransferred;
-            TotalBytes = totalBytes;
-        }
-
-        public long BytesTransferred { get; }
-        public long? TotalBytes { get; }
-        public int ProgressPercentage { get; }
+        public long BytesTransferred { get; } = bytesTransferred;
+        public long? TotalBytes { get; } = totalBytes;
+        public int ProgressPercentage { get; } = progressPercentage;
     }
 
     #region Windows API for Acrylic Blur
@@ -4254,12 +4213,12 @@ oLink3.Save";
         public string GameName { get; set; }
         public string GamePath { get; set; }
         public string AppId { get; set; }
-        public List<string> DllsBackedUp { get; } = new();
-        public List<string> DllsReplaced { get; } = new();
-        public List<string> ExesTried { get; } = new(); // All EXEs Steamless attempted
-        public List<string> ExesUnpacked { get; } = new(); // EXEs with Steam Stub that were unpacked
-        public List<string> ExesSkipped { get; } = new(); // Legacy - no longer used
-        public List<string> Errors { get; } = new();
+        public List<string> DllsBackedUp { get; } = [];
+        public List<string> DllsReplaced { get; } = [];
+        public List<string> ExesTried { get; } = []; // All EXEs Steamless attempted
+        public List<string> ExesUnpacked { get; } = []; // EXEs with Steam Stub that were unpacked
+        public List<string> ExesSkipped { get; } = []; // Legacy - no longer used
+        public List<string> Errors { get; } = [];
         public bool Success { get; set; }
         public DateTime Timestamp { get; set; } = DateTime.Now;
 
@@ -4385,7 +4344,7 @@ oLink3.Save";
     /// <summary>
     ///     History of crack operations for the current session
     /// </summary>
-    public List<CrackDetails> CrackHistory { get; } = new();
+    public List<CrackDetails> CrackHistory { get; } = [];
 
     #endregion
 
@@ -4460,7 +4419,7 @@ oLink3.Save";
 
         batchIndicator.Click += (s, e) =>
         {
-            if (activeBatchForm != null && !activeBatchForm.IsDisposed)
+            if (activeBatchForm is { IsDisposed: false })
             {
                 activeBatchForm.Show();
                 activeBatchForm.WindowState = FormWindowState.Normal;
@@ -4527,7 +4486,7 @@ oLink3.Save";
                         if (dx != 0 || dy != 0)
                         {
                             g.DrawString(text, font, outlineBrush,
-                                new RectangleF(textRect.X + dx, textRect.Y + dy, textRect.Width, textRect.Height), sf);
+                                textRect with { X = textRect.X + dx, Y = textRect.Y + dy }, sf);
                         }
                     }
                 }
@@ -4554,7 +4513,7 @@ oLink3.Save";
     {
         if (InvokeRequired)
         {
-            try { BeginInvoke(() => ShowBatchIndicator()); }
+            try { BeginInvoke(ShowBatchIndicator); }
             catch { }
 
             return;
@@ -4590,7 +4549,7 @@ oLink3.Save";
     {
         if (InvokeRequired)
         {
-            try { BeginInvoke(() => HideBatchIndicator()); }
+            try { BeginInvoke(HideBatchIndicator); }
             catch { }
 
             return;
@@ -4664,7 +4623,7 @@ oLink3.Save";
     {
         if (InvokeRequired)
         {
-            try { BeginInvoke(() => HideCrackButtons()); }
+            try { BeginInvoke(HideCrackButtons); }
             catch { }
 
             return;
@@ -4693,7 +4652,7 @@ oLink3.Save";
     {
         if (InvokeRequired)
         {
-            try { BeginInvoke(() => ShowUploadButton()); }
+            try { BeginInvoke(ShowUploadButton); }
             catch { }
 
             return;
@@ -4742,7 +4701,7 @@ oLink3.Save";
         // Set up minimize-to-indicator behavior
         form.Resize += (s, e) =>
         {
-            if (form.WindowState == FormWindowState.Minimized && form.IsProcessing)
+            if (form is { WindowState: FormWindowState.Minimized, IsProcessing: true })
             {
                 form.Hide();
                 Show(); // Show main form so indicator is visible
@@ -4756,8 +4715,7 @@ oLink3.Save";
         form.FormClosed += (s, e) =>
         {
             // Reposition main form to center on where child was
-            var childForm = s as Form;
-            if (childForm != null)
+            if (s is Form childForm)
             {
                 int newX = childForm.Location.X + (childForm.Width - Width) / 2;
                 int newY = childForm.Location.Y + (childForm.Height - Height) / 2;
@@ -4865,10 +4823,10 @@ oLink3.Save";
 
                 // Delete common crack artifacts
                 string[] artifacts =
-                {
+                [
                     "CreamAPI.dll", "cream_api.ini", "CreamLinux", "steam_api_o.dll", "steam_api64_o.dll",
                     "local_save.txt"
-                };
+                ];
                 foreach (var artifact in artifacts)
                 {
                     foreach (var f in Directory.GetFiles(installPath, artifact, SearchOption.AllDirectories))
@@ -4969,7 +4927,7 @@ oLink3.Save";
         double uploadWeight = estUploadTime / totalEstimatedSeconds;
         double conversionWeight = estConversionTime / totalEstimatedSeconds;
 
-        Action<string, double> updateProgress = (phase, phaseProgress) =>
+        void UpdateProgress(string phase, double phaseProgress)
         {
             // Recalculate based on actual speeds if we have data
             double remainingZipTime = (totalBytesToZip - bytesZippedSoFar) / actualZipRate;
@@ -4989,10 +4947,10 @@ oLink3.Save";
             batchForm.UpdateTitleProgress(percent);
             batchForm.UpdateProgressWithEta(percent, totalRemaining);
             UpdateBatchIndicator(percent);
-        };
+        }
 
         // Initial progress update
-        updateProgress("init", 0);
+        UpdateProgress("init", 0);
 
         // Periodic timer to update progress every 20 seconds during long operations
         Timer progressTimer = null;
@@ -5001,11 +4959,11 @@ oLink3.Save";
         {
             if (InvokeRequired)
             {
-                BeginInvoke(() => updateProgress("timer", 0));
+                BeginInvoke(() => UpdateProgress("timer", 0));
             }
             else
             {
-                updateProgress("timer", 0);
+                UpdateProgress("timer", 0);
             }
         };
         progressTimer.Start();
@@ -5068,7 +5026,7 @@ oLink3.Save";
 
                 // Reduce remaining crack estimate
                 estCrackTime = Math.Max(0, estCrackTime - 3.0);
-                updateProgress("crack", 0);
+                UpdateProgress("crack", 0);
             }
 
             // Games that didn't need cracking
@@ -5084,11 +5042,13 @@ oLink3.Save";
             // Games that only need zip (no upload) are done first
 
             var gamesToZipOnly = games
-                .Where(g => g.ShouldZip && !g.ShouldUpload && crackResults.ContainsKey(g.Path) && crackResults[g.Path])
+                .Where(g => g is { ShouldZip: true, ShouldUpload: false } && crackResults.ContainsKey(g.Path) &&
+                            crackResults[g.Path])
                 .ToList();
             var gamesToZipAndUpload =
                 games.Where(g =>
-                        g.ShouldZip && g.ShouldUpload && crackResults.ContainsKey(g.Path) && crackResults[g.Path])
+                        g is { ShouldZip: true, ShouldUpload: true } && crackResults.ContainsKey(g.Path) &&
+                        crackResults[g.Path])
                     .ToList();
             var gamesToUpload = gamesToZipAndUpload.ToList(); // Will upload after zipping
 
@@ -5098,89 +5058,89 @@ oLink3.Save";
             string password = usePassword ? "rin" : null;
 
             // Helper function to zip a single game
-            Func<BatchGameItem, Task<(BatchGameItem game, bool success, string error, string archivePath)>> zipOneGame =
-                async game =>
+            async Task<(BatchGameItem game, bool success, string error, string archivePath)> ZipOneGame(
+                BatchGameItem game)
+            {
+                string ext = compressionFormat == "7Z" ? ".7z" : ".zip";
+                string parent = Directory.GetParent(game.Path).FullName;
+                string archivePath = Path.Combine(parent, game.Name + ext);
+                archivePaths[game.Path] = archivePath;
+
+                string zipError = null;
+                bool zipSuccess = await Task.Run(() =>
                 {
-                    string ext = compressionFormat == "7Z" ? ".7z" : ".zip";
-                    string parent = Directory.GetParent(game.Path).FullName;
-                    string archivePath = Path.Combine(parent, game.Name + ext);
-                    archivePaths[game.Path] = archivePath;
-
-                    string zipError = null;
-                    bool zipSuccess = await Task.Run(() =>
+                    try
                     {
-                        try
+                        string formatArg = compressionFormat == "7Z" ? "-t7z" : "-tzip";
+                        // Add -bsp1 for progress to stdout
+                        string args =
+                            $"a {formatArg} -mx={compressionLevel} -bsp1 \"{archivePath}\" \"{game.Path}\\*\"";
+                        if (!string.IsNullOrEmpty(password))
                         {
-                            string formatArg = compressionFormat == "7Z" ? "-t7z" : "-tzip";
-                            // Add -bsp1 for progress to stdout
-                            string args =
-                                $"a {formatArg} -mx={compressionLevel} -bsp1 \"{archivePath}\" \"{game.Path}\\*\"";
-                            if (!string.IsNullOrEmpty(password))
-                            {
-                                args += $" -p{password}";
-                            }
+                            args += $" -p{password}";
+                        }
 
-                            var psi = new ProcessStartInfo
-                            {
-                                FileName = sevenZipPath,
-                                Arguments = args,
-                                UseShellExecute = false,
-                                CreateNoWindow = true,
-                                RedirectStandardOutput = true,
-                                RedirectStandardError = true
-                            };
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = sevenZipPath,
+                            Arguments = args,
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true
+                        };
 
-                            using (var proc = Process.Start(psi))
+                        using var proc = Process.Start(psi);
+                        // Read stdout async to get progress updates
+                        var lastUpdate = DateTime.MinValue;
+                        proc.OutputDataReceived += (s, e) =>
+                        {
+                            if (e.Data != null && e.Data.Contains("%"))
                             {
-                                // Read stdout async to get progress updates
-                                var lastUpdate = DateTime.MinValue;
-                                proc.OutputDataReceived += (s, e) =>
+                                // Throttle updates to max 4/sec
+                                if ((DateTime.Now - lastUpdate).TotalMilliseconds < 250)
                                 {
-                                    if (e.Data != null && e.Data.Contains("%"))
-                                    {
-                                        // Throttle updates to max 4/sec
-                                        if ((DateTime.Now - lastUpdate).TotalMilliseconds < 250)
-                                        {
-                                            return;
-                                        }
-
-                                        lastUpdate = DateTime.Now;
-
-                                        // Parse percentage from output like "  5% 3 + file.dll"
-                                        var match = Regex.Match(e.Data, @"(\d+)%");
-                                        if (match.Success)
-                                        {
-                                            string pct = match.Groups[1].Value;
-                                            try
-                                            {
-                                                batchForm.BeginInvoke(() =>
-                                                    batchForm.UpdateStatus(game.Path, $"Zipping {pct}%", Color.Cyan));
-                                            }
-                                            catch { }
-                                        }
-                                    }
-                                };
-                                proc.BeginOutputReadLine();
-
-                                string stderr = proc.StandardError.ReadToEnd();
-                                proc.WaitForExit();
-                                if (proc.ExitCode != 0 && !string.IsNullOrEmpty(stderr))
-                                {
-                                    zipError = stderr.Length > 100 ? stderr.Substring(0, 100) + "..." : stderr;
+                                    return;
                                 }
 
-                                return proc.ExitCode == 0;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            zipError = ex.Message;
-                            return false;
-                        }
-                    });
+                                lastUpdate = DateTime.Now;
 
-                    return (game, zipSuccess, zipError, archivePath);
-                };
+                                // Parse percentage from output like "  5% 3 + file.dll"
+                                var match = Regex.Match(e.Data, @"(\d+)%");
+                                if (match.Success)
+                                {
+                                    string pct = match.Groups[1].Value;
+                                    try
+                                    {
+                                        batchForm.BeginInvoke(() =>
+                                            batchForm.UpdateStatus(game.Path, $"Zipping {pct}%", Color.Cyan));
+                                    }
+                                    catch
+                                    {
+                                    }
+                                }
+                            }
+                        };
+                        proc.BeginOutputReadLine();
+
+                        string stderr = proc.StandardError.ReadToEnd();
+                        proc.WaitForExit();
+                        if (proc.ExitCode != 0 && !string.IsNullOrEmpty(stderr))
+                        {
+                            zipError = stderr.Length > 100 ? stderr.Substring(0, 100) + "..." : stderr;
+                        }
+
+                        return proc.ExitCode == 0;
+                    }
+                    catch (Exception ex)
+                    {
+                        zipError = ex.Message;
+                        return false;
+                    }
+                });
+
+                return (game, zipSuccess, zipError, archivePath);
+            }
 
             // STEP 1: Zip games that only need zipping (no upload) - can be parallel
             if (gamesToZipOnly.Count > 0)
@@ -5190,7 +5150,7 @@ oLink3.Save";
                     batchForm.UpdateStatus(game.Path, "Zipping...", Color.Cyan);
                 }
 
-                var zipOnlyTasks = gamesToZipOnly.Select(g => zipOneGame(g)).ToList();
+                var zipOnlyTasks = gamesToZipOnly.Select(ZipOneGame).ToList();
                 var zipOnlyResults = await Task.WhenAll(zipOnlyTasks);
 
                 foreach (var result in zipOnlyResults)
@@ -5200,9 +5160,7 @@ oLink3.Save";
                         zipped++;
                         batchForm.UpdateStatus(result.game.Path, "Zipped ✓", Color.LightGreen);
                         batchForm.UpdateZipStatus(result.game.Path, true, result.archivePath);
-                        totalBytesActuallyZipped += folderSizes.ContainsKey(result.game.Path)
-                            ? folderSizes[result.game.Path]
-                            : 0;
+                        totalBytesActuallyZipped += folderSizes.GetValueOrDefault(result.game.Path, 0);
                     }
                     else
                     {
@@ -5213,8 +5171,8 @@ oLink3.Save";
                         failureReasons.Add((result.game.Name, $"Zip failed: {result.error ?? "Unknown"}"));
                     }
 
-                    bytesZippedSoFar += folderSizes.ContainsKey(result.game.Path) ? folderSizes[result.game.Path] : 0;
-                    updateProgress("zip", 0);
+                    bytesZippedSoFar += folderSizes.GetValueOrDefault(result.game.Path, 0);
+                    UpdateProgress("zip", 0);
                 }
             }
 
@@ -5226,7 +5184,7 @@ oLink3.Save";
             batchForm.ResetSkipCancelState();
 
             // Helper to upload a single game (runs in background, returns true if success)
-            Func<BatchGameItem, string, Task<bool>> uploadOneGame = async (game, archivePath) =>
+            async Task<bool> UploadOneGame(BatchGameItem game, string archivePath)
             {
                 // Wait for a slot to become available
                 await uploadSemaphore.WaitAsync();
@@ -5273,132 +5231,136 @@ oLink3.Save";
 
                         try
                         {
-                            using (var uploader = new OneFichierUploader())
+                            using var uploader = new OneFichierUploader();
+                            var gamePath = game.Path;
+                            int currentSlot = slotIndex;
+                            double lastProgress = 0;
+                            DateTime lastProgressTime = DateTime.Now;
+                            double smoothedSpeed = 0;
+
+                            var progress = new Progress<double>(p =>
                             {
-                                var gamePath = game.Path;
-                                int currentSlot = slotIndex;
-                                double lastProgress = 0;
-                                DateTime lastProgressTime = DateTime.Now;
-                                double smoothedSpeed = 0;
+                                int pct = (int)(p * 100);
+                                var now = DateTime.Now;
+                                double progressDelta = p - lastProgress;
+                                double timeDelta = (now - lastProgressTime).TotalSeconds;
 
-                                var progress = new Progress<double>(p =>
+                                if (timeDelta > 0.1 && progressDelta > 0)
                                 {
-                                    int pct = (int)(p * 100);
-                                    var now = DateTime.Now;
-                                    double progressDelta = p - lastProgress;
-                                    double timeDelta = (now - lastProgressTime).TotalSeconds;
-
-                                    if (timeDelta > 0.1 && progressDelta > 0)
+                                    long uploadedBytes = (long)(p * fileSize);
+                                    double bytesDelta = progressDelta * fileSize;
+                                    double currentSpeed = bytesDelta / timeDelta;
+                                    smoothedSpeed = smoothedSpeed > 0
+                                        ? smoothedSpeed * 0.7 + currentSpeed * 0.3
+                                        : currentSpeed;
+                                    if (smoothedSpeed > 0)
                                     {
-                                        long uploadedBytes = (long)(p * fileSize);
-                                        double bytesDelta = progressDelta * fileSize;
-                                        double currentSpeed = bytesDelta / timeDelta;
-                                        smoothedSpeed = smoothedSpeed > 0
-                                            ? smoothedSpeed * 0.7 + currentSpeed * 0.3
-                                            : currentSpeed;
-                                        if (smoothedSpeed > 0)
-                                        {
-                                            actualUploadRate = smoothedSpeed;
-                                        }
-
-                                        // Calculate ETA
-                                        long remaining = fileSize - uploadedBytes;
-                                        double etaSec = smoothedSpeed > 0 ? remaining / smoothedSpeed : 0;
-                                        string eta = etaSec < 60
-                                            ? $"{(int)etaSec}s"
-                                            : $"{(int)(etaSec / 60)}m{(int)(etaSec % 60)}s";
-                                        string speed = smoothedSpeed > 1_000_000
-                                            ? $"{smoothedSpeed / 1_000_000:F1}MB/s"
-                                            : $"{smoothedSpeed / 1_000:F0}KB/s";
-
-                                        // Update grid status column
-                                        batchForm.UpdateStatus(gamePath, $"⬆ {pct}% | {speed} | {eta}", Color.Magenta);
-
-                                        // Update visual slot progress bar
-                                        if (currentSlot >= 0)
-                                        {
-                                            batchForm.UpdateSlotProgress(currentSlot, pct, uploadedBytes, fileSize,
-                                                smoothedSpeed);
-                                        }
-
-                                        lastProgress = p;
-                                        lastProgressTime = now;
+                                        actualUploadRate = smoothedSpeed;
                                     }
-                                });
 
-                                var result = await Task.Run(() =>
-                                    uploader.UploadFileAsync(archivePath, progress, null, cancellationToken));
+                                    // Calculate ETA
+                                    long remaining = fileSize - uploadedBytes;
+                                    double etaSec = smoothedSpeed > 0 ? remaining / smoothedSpeed : 0;
+                                    string eta = etaSec < 60
+                                        ? $"{(int)etaSec}s"
+                                        : $"{(int)(etaSec / 60)}m{(int)(etaSec % 60)}s";
+                                    string speed = smoothedSpeed > 1_000_000
+                                        ? $"{smoothedSpeed / 1_000_000:F1}MB/s"
+                                        : $"{smoothedSpeed / 1_000:F0}KB/s";
 
-                                if (result != null && !string.IsNullOrEmpty(result.DownloadUrl))
+                                    // Update grid status column
+                                    batchForm.UpdateStatus(gamePath, $"⬆ {pct}% | {speed} | {eta}", Color.Magenta);
+
+                                    // Update visual slot progress bar
+                                    if (currentSlot >= 0)
+                                    {
+                                        batchForm.UpdateSlotProgress(currentSlot, pct, uploadedBytes, fileSize,
+                                            smoothedSpeed);
+                                    }
+
+                                    lastProgress = p;
+                                    lastProgressTime = now;
+                                }
+                            });
+
+                            var result = await Task.Run(() =>
+                                uploader.UploadFileAsync(archivePath, progress, null, cancellationToken));
+
+                            if (result != null && !string.IsNullOrEmpty(result.DownloadUrl))
+                            {
+                                string oneFichierUrl = result.DownloadUrl;
+                                uploadSuccess = true;
+                                batchForm.UpdateUploadStatus(game.Path, true, oneFichierUrl, null, attempt - 1);
+                                try
                                 {
-                                    string oneFichierUrl = result.DownloadUrl;
-                                    uploadSuccess = true;
-                                    batchForm.UpdateUploadStatus(game.Path, true, oneFichierUrl, null, attempt - 1);
-                                    try
+                                    BeginInvoke(() =>
                                     {
-                                        BeginInvoke(() =>
+                                        try
                                         {
-                                            try { Clipboard.SetText(oneFichierUrl); }
-                                            catch { }
-                                        });
-                                    }
-                                    catch { }
-
-                                    // Check if PyDrive conversion is disabled
-                                    if (Settings.Default.SkipPyDriveConversion)
-                                    {
-                                        // Skip PyDrive conversion, just use 1fichier link
-                                        lock (uploadResults)
-                                        {
-                                            uploadResults.Add((game.Name, oneFichierUrl, null));
+                                            Clipboard.SetText(oneFichierUrl);
                                         }
-
-                                        batchForm.UpdateStatus(game.Path, "1fichier ✓", Color.LightGreen);
-                                        batchForm.SetFinalUrl(game.Path, oneFichierUrl);
-                                    }
-                                    else
-                                    {
-                                        batchForm.UpdateStatus(game.Path, "Converting...", Color.Yellow);
-                                        batchForm.SetConvertingUrl(game.Path, oneFichierUrl);
-                                        var conversionTask = Task.Run(async () =>
+                                        catch
                                         {
-                                            string pydriveUrl = await ConvertOneFichierToPydrive(oneFichierUrl,
-                                                fileSize,
-                                                status => batchForm.UpdateStatus(game.Path, status, Color.Yellow));
-                                            batchForm.ClearConvertingUrl(game.Path);
-
-                                            if (!string.IsNullOrEmpty(pydriveUrl))
-                                            {
-                                                lock (uploadResults)
-                                                {
-                                                    uploadResults.Add((game.Name, oneFichierUrl, pydriveUrl));
-                                                }
-
-                                                batchForm.UpdateStatus(game.Path, "PyDrive ✓", Color.LightGreen);
-                                                batchForm.SetFinalUrl(game.Path, pydriveUrl);
-                                                batchForm.UpdatePyDriveUrl(game.Path, pydriveUrl);
-                                            }
-                                            else
-                                            {
-                                                lock (uploadResults)
-                                                {
-                                                    uploadResults.Add((game.Name, oneFichierUrl, null));
-                                                }
-
-                                                batchForm.UpdateStatus(game.Path, "1fichier ✓", Color.LightGreen);
-                                                batchForm.SetFinalUrl(game.Path, oneFichierUrl);
-                                            }
-                                        });
-                                        lock (conversionTasks)
-                                        {
-                                            conversionTasks.Add(conversionTask);
                                         }
+                                    });
+                                }
+                                catch
+                                {
+                                }
+
+                                // Check if PyDrive conversion is disabled
+                                if (Settings.Default.SkipPyDriveConversion)
+                                {
+                                    // Skip PyDrive conversion, just use 1fichier link
+                                    lock (uploadResults)
+                                    {
+                                        uploadResults.Add((game.Name, oneFichierUrl, null));
                                     }
+
+                                    batchForm.UpdateStatus(game.Path, "1fichier ✓", Color.LightGreen);
+                                    batchForm.SetFinalUrl(game.Path, oneFichierUrl);
                                 }
                                 else
                                 {
-                                    lastError = "No URL returned";
+                                    batchForm.UpdateStatus(game.Path, "Converting...", Color.Yellow);
+                                    batchForm.SetConvertingUrl(game.Path, oneFichierUrl);
+                                    var conversionTask = Task.Run(async () =>
+                                    {
+                                        string pydriveUrl = await ConvertOneFichierToPydrive(oneFichierUrl, fileSize,
+                                            status => batchForm.UpdateStatus(game.Path, status, Color.Yellow));
+                                        batchForm.ClearConvertingUrl(game.Path);
+
+                                        if (!string.IsNullOrEmpty(pydriveUrl))
+                                        {
+                                            lock (uploadResults)
+                                            {
+                                                uploadResults.Add((game.Name, oneFichierUrl, pydriveUrl));
+                                            }
+
+                                            batchForm.UpdateStatus(game.Path, "PyDrive ✓", Color.LightGreen);
+                                            batchForm.SetFinalUrl(game.Path, pydriveUrl);
+                                            batchForm.UpdatePyDriveUrl(game.Path, pydriveUrl);
+                                        }
+                                        else
+                                        {
+                                            lock (uploadResults)
+                                            {
+                                                uploadResults.Add((game.Name, oneFichierUrl, null));
+                                            }
+
+                                            batchForm.UpdateStatus(game.Path, "1fichier ✓", Color.LightGreen);
+                                            batchForm.SetFinalUrl(game.Path, oneFichierUrl);
+                                        }
+                                    });
+                                    lock (conversionTasks)
+                                    {
+                                        conversionTasks.Add(conversionTask);
+                                    }
                                 }
+                            }
+                            else
+                            {
+                                lastError = "No URL returned";
                             }
                         }
                         catch (Exception ex)
@@ -5437,10 +5399,10 @@ oLink3.Save";
 
                     lock (this)
                     {
-                        bytesUploadedSoFar += folderSizes.ContainsKey(game.Path) ? folderSizes[game.Path] : 0;
+                        bytesUploadedSoFar += folderSizes.GetValueOrDefault(game.Path, 0);
                     }
 
-                    updateProgress("upload", 0);
+                    UpdateProgress("upload", 0);
                     return uploadSuccess;
                 }
                 finally
@@ -5453,7 +5415,7 @@ oLink3.Save";
 
                     uploadSemaphore.Release();
                 }
-            };
+            }
 
             // Zip each game sequentially, fire off upload immediately after each zip
             foreach (var game in gamesToZipAndUpload)
@@ -5464,17 +5426,17 @@ oLink3.Save";
                 }
 
                 batchForm.UpdateStatus(game.Path, "Zipping...", Color.Cyan);
-                var zipResult = await zipOneGame(game);
+                var zipResult = await ZipOneGame(game);
 
                 if (zipResult.success)
                 {
                     zipped++;
                     batchForm.UpdateStatus(game.Path, "Queued for upload", Color.Yellow);
                     batchForm.UpdateZipStatus(game.Path, true, zipResult.archivePath);
-                    totalBytesActuallyZipped += folderSizes.ContainsKey(game.Path) ? folderSizes[game.Path] : 0;
+                    totalBytesActuallyZipped += folderSizes.GetValueOrDefault(game.Path, 0);
 
                     // Fire off upload immediately - don't wait
-                    var uploadTask = uploadOneGame(game, zipResult.archivePath);
+                    var uploadTask = UploadOneGame(game, zipResult.archivePath);
                     uploadTasks.Add(uploadTask);
                 }
                 else
@@ -5485,8 +5447,8 @@ oLink3.Save";
                     failureReasons.Add((game.Name, $"Zip failed: {zipResult.error ?? "Unknown"}"));
                 }
 
-                bytesZippedSoFar += folderSizes.ContainsKey(game.Path) ? folderSizes[game.Path] : 0;
-                updateProgress("zip", 0);
+                bytesZippedSoFar += folderSizes.GetValueOrDefault(game.Path, 0);
+                UpdateProgress("zip", 0);
             }
 
             // Save zip rate
@@ -5655,48 +5617,44 @@ oLink3.Save";
 
                 Console.WriteLine($"[CONVERT] Attempt {attempt}/{maxRetries} - estimated {timeStr} remaining");
 
-                using (var client = new HttpClient())
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(30); // Match EnhancedShareWindow
+
+                var requestBody = new { link = oneFichierUrl };
+                var json = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await client
+                    .PostAsync("https://pydrive.harryeffingpotter.com/convert-1fichier", content)
+                    .ConfigureAwait(false);
+
+                Console.WriteLine($"[CONVERT] Response status: {(int)response.StatusCode} {response.StatusCode}");
+
+                if (response.IsSuccessStatusCode)
                 {
-                    client.Timeout = TimeSpan.FromSeconds(30); // Match EnhancedShareWindow
+                    var responseJson = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    Console.WriteLine($"[CONVERT] Response body: {responseJson}");
 
-                    var requestBody = new { link = oneFichierUrl };
-                    var json = JsonSerializer.Serialize(requestBody);
-                    var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                    var response = await client
-                        .PostAsync("https://pydrive.harryeffingpotter.com/convert-1fichier", content)
-                        .ConfigureAwait(false);
-
-                    Console.WriteLine($"[CONVERT] Response status: {(int)response.StatusCode} {response.StatusCode}");
-
-                    if (response.IsSuccessStatusCode)
+                    // API returns {"link": "..."} - same as EnhancedShareWindow
+                    using var doc = JsonDocument.Parse(responseJson);
+                    if (doc.RootElement.TryGetProperty("link", out var linkProp))
                     {
-                        var responseJson = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        Console.WriteLine($"[CONVERT] Response body: {responseJson}");
-
-                        // API returns {"link": "..."} - same as EnhancedShareWindow
-                        using (var doc = JsonDocument.Parse(responseJson))
-                        {
-                            if (doc.RootElement.TryGetProperty("link", out var linkProp))
-                            {
-                                string pydriveUrl = linkProp.GetString();
-                                Console.WriteLine($"[CONVERT] SUCCESS! PyDrive URL: {pydriveUrl}");
-                                return pydriveUrl;
-                            }
-
-                            Console.WriteLine("[CONVERT] No 'link' in response, will retry...");
-                        }
+                        string pydriveUrl = linkProp.GetString();
+                        Console.WriteLine($"[CONVERT] SUCCESS! PyDrive URL: {pydriveUrl}");
+                        return pydriveUrl;
                     }
-                    else
-                    {
-                        var errorBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                        Console.WriteLine($"[CONVERT] Error response: {errorBody}");
 
-                        // Check if it's a "still processing" error - keep retrying
-                        if (errorBody.Contains("LINK_DOWN") || errorBody.Contains("wait"))
-                        {
-                            Console.WriteLine("[CONVERT] 1fichier still scanning file, waiting...");
-                        }
+                    Console.WriteLine("[CONVERT] No 'link' in response, will retry...");
+                }
+                else
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    Console.WriteLine($"[CONVERT] Error response: {errorBody}");
+
+                    // Check if it's a "still processing" error - keep retrying
+                    if (errorBody.Contains("LINK_DOWN") || errorBody.Contains("wait"))
+                    {
+                        Console.WriteLine("[CONVERT] 1fichier still scanning file, waiting...");
                     }
                 }
             }

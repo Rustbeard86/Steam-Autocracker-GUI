@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Net;
 using APPID;
 using APPID.Properties;
 using SteamAutocrackGUI;
@@ -26,7 +25,8 @@ internal static class Program
         Application.ThreadException += OnThreadException;
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
-        ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+        // Note: TLS 1.2 is enabled by default in .NET Core/.NET 5+ for HttpClient
+        // ServicePointManager.SecurityProtocol is obsolete and no longer needed
 
         // Bootstrap _bin folder if missing
         BootstrapBinFolder();

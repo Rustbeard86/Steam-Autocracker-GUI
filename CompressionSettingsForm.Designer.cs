@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace SteamAutocrackGUI
 {
     partial class CompressionSettingsForm
@@ -5,7 +7,7 @@ namespace SteamAutocrackGUI
         /// <summary>
         /// Required designer variable.
         /// </summary>
-        private System.ComponentModel.IContainer components = null;
+        private IContainer components = null;
 
         /// <summary>
         /// Clean up any resources being used.
@@ -200,14 +202,14 @@ namespace SteamAutocrackGUI
 
         #endregion
 
-        private System.Windows.Forms.Label titleLabel;
-        private System.Windows.Forms.RadioButton zipRadioButton;
-        private System.Windows.Forms.RadioButton sevenZipRadioButton;
-        private System.Windows.Forms.TrackBar levelTrackBar;
-        private System.Windows.Forms.Label levelDescriptionLabel;
-        private System.Windows.Forms.CheckBox rinPasswordCheckBox;
-        private System.Windows.Forms.Label ctrlSLabel;
-        private System.Windows.Forms.Button okButton;
-        private System.Windows.Forms.Button cancelButton;
+        private Label titleLabel;
+        private RadioButton zipRadioButton;
+        private RadioButton sevenZipRadioButton;
+        private TrackBar levelTrackBar;
+        private Label levelDescriptionLabel;
+        private CheckBox rinPasswordCheckBox;
+        private Label ctrlSLabel;
+        private Button okButton;
+        private Button cancelButton;
     }
 }

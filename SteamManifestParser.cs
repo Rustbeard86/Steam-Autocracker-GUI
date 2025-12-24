@@ -50,13 +50,13 @@ public static class SteamManifestParser
                 if (manifest.ContainsKey("installdir") &&
                     string.Equals(manifest["installdir"], gameFolderName, StringComparison.OrdinalIgnoreCase))
                 {
-                    string appId = manifest.ContainsKey("appid") ? manifest["appid"] : null;
-                    string gameName = manifest.ContainsKey("name") ? manifest["name"] : gameFolderName;
+                    string appId = manifest.GetValueOrDefault("appid");
+                    string gameName = manifest.GetValueOrDefault("name", gameFolderName);
                     long sizeOnDisk = 0;
 
-                    if (manifest.ContainsKey("SizeOnDisk"))
+                    if (manifest.TryGetValue("SizeOnDisk", out string? value2))
                     {
-                        long.TryParse(manifest["SizeOnDisk"], out sizeOnDisk);
+                        long.TryParse(value2, out sizeOnDisk);
                     }
 
                     Debug.WriteLine("[MANIFEST] ✅ Found match!");
@@ -86,7 +86,7 @@ public static class SteamManifestParser
         {
             string content = File.ReadAllText(acfFilePath);
             var manifest = ParseAcfFile(content);
-            return manifest.ContainsKey("appid") ? manifest["appid"] : null;
+            return manifest.GetValueOrDefault("appid");
         }
         catch
         {
@@ -158,10 +158,7 @@ public static class SteamManifestParser
                 string value = match.Groups[2].Value;
 
                 // Only store the first occurrence of each key (ignores nested structures)
-                if (!result.ContainsKey(key))
-                {
-                    result[key] = value;
-                }
+                result.TryAdd(key, value);
             }
         }
 
@@ -210,9 +207,9 @@ public static class SteamManifestParser
                     var manifest = ParseAcfFile(content);
 
                     if (manifest.ContainsKey("appid") && manifest.ContainsKey("name") &&
-                        manifest.ContainsKey("installdir"))
+                        manifest.TryGetValue("installdir", out string? value))
                     {
-                        string installPath = Path.Combine(steamappsPath, "common", manifest["installdir"]);
+                        string installPath = Path.Combine(steamappsPath, "common", value);
                         if (Directory.Exists(installPath))
                         {
                             games.Add((manifest["appid"], manifest["name"], installPath));

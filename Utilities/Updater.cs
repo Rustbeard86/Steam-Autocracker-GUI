@@ -1,5 +1,5 @@
-using System.Net;
 using System.Net.NetworkInformation;
+using APPID.Utilities;
 using Newtonsoft.Json;
 using Octokit;
 using RestSharp;
@@ -26,8 +26,7 @@ internal static class Updater
     /// </summary>
     private static dynamic? GetJson(string requestURL)
     {
-        ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-
+        // Certificate validation is now handled by RestClient options
         try
         {
             string baseURL = "https://api.github.com/repos/";
@@ -58,8 +57,7 @@ internal static class Updater
     /// </summary>
     public static async Task<bool> CheckForNetAsync()
     {
-        ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-
+        // Certificate validation is now handled per-HttpClient via HttpClientFactory
         if (IsOffline)
         {
             return HasInternet;
@@ -89,7 +87,7 @@ internal static class Updater
     {
         try
         {
-            ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+            // Certificate validation is now handled per-HttpClient via HttpClientFactory
 
             dynamic? obj = GetJson($"{user}/{repo}/releases");
             if (obj is null)
@@ -140,8 +138,8 @@ internal static class Updater
                     "browser_download_url\": \"");
                 downloadUrl = StringTools.RemoveEverythingAfterFirstRemoveString(downloadUrl, "\"");
 
-                // Download the new version
-                using var httpClient = new HttpClient();
+                // Download the new version using HttpClient
+                using var httpClient = HttpClientFactory.CreateClient();
                 HttpResponseMessage response = await httpClient.GetAsync(downloadUrl);
                 await using (FileStream fs = new("SLS.zip", FileMode.CreateNew))
                 {
@@ -170,7 +168,7 @@ internal static class Updater
     {
         try
         {
-            ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+            // Certificate validation is now handled per-HttpClient via HttpClientFactory
 
             // Get latest release from the fork
             dynamic? obj = GetJson("Detanup01/gbe_fork/releases/latest");
@@ -211,8 +209,8 @@ internal static class Updater
                 return;
             }
 
-            // Download the new version
-            using var httpClient = new HttpClient();
+            // Download the new version using HttpClient
+            using var httpClient = HttpClientFactory.CreateClient();
             string tempFile = "gbe_fork.7z";
             HttpResponseMessage response = await httpClient.GetAsync(downloadUrl);
             await using (FileStream fs = new(tempFile, FileMode.CreateNew))

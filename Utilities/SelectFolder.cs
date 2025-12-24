@@ -31,19 +31,17 @@ public class FolderSelectDialog
 
     public bool Show(IntPtr hWndOwner)
     {
-        using (var dialog = new FolderBrowserDialog())
-        {
-            dialog.Description = Title;
-            dialog.InitialDirectory = InitialDirectory;
-            dialog.UseDescriptionForTitle = true;
-            dialog.ShowNewFolderButton = true;
+        using var dialog = new FolderBrowserDialog();
+        dialog.Description = Title;
+        dialog.InitialDirectory = InitialDirectory;
+        dialog.UseDescriptionForTitle = true;
+        dialog.ShowNewFolderButton = true;
 
-            var owner = hWndOwner != IntPtr.Zero ? new WindowWrapper(hWndOwner) : null;
-            if (dialog.ShowDialog(owner) == DialogResult.OK)
-            {
-                FileName = dialog.SelectedPath;
-                return true;
-            }
+        var owner = hWndOwner != IntPtr.Zero ? new WindowWrapper(hWndOwner) : null;
+        if (dialog.ShowDialog(owner) == DialogResult.OK)
+        {
+            FileName = dialog.SelectedPath;
+            return true;
         }
 
         return false;
@@ -54,9 +52,8 @@ public class FolderSelectDialog
         throw new NotImplementedException();
     }
 
-    private class WindowWrapper : IWin32Window
+    private class WindowWrapper(IntPtr handle) : IWin32Window
     {
-        public WindowWrapper(IntPtr handle) { Handle = handle; }
-        public IntPtr Handle { get; }
+        public IntPtr Handle { get; } = handle;
     }
 }

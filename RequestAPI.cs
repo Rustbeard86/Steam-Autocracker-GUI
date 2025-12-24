@@ -23,11 +23,9 @@ namespace SteamAppIdIdentifier
 
                 var combined = $"{cpuId}_{motherboardId}_{diskId}";
 
-                using (var sha256 = SHA256.Create())
-                {
-                    var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(combined));
-                    _hwid = Convert.ToBase64String(hash).Substring(0, 16);
-                }
+                using var sha256 = SHA256.Create();
+                var hash = sha256.ComputeHash(Encoding.UTF8.GetBytes(combined));
+                _hwid = Convert.ToBase64String(hash).Substring(0, 16);
             }
 
             return _hwid;
@@ -37,12 +35,10 @@ namespace SteamAppIdIdentifier
         {
             try
             {
-                using (var searcher = new ManagementObjectSearcher($"SELECT {property} FROM {wmiClass}"))
+                using var searcher = new ManagementObjectSearcher($"SELECT {property} FROM {wmiClass}");
+                foreach (var obj in searcher.Get())
                 {
-                    foreach (var obj in searcher.Get())
-                    {
-                        return obj[property]?.ToString() ?? "Unknown";
-                    }
+                    return obj[property]?.ToString() ?? "Unknown";
                 }
             }
             catch (Exception ex)
@@ -172,7 +168,7 @@ namespace SteamAppIdIdentifier
             }
             catch { }
 
-            return new List<TopRequestedGame>();
+            return [];
         }
 
         // Get active requests
@@ -189,7 +185,7 @@ namespace SteamAppIdIdentifier
             }
             catch { }
 
-            return new List<RequestedGame>();
+            return [];
         }
 
         // Remove a request
@@ -269,17 +265,17 @@ namespace SteamAppIdIdentifier
 
             return new UserActivity
             {
-                RecentRequests = new List<RequestedGame>(),
-                RecentHonors = new List<HonorRecord>(),
-                ActiveRequests = new List<RequestedGame>(),
-                FulfilledRequests = new List<RequestedGame>(),
-                Contributions = new List<HonorRecord>()
+                RecentRequests = [],
+                RecentHonors = [],
+                ActiveRequests = [],
+                FulfilledRequests = [],
+                Contributions = []
             };
         }
 
         public class UserStatus
         {
-            public List<RequestedGame> NeededGames { get; set; } = new();
+            public List<RequestedGame> NeededGames { get; set; } = [];
             public int TotalRequests { get; set; }
             public int UserHonored { get; set; }
             public int UserRequested { get; set; }

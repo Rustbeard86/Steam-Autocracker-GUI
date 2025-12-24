@@ -1,4 +1,3 @@
-using System.Net.Http;
 using System.Text.Json;
 using APPID.Services.Interfaces;
 
@@ -39,7 +38,7 @@ public sealed class UrlConversionService : IUrlConversionService
 
                 var requestBody = new { link = oneFichierUrl };
                 var json = JsonSerializer.Serialize(requestBody);
-                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
 
                 statusCallback?.Invoke($"Converting... (attempt {attempt}/{MaxRetries})");
                 LogHelper.Log($"[URL_CONVERT] Attempting conversion (attempt {attempt}/{MaxRetries}): {oneFichierUrl}");
@@ -52,7 +51,7 @@ public sealed class UrlConversionService : IUrlConversionService
                     var responseJson = await response.Content.ReadAsStringAsync(cancellationToken)
                         .ConfigureAwait(false);
                     var jsonDoc = JsonDocument.Parse(responseJson);
-                    
+
                     if (jsonDoc.RootElement.TryGetProperty("link", out var linkProperty))
                     {
                         var convertedUrl = linkProperty.GetString();
@@ -67,7 +66,7 @@ public sealed class UrlConversionService : IUrlConversionService
                     LogHelper.Log($"[URL_CONVERT] Failed with status {response.StatusCode}: {responseContent}");
 
                     // Check if it's a "still processing" error
-                    if ((responseContent.Contains("LINK_DOWN") || responseContent.Contains("wait")) 
+                    if ((responseContent.Contains("LINK_DOWN") || responseContent.Contains("wait"))
                         && attempt < MaxRetries)
                     {
                         // Variable delay - increases with each attempt
@@ -80,6 +79,7 @@ public sealed class UrlConversionService : IUrlConversionService
                                 $"1fichier scanning... retry in {i}s (attempt {attempt}/{MaxRetries})");
                             await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
                         }
+
                         continue;
                     }
                 }
@@ -92,7 +92,7 @@ public sealed class UrlConversionService : IUrlConversionService
             catch (Exception ex)
             {
                 LogHelper.LogError($"[URL_CONVERT] Exception during conversion (attempt {attempt}/{MaxRetries})", ex);
-                
+
                 if (attempt < MaxRetries && !cancellationToken.IsCancellationRequested)
                 {
                     int delaySec = BaseRetryDelaySeconds;
@@ -101,6 +101,7 @@ public sealed class UrlConversionService : IUrlConversionService
                         statusCallback?.Invoke($"Error, retry in {i}s (attempt {attempt}/{MaxRetries})");
                         await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
                     }
+
                     continue;
                 }
             }
@@ -124,13 +125,13 @@ public sealed class UrlConversionService : IUrlConversionService
 
     public bool IsOneFichierUrl(string url)
     {
-        return !string.IsNullOrEmpty(url) && 
+        return !string.IsNullOrEmpty(url) &&
                url.Contains("1fichier.com", StringComparison.OrdinalIgnoreCase);
     }
 
     public bool IsPyDriveUrl(string url)
     {
-        return !string.IsNullOrEmpty(url) && 
+        return !string.IsNullOrEmpty(url) &&
                url.Contains("pydrive.harryeffingpotter.com", StringComparison.OrdinalIgnoreCase);
     }
 }

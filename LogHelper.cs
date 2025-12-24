@@ -7,7 +7,7 @@ namespace APPID;
 public static class LogHelper
 {
     private const long MaxLogSizeBytes = 10 * 1024 * 1024; // 10MB
-    private static readonly object LockObject = new();
+    private static readonly Lock LockObject = new();
     private static bool _initialized;
 
     /// <summary>

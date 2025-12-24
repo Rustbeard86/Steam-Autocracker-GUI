@@ -7,27 +7,27 @@ namespace APPID.Services;
 ///     Note: This is a simplified initial extraction. Full implementation would require additional refactoring
 ///     to remove UI dependencies (forms, progress callbacks, etc.)
 /// </summary>
-public sealed class BatchProcessingService : IBatchProcessingService
+public sealed class BatchProcessingService(
+    ICrackingService crackingService,
+    ICompressionService compressionService,
+    IUploadService uploadService,
+    IUrlConversionService urlConversionService,
+    IFileSystemService fileSystem)
+    : IBatchProcessingService
 {
-    private readonly ICrackingService _crackingService;
-    private readonly ICompressionService _compressionService;
-    private readonly IUploadService _uploadService;
-    private readonly IUrlConversionService _urlConversionService;
-    private readonly IFileSystemService _fileSystem;
+    private readonly ICompressionService _compressionService =
+        compressionService ?? throw new ArgumentNullException(nameof(compressionService));
 
-    public BatchProcessingService(
-        ICrackingService crackingService,
-        ICompressionService compressionService,
-        IUploadService uploadService,
-        IUrlConversionService urlConversionService,
-        IFileSystemService fileSystem)
-    {
-        _crackingService = crackingService ?? throw new ArgumentNullException(nameof(crackingService));
-        _compressionService = compressionService ?? throw new ArgumentNullException(nameof(compressionService));
-        _uploadService = uploadService ?? throw new ArgumentNullException(nameof(uploadService));
-        _urlConversionService = urlConversionService ?? throw new ArgumentNullException(nameof(urlConversionService));
-        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-    }
+    private readonly ICrackingService _crackingService =
+        crackingService ?? throw new ArgumentNullException(nameof(crackingService));
+
+    private readonly IFileSystemService _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+
+    private readonly IUploadService _uploadService =
+        uploadService ?? throw new ArgumentNullException(nameof(uploadService));
+
+    private readonly IUrlConversionService _urlConversionService =
+        urlConversionService ?? throw new ArgumentNullException(nameof(urlConversionService));
 
     public async Task<BatchProcessingResult> ProcessBatchGamesAsync(
         List<BatchGameItem> games,
@@ -48,7 +48,9 @@ public sealed class BatchProcessingService : IBatchProcessingService
             foreach (var game in games.Where(g => g.ShouldCrack))
             {
                 if (cancellationToken.IsCancellationRequested)
+                {
                     break;
+                }
 
                 currentIndex++;
                 progress?.Report(new BatchProgress
@@ -68,9 +70,7 @@ public sealed class BatchProcessingService : IBatchProcessingService
                         settings.UseGoldberg,
                         status => progress?.Report(new BatchProgress
                         {
-                            Phase = "Cracking",
-                            GameName = game.Name,
-                            Message = status
+                            Phase = "Cracking", GameName = game.Name, Message = status
                         })).ConfigureAwait(false);
 
                     if (crackResult.Success)
@@ -96,7 +96,9 @@ public sealed class BatchProcessingService : IBatchProcessingService
             foreach (var game in games.Where(g => g.ShouldZip))
             {
                 if (cancellationToken.IsCancellationRequested)
+                {
                     break;
+                }
 
                 currentIndex++;
                 progress?.Report(new BatchProgress
@@ -111,8 +113,8 @@ public sealed class BatchProcessingService : IBatchProcessingService
                 try
                 {
                     string parentDir = Path.GetDirectoryName(game.Path)!;
-                    string extension = settings.CompressionFormat.Equals("7z", StringComparison.OrdinalIgnoreCase) 
-                        ? ".7z" 
+                    string extension = settings.CompressionFormat.Equals("7z", StringComparison.OrdinalIgnoreCase)
+                        ? ".7z"
                         : ".zip";
                     string outputPath = Path.Combine(parentDir, game.Name + extension);
 
@@ -154,7 +156,9 @@ public sealed class BatchProcessingService : IBatchProcessingService
             foreach (var game in games.Where(g => g.ShouldUpload))
             {
                 if (cancellationToken.IsCancellationRequested)
+                {
                     break;
+                }
 
                 currentIndex++;
                 progress?.Report(new BatchProgress
@@ -187,7 +191,9 @@ public sealed class BatchProcessingService : IBatchProcessingService
         foreach (var game in games)
         {
             if (cancellationToken.IsCancellationRequested)
+            {
                 break;
+            }
 
             try
             {
@@ -214,10 +220,10 @@ public sealed class BatchProcessingService : IBatchProcessingService
 
                     // Delete common crack artifacts
                     string[] artifacts =
-                    {
+                    [
                         "CreamAPI.dll", "cream_api.ini", "CreamLinux",
                         "steam_api_o.dll", "steam_api64_o.dll", "local_save.txt"
-                    };
+                    ];
 
                     foreach (var artifact in artifacts)
                     {
@@ -248,6 +254,7 @@ public sealed class BatchProcessingService : IBatchProcessingService
                     {
                         _fileSystem.DeleteFile(originalFile);
                     }
+
                     _fileSystem.MoveFile(bakFile, originalFile);
                 }
                 catch { }

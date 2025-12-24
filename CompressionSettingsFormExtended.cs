@@ -5,9 +5,9 @@ namespace SteamAutocrackGUI;
 
 public class CompressionSettingsFormExtended : Form
 {
-    private Button cancelButton;
     private readonly string gameName;
     private readonly bool isCracked;
+    private Button cancelButton;
     private Label levelDescriptionLabel;
     private TrackBar levelTrackBar;
     private Button okButton;
@@ -203,14 +203,12 @@ public class CompressionSettingsFormExtended : Form
         int fillWidth = (int)(sliderValue / 10.0 * trackWidth);
         if (fillWidth > 0)
         {
-            using (var fillBrush = new LinearGradientBrush(
-                       new Point(trackStart, 0),
-                       new Point(trackEnd, 0),
-                       Color.FromArgb(0, 200, 255),
-                       Color.FromArgb(192, 255, 255)))
-            {
-                g.FillRectangle(fillBrush, trackStart, trackY - 2, fillWidth, 4);
-            }
+            using var fillBrush = new LinearGradientBrush(
+                new Point(trackStart, 0),
+                new Point(trackEnd, 0),
+                Color.FromArgb(0, 200, 255),
+                Color.FromArgb(192, 255, 255));
+            g.FillRectangle(fillBrush, trackStart, trackY - 2, fillWidth, 4);
         }
 
         // Draw handle

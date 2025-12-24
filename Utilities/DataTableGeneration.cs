@@ -1,6 +1,6 @@
-﻿using System.Data;
-using System.Net;
+using System.Data;
 using System.Text.RegularExpressions;
+using APPID.Utilities;
 using Newtonsoft.Json;
 
 namespace APPID;
@@ -53,7 +53,7 @@ public class DataTableGeneration
             {
                 string cachedContent = File.ReadAllText(cacheFile);
                 SteamGames cachedGames = JsonConvert.DeserializeObject<SteamGames>(cachedContent);
-                if (cachedGames != null && cachedGames.Apps != null)
+                if (cachedGames is not null)
                 {
                     foreach (var item in cachedGames.Apps)
                     {
@@ -73,16 +73,14 @@ public class DataTableGeneration
                     {
                         try
                         {
-                            ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-                            using (var client = new HttpClient())
-                            {
-                                client.Timeout = TimeSpan.FromSeconds(60);
-                                string freshContent =
-                                    await client.GetStringAsync(
-                                        "https://pydrive.harryeffingpotter.com/sacgui/steam-applist");
-                                File.WriteAllText(cacheFile, freshContent);
-                                LogHelper.Log("[Steam Cache] Background update completed successfully");
-                            }
+                            // Use HttpClientFactory instead of obsolete ServicePointManager
+                            using var client = HttpClientFactory.CreateClient(true);
+                            client.Timeout = TimeSpan.FromSeconds(60);
+                            string freshContent =
+                                await client.GetStringAsync(
+                                    "https://pydrive.harryeffingpotter.com/sacgui/steam-applist");
+                            File.WriteAllText(cacheFile, freshContent);
+                            LogHelper.Log("[Steam Cache] Background update completed successfully");
                         }
                         catch (Exception ex)
                         {
@@ -102,8 +100,8 @@ public class DataTableGeneration
         // No cache or failed to load, fetch from backend
         try
         {
-            ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
-            var httpClient = new HttpClient();
+            // Use HttpClientFactory instead of obsolete ServicePointManager
+            using var httpClient = HttpClientFactory.CreateClient(true);
             httpClient.Timeout = TimeSpan.FromSeconds(60);
             string content =
                 await httpClient.GetStringAsync("https://pydrive.harryeffingpotter.com/sacgui/steam-applist");

@@ -168,8 +168,7 @@ public static class CleanFilesVerifier
         // Known Goldberg Steam API sizes (approximate)
         var knownCrackSizes = new Dictionary<string, long[]>
         {
-            { "steam_api.dll", new long[] { 247808, 251904, 268288 } },
-            { "steam_api64.dll", new long[] { 288256, 292352, 309760 } }
+            { "steam_api.dll", [247808, 251904, 268288] }, { "steam_api64.dll", [288256, 292352, 309760] }
         };
 
         if (knownCrackSizes.ContainsKey(fileName.ToLower()))
@@ -280,9 +279,9 @@ public static class CleanFilesVerifier
     public class VerificationResult
     {
         public bool IsClean { get; set; }
-        public List<string> ContaminationReasons { get; set; } = new();
-        public List<string> FoundBackups { get; set; } = new();
-        public List<string> FoundCrackArtifacts { get; set; } = new();
+        public List<string> ContaminationReasons { get; set; } = [];
+        public List<string> FoundBackups { get; set; } = [];
+        public List<string> FoundCrackArtifacts { get; set; } = [];
         public bool HasSteamSettings { get; set; }
         public bool HasLobbyShortcuts { get; set; }
         public bool HasBackupFiles { get; set; }

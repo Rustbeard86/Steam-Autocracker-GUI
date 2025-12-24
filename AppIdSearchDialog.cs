@@ -323,7 +323,10 @@ public class AppIdSearchDialog : Form
         {
             AcrylicHelper.ApplyAcrylic(this, disableShadow: true);
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void Form_MouseDown(object sender, MouseEventArgs e)
@@ -338,9 +341,7 @@ public class AppIdSearchDialog : Form
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
-        using (var pen = new Pen(Color.FromArgb(60, 60, 65), 1))
-        {
-            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
-        }
+        using var pen = new Pen(Color.FromArgb(60, 60, 65), 1);
+        e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
     }
 }

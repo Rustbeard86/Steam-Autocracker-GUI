@@ -5,14 +5,9 @@ namespace APPID.Services;
 /// <summary>
 ///     Implementation of batch game data service for folder operations and formatting.
 /// </summary>
-public sealed class BatchGameDataService : IBatchGameDataService
+public sealed class BatchGameDataService(IFileSystemService fileSystem) : IBatchGameDataService
 {
-    private readonly IFileSystemService _fileSystem;
-
-    public BatchGameDataService(IFileSystemService fileSystem)
-    {
-        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-    }
+    private readonly IFileSystemService _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public long GetFolderSize(string folderPath)
     {
@@ -35,7 +30,7 @@ public sealed class BatchGameDataService : IBatchGameDataService
 
     public string FormatFileSize(long bytes)
     {
-        string[] suffixes = { "B", "KB", "MB", "GB", "TB" };
+        string[] suffixes = ["B", "KB", "MB", "GB", "TB"];
         int i = 0;
         double size = bytes;
         while (size >= 1024 && i < suffixes.Length - 1)

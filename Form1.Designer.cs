@@ -1,4 +1,6 @@
 ﻿
+using System.ComponentModel;
+
 namespace APPID
 {
     partial class SteamAppId
@@ -6,11 +8,11 @@ namespace APPID
         /// <summary>
         /// Required designer variable.
         /// </summary>
-        private System.ComponentModel.IContainer components = null;
-        private System.Windows.Forms.Panel titleBar;
-        private System.Windows.Forms.Label lblTitle;
-        private System.Windows.Forms.Button btnMinimize;
-        private System.Windows.Forms.Button btnClose;
+        private IContainer components = null;
+        private Panel titleBar;
+        private Label lblTitle;
+        private Button btnMinimize;
+        private Button btnClose;
 
         /// <summary>
         /// Clean up any resources being used.
@@ -633,42 +635,42 @@ namespace APPID
         }
 
         #endregion
-        private System.Windows.Forms.TextBox searchTextBox;
-        private System.Windows.Forms.Button btnSearch;
-        private System.Windows.Forms.Label resinstruccZip;
-        private System.Windows.Forms.Label tgDisc;
-        public System.Windows.Forms.DataGridView dataGridView1;
-        private System.Windows.Forms.PictureBox gitHub;
-        private System.Windows.Forms.Panel mainPanel;
-        private System.Windows.Forms.PictureBox selectDir;
-        private System.Windows.Forms.Label selectDirLabel;
-        private System.Windows.Forms.Label label5;
-        private System.Windows.Forms.PictureBox donePic;
-        private System.Windows.Forms.PictureBox startCrackPic;
+        private TextBox searchTextBox;
+        private Button btnSearch;
+        private Label resinstruccZip;
+        private Label tgDisc;
+        public DataGridView dataGridView1;
+        private PictureBox gitHub;
+        private Panel mainPanel;
+        private PictureBox selectDir;
+        private Label selectDirLabel;
+        private Label label5;
+        private PictureBox donePic;
+        private PictureBox startCrackPic;
         private TransparentComboBox dllSelect;
-        private System.Windows.Forms.CheckBox lanMultiplayerCheckBox;
-        private System.Windows.Forms.ToolTip lanMultiplayerToolTip;
-        private System.Windows.Forms.Label drgdropText;
-        public System.Windows.Forms.Label currDIrText;
-        private System.Windows.Forms.PictureBox unPin;
-        private System.Windows.Forms.PictureBox pin;
-        private System.Windows.Forms.Button OpenDir;
-        private System.Windows.Forms.Button ZipToShare;
-        private System.Windows.Forms.Button UploadZipButton;
-        private System.Windows.Forms.PictureBox ShareButton;
-        private System.Windows.Forms.Button RequestButton;
-        private System.Windows.Forms.Panel ManAppPanel;
-        private System.Windows.Forms.Label ManAppLbl;
-        private System.Windows.Forms.TextBox ManAppBox;
-        private System.Windows.Forms.Button ManAppBtn;
-        private System.Windows.Forms.Label StatusLabel;
-        public System.Windows.Forms.Button btnManualEntry;
-        private System.Windows.Forms.PictureBox autoCrackOff;
-        private System.Windows.Forms.PictureBox autoCrackOn;
-        private System.Windows.Forms.Label label1;
-        public System.Windows.Forms.PictureBox batchProgressIcon;
-        public System.Windows.Forms.Label batchProgressLabel;
-        public System.Windows.Forms.Label arrowBatchConversionLabel;
+        private CheckBox lanMultiplayerCheckBox;
+        private ToolTip lanMultiplayerToolTip;
+        private Label drgdropText;
+        public Label currDIrText;
+        private PictureBox unPin;
+        private PictureBox pin;
+        private Button OpenDir;
+        private Button ZipToShare;
+        private Button UploadZipButton;
+        private PictureBox ShareButton;
+        private Button RequestButton;
+        private Panel ManAppPanel;
+        private Label ManAppLbl;
+        private TextBox ManAppBox;
+        private Button ManAppBtn;
+        private Label StatusLabel;
+        public Button btnManualEntry;
+        private PictureBox autoCrackOff;
+        private PictureBox autoCrackOn;
+        private Label label1;
+        public PictureBox batchProgressIcon;
+        public Label batchProgressLabel;
+        public Label arrowBatchConversionLabel;
     }
 }
 

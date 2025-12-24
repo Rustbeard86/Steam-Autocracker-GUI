@@ -7,14 +7,9 @@ namespace APPID.Services;
 /// <summary>
 ///     Implementation of compression service using 7-Zip or built-in .NET compression.
 /// </summary>
-public sealed class CompressionService : ICompressionService
+public sealed class CompressionService(string binPath) : ICompressionService
 {
-    private readonly string _binPath;
-
-    public CompressionService(string binPath)
-    {
-        _binPath = binPath ?? throw new ArgumentNullException(nameof(binPath));
-    }
+    private readonly string _binPath = binPath ?? throw new ArgumentNullException(nameof(binPath));
 
     public async Task<bool> CompressAsync(string sourcePath, string outputPath, string format,
         string level, bool usePassword, Action<int>? progressCallback = null)

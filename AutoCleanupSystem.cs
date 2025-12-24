@@ -3,8 +3,8 @@ namespace SteamAppIdIdentifier;
 public static class AutoCleanupSystem
 {
     // Files and folders we create during cracking
-    private static readonly string[] OurCreatedFiles = new[]
-    {
+    private static readonly string[] OurCreatedFiles =
+    [
         "steam_settings", // Directory
         "*.bak", // Backup files
         "*Lobby*.lnk", // Lobby shortcuts
@@ -12,7 +12,7 @@ public static class AutoCleanupSystem
         "connect_lobby_*.bat", "steam_appid.txt", // Only if we created it (check alongside steam_settings)
         "ALI213.ini", "valve.ini", "steam_interfaces.txt", "local_save.txt", "achievements.json", "items.json",
         "stats.txt"
-    };
+    ];
 
     public static async Task<bool> HandleContaminatedGame(string gamePath, string gameName, Form parentForm)
     {
@@ -227,7 +227,10 @@ public static class AutoCleanupSystem
                         File.Delete(steamAppIdFile);
                         result.DeletedFiles.Add("steam_appid.txt");
                     }
-                    catch { }
+                    catch
+                    {
+                        // ignored
+                    }
                 }
             }
 
@@ -247,7 +250,10 @@ public static class AutoCleanupSystem
                         File.Delete(file);
                         result.DeletedFiles.Add(Path.GetFileName(file));
                     }
-                    catch { }
+                    catch
+                    {
+                        // ignored
+                    }
                 }
             }
 
@@ -454,9 +460,9 @@ public static class AutoCleanupSystem
     public class CleanupResult
     {
         public bool Success { get; set; }
-        public List<string> RestoredFiles { get; set; } = new();
-        public List<string> DeletedFiles { get; set; } = new();
-        public List<string> Errors { get; set; } = new();
+        public List<string> RestoredFiles { get; set; } = [];
+        public List<string> DeletedFiles { get; set; } = [];
+        public List<string> Errors { get; set; } = [];
         public string Summary { get; set; }
     }
 }

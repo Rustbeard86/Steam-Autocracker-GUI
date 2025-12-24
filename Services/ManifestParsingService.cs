@@ -6,14 +6,9 @@ namespace APPID.Services;
 /// <summary>
 ///     Implementation of manifest parsing service for Steam ACF files.
 /// </summary>
-public sealed class ManifestParsingService : IManifestParsingService
+public sealed class ManifestParsingService(IFileSystemService fileSystem) : IManifestParsingService
 {
-    private readonly IFileSystemService _fileSystem;
-
-    public ManifestParsingService(IFileSystemService fileSystem)
-    {
-        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-    }
+    private readonly IFileSystemService _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public ManifestInfo? ParseManifest(string manifestPath)
     {
@@ -36,7 +31,7 @@ public sealed class ManifestParsingService : IManifestParsingService
             {
                 AppId = manifest["appid"],
                 InstallDir = manifest["installdir"],
-                Name = manifest.ContainsKey("name") ? manifest["name"] : manifest["installdir"]
+                Name = manifest.TryGetValue("name", out string? value) ? value : manifest["installdir"]
             };
         }
         catch (Exception ex)
@@ -74,8 +69,7 @@ public sealed class ManifestParsingService : IManifestParsingService
         // Default Steam installation paths
         var defaultPaths = new[]
         {
-            @"C:\Program Files (x86)\Steam",
-            @"C:\Program Files\Steam",
+            @"C:\Program Files (x86)\Steam", @"C:\Program Files\Steam",
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Steam")
         };
@@ -139,10 +133,7 @@ public sealed class ManifestParsingService : IManifestParsingService
                 string value = match.Groups[2].Value;
 
                 // Only store the first occurrence of each key (ignores nested structures)
-                if (!result.ContainsKey(key))
-                {
-                    result[key] = value;
-                }
+                result.TryAdd(key, value);
             }
         }
 

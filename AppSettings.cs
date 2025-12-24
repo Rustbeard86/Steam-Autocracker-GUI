@@ -7,8 +7,6 @@ namespace APPID;
 /// </summary>
 public sealed class AppSettings
 {
-    private static AppSettings? _instance;
-
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "SACGUI",
@@ -53,8 +51,8 @@ public sealed class AppSettings
     {
         get
         {
-            _instance ??= Load();
-            return _instance;
+            field ??= Load();
+            return field;
         }
     }
 

@@ -5,14 +5,9 @@ namespace APPID.Services;
 /// <summary>
 ///     Implementation of Steamless EXE unpacking service.
 /// </summary>
-public sealed class SteamlessService : ISteamlessService
+public sealed class SteamlessService(string binPath) : ISteamlessService
 {
-    private readonly string _binPath;
-
-    public SteamlessService(string binPath)
-    {
-        _binPath = binPath ?? throw new ArgumentNullException(nameof(binPath));
-    }
+    private readonly string _binPath = binPath ?? throw new ArgumentNullException(nameof(binPath));
 
     public async Task<SteamlessResult> UnpackExeAsync(string exePath, string workingDirectory,
         Action<string>? statusCallback = null)

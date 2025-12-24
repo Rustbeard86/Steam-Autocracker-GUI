@@ -38,6 +38,5 @@ public sealed class FileSystemService : IFileSystemService
     public void CreateDirectory(string path)
         => Directory.CreateDirectory(path);
 
-    public FileInfo GetFileInfo(string path)
-        => new FileInfo(path);
+    public FileInfo GetFileInfo(string path) => new(path);
 }

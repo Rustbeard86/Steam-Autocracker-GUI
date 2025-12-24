@@ -5,14 +5,9 @@ namespace APPID.Services;
 /// <summary>
 ///     Implementation of game detection service for Steam games.
 /// </summary>
-public sealed class GameDetectionService : IGameDetectionService
+public sealed class GameDetectionService(IFileSystemService fileSystem) : IGameDetectionService
 {
-    private readonly IFileSystemService _fileSystem;
-
-    public GameDetectionService(IFileSystemService fileSystem)
-    {
-        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-    }
+    private readonly IFileSystemService _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
 
     public List<string> DetectGamesInFolder(string path)
     {
@@ -43,18 +38,22 @@ public sealed class GameDetectionService : IGameDetectionService
                 // The game folder is typically the parent or grandparent of the DLL
                 var dllFolder = Path.GetDirectoryName(dllPath);
                 if (string.IsNullOrEmpty(dllFolder))
+                {
                     continue;
+                }
 
                 // Check if this DLL folder is a direct child of the search path
                 var relativePath = dllFolder.Substring(path.Length).TrimStart(Path.DirectorySeparatorChar);
                 var pathParts = relativePath.Split(Path.DirectorySeparatorChar);
                 if (pathParts.Length == 0)
+                {
                     continue;
+                }
 
                 var topLevelFolder = pathParts[0];
                 var gameFolder = Path.Combine(path, topLevelFolder);
 
-                if (_fileSystem.DirectoryExists(gameFolder) && !gameFoldersFromDlls.Contains(gameFolder))
+                if (_fileSystem.DirectoryExists(gameFolder))
                 {
                     gameFoldersFromDlls.Add(gameFolder);
                 }
@@ -102,7 +101,7 @@ public sealed class GameDetectionService : IGameDetectionService
     public List<string> FindSteamApiDlls(string path)
     {
         var dllPaths = new List<string>();
-        
+
         if (!_fileSystem.DirectoryExists(path))
         {
             return dllPaths;

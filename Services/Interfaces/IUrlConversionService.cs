@@ -12,7 +12,7 @@ public interface IUrlConversionService
     /// <param name="statusCallback">Optional callback for status updates.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The converted PyDrive URL, or null if conversion fails.</returns>
-    Task<string?> ConvertOneFichierToPyDriveAsync(string oneFichierUrl, 
+    Task<string?> ConvertOneFichierToPyDriveAsync(string oneFichierUrl,
         Action<string>? statusCallback = null,
         CancellationToken cancellationToken = default);
 

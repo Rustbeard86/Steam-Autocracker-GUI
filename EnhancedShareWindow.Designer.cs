@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace SteamAppIdIdentifier
 {
     partial class EnhancedShareWindow
@@ -5,16 +7,16 @@ namespace SteamAppIdIdentifier
         /// <summary>
         /// Required designer variable.
         /// </summary>
-        private System.ComponentModel.IContainer components = null;
-        private System.Windows.Forms.Panel mainPanel;
-        private System.Windows.Forms.Panel titleBar;
-        private System.Windows.Forms.Button btnClose;
-        private System.Windows.Forms.Button btnMinimize;
-        private System.Windows.Forms.Label lblTitle;
-        private System.Windows.Forms.DataGridView gamesGrid;
-        private System.Windows.Forms.Label lblStatus;
-        private System.Windows.Forms.ProgressBar progressBar;
-        private System.Windows.Forms.ToolTip toolTip;
+        private IContainer components = null;
+        private Panel mainPanel;
+        private Panel titleBar;
+        private Button btnClose;
+        private Button btnMinimize;
+        private Label lblTitle;
+        private DataGridView gamesGrid;
+        private Label lblStatus;
+        private ProgressBar progressBar;
+        private ToolTip toolTip;
 
         /// <summary>
         /// Clean up any resources being used.
@@ -433,20 +435,20 @@ namespace SteamAppIdIdentifier
 
         #endregion
 
-        private System.Windows.Forms.DataGridViewCheckBoxColumn SelectGame;
-        private System.Windows.Forms.DataGridViewTextBoxColumn GameName;
-        private System.Windows.Forms.DataGridViewTextBoxColumn InstallPath;
-        private System.Windows.Forms.DataGridViewTextBoxColumn GameSize;
-        private System.Windows.Forms.DataGridViewTextBoxColumn BuildID;
-        private System.Windows.Forms.DataGridViewTextBoxColumn AppID;
-        private System.Windows.Forms.DataGridViewTextBoxColumn LastUpdated;
-        private System.Windows.Forms.DataGridViewButtonColumn CrackOnly;
-        private System.Windows.Forms.DataGridViewButtonColumn ShareClean;
-        private System.Windows.Forms.DataGridViewButtonColumn ShareCracked;
-        private System.Windows.Forms.Label lblSelectedPrefix;
-        private System.Windows.Forms.Label lblSelectedCount;
-        private System.Windows.Forms.Label lblSelectedSuffix;
-        private System.Windows.Forms.Button btnSettings;
-        private System.Windows.Forms.Button btnProcessSelected;
+        private DataGridViewCheckBoxColumn SelectGame;
+        private DataGridViewTextBoxColumn GameName;
+        private DataGridViewTextBoxColumn InstallPath;
+        private DataGridViewTextBoxColumn GameSize;
+        private DataGridViewTextBoxColumn BuildID;
+        private DataGridViewTextBoxColumn AppID;
+        private DataGridViewTextBoxColumn LastUpdated;
+        private DataGridViewButtonColumn CrackOnly;
+        private DataGridViewButtonColumn ShareClean;
+        private DataGridViewButtonColumn ShareCracked;
+        private Label lblSelectedPrefix;
+        private Label lblSelectedCount;
+        private Label lblSelectedSuffix;
+        private Button btnSettings;
+        private Button btnProcessSelected;
     }
 }

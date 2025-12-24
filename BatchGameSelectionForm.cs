@@ -2,7 +2,7 @@ using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using APPID;
 using APPID.Properties;
-using SteamAppIdIdentifier;
+using APPID.Services;
 using APPID.Services.Interfaces;
 using Timer = System.Windows.Forms.Timer;
 
@@ -14,6 +14,17 @@ public class BatchGameSelectionForm : Form
     private const int HTCAPTION = 0x2;
     private const int MAX_UPLOAD_SLOTS = 3;
 
+    // Service dependencies
+    private readonly IAppIdDetectionService _appIdDetection;
+    private readonly IFormattingService _formatting;
+    private readonly IBatchGameDataService _gameData;
+    private readonly Dictionary<string, string> convertingUrls = []; // gamePath -> 1fichier URL during conversion
+    private readonly Dictionary<string, SteamAppId.CrackDetails> crackDetailsMap = []; // gamePath -> crack details
+    private readonly Dictionary<int, string> detectedAppIds = [];
+    private readonly Dictionary<string, string> finalUrls = []; // gamePath -> final URL (pydrive or 1fichier)
+    private readonly List<string> gamePaths;
+    private readonly UploadSlot[] uploadSlots = new UploadSlot[MAX_UPLOAD_SLOTS];
+
     private string allLinksMarkdown = string.Empty;
     private string allLinksPhpBB = string.Empty;
     private string? allLinksPlaintext;
@@ -21,35 +32,25 @@ public class BatchGameSelectionForm : Form
     private ToolTip? batchToolTip;
     private Button? btnCancelAll;
     private bool cancelAllRemaining;
-    private readonly Dictionary<string, string> convertingUrls = []; // gamePath -> 1fichier URL during conversion
     private Button? copyDiscordBtn;
     private Button? copyPlaintextBtn;
     private Button? copyRinBtn;
-    private readonly Dictionary<string, SteamAppId.CrackDetails> crackDetailsMap = []; // gamePath -> crack details
-    private readonly Dictionary<int, string> detectedAppIds = [];
-    private readonly Dictionary<string, string> finalUrls = []; // gamePath -> final URL (pydrive or 1fichier)
 
     private DataGridView? gameGrid;
-    private readonly List<string> gamePaths;
-    private readonly UploadSlot[] uploadSlots = new UploadSlot[MAX_UPLOAD_SLOTS];
     private Panel? uploadSlotsContainer;
-    
-    // Service dependencies
-    private readonly IAppIdDetectionService _appIdDetection;
-    private readonly IBatchGameDataService _gameData;
-    private readonly IFormattingService _formatting;
 
-    public BatchGameSelectionForm(List<string> paths, IAppIdDetectionService? appIdDetection = null, IBatchGameDataService? gameData = null, IFormattingService? formatting = null)
+    public BatchGameSelectionForm(List<string> paths, IAppIdDetectionService? appIdDetection = null,
+        IBatchGameDataService? gameData = null, IFormattingService? formatting = null)
     {
         gamePaths = paths;
-        
+
         // Initialize services - use provided or create defaults
-        var fileSystem = new APPID.Services.FileSystemService();
-        var manifestParsing = new APPID.Services.ManifestParsingService(fileSystem);
-        _appIdDetection = appIdDetection ?? new APPID.Services.AppIdDetectionService(fileSystem, manifestParsing);
-        _gameData = gameData ?? new APPID.Services.BatchGameDataService(fileSystem);
-        _formatting = formatting ?? new APPID.Services.FormattingService();
-        
+        var fileSystem = new FileSystemService();
+        var manifestParsing = new ManifestParsingService(fileSystem);
+        _appIdDetection = appIdDetection ?? new AppIdDetectionService(fileSystem, manifestParsing);
+        _gameData = gameData ?? new BatchGameDataService(fileSystem);
+        _formatting = formatting ?? new FormattingService();
+
         InitializeForm();
 
         Load += (s, e) =>
@@ -61,7 +62,10 @@ public class BatchGameSelectionForm : Form
             {
                 Icon = Resources.sac_icon;
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         };
         MouseDown += Form_MouseDown;
 
@@ -80,7 +84,7 @@ public class BatchGameSelectionForm : Form
     /// <summary>
     ///     Gets the list of games selected for batch processing.
     /// </summary>
-    public List<APPID.Services.Interfaces.BatchGameItem> SelectedGames { get; } = [];
+    public List<BatchGameItem> SelectedGames { get; } = [];
 
     /// <summary>
     ///     Gets or sets the compression format to use (ZIP or 7Z).
@@ -109,7 +113,7 @@ public class BatchGameSelectionForm : Form
     private static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
 
     // Event for when Process is clicked
-    public event Action<List<APPID.Services.Interfaces.BatchGameItem>, string, string, bool> ProcessRequested;
+    public event Action<List<BatchGameItem>, string, string, bool> ProcessRequested;
 
     private void CenterToParentWithScreenClamp()
     {
@@ -292,26 +296,27 @@ public class BatchGameSelectionForm : Form
         gameGrid.Columns.Add(detailsCol);
 
         // Track header checkbox states
-        Dictionary<string, bool> headerCheckStates = new()
-        {
-            ["Crack"] = true,
-            ["Zip"] = false,
-            ["Upload"] = false
-        };
+        Dictionary<string, bool> headerCheckStates = new() { ["Crack"] = true, ["Zip"] = false, ["Upload"] = false };
 
         // Custom paint for cells and headers
         Image? infoIcon = null;
         Image? zipperIcon = null;
         try { infoIcon = Resources.info_icon; }
-        catch { }
+        catch
+        {
+            // ignored
+        }
 
         try { zipperIcon = Resources.zipper_icon; }
-        catch { }
+        catch
+        {
+            // ignored
+        }
 
         gameGrid.CellPainting += (s, e) =>
         {
             // Paint checkbox column HEADERS with actual checkbox
-            if (e.RowIndex == -1 && e.ColumnIndex >= 0)
+            if (e is { RowIndex: -1, ColumnIndex: >= 0 })
             {
                 string colName = gameGrid.Columns[e.ColumnIndex].Name;
                 if (colName == "Crack" || colName == "Zip" || colName == "Upload")
@@ -365,27 +370,23 @@ public class BatchGameSelectionForm : Form
                     else
                     {
                         // Empty rounded rectangle - light gray outline like cell checkboxes
-                        using (var path = new GraphicsPath())
-                        {
-                            int r = 4;
-                            path.AddArc(boxRect.X, boxRect.Y, r * 2, r * 2, 180, 90);
-                            path.AddArc(boxRect.Right - r * 2, boxRect.Y, r * 2, r * 2, 270, 90);
-                            path.AddArc(boxRect.Right - r * 2, boxRect.Bottom - r * 2, r * 2, r * 2, 0, 90);
-                            path.AddArc(boxRect.X, boxRect.Bottom - r * 2, r * 2, r * 2, 90, 90);
-                            path.CloseFigure();
+                        using var path = new GraphicsPath();
+                        int r = 4;
+                        path.AddArc(boxRect.X, boxRect.Y, r * 2, r * 2, 180, 90);
+                        path.AddArc(boxRect.Right - r * 2, boxRect.Y, r * 2, r * 2, 270, 90);
+                        path.AddArc(boxRect.Right - r * 2, boxRect.Bottom - r * 2, r * 2, r * 2, 0, 90);
+                        path.AddArc(boxRect.X, boxRect.Bottom - r * 2, r * 2, r * 2, 90, 90);
+                        path.CloseFigure();
 
-                            using (var pen = new Pen(Color.FromArgb(180, 180, 190), 1.5f))
-                            {
-                                e.Graphics.DrawPath(pen, path);
-                            }
-                        }
+                        using var pen = new Pen(Color.FromArgb(180, 180, 190), 1.5f);
+                        e.Graphics.DrawPath(pen, path);
                     }
 
                     e.Handled = true;
                 }
             }
 
-            if (e.ColumnIndex >= 0 && e.RowIndex >= 0)
+            if (e is { ColumnIndex: >= 0, RowIndex: >= 0 })
             {
                 string colName = gameGrid.Columns[e.ColumnIndex].Name;
 
@@ -431,20 +432,16 @@ public class BatchGameSelectionForm : Form
                     else
                     {
                         // Empty rounded rectangle - light gray outline
-                        using (var path = new GraphicsPath())
-                        {
-                            int r = 3;
-                            path.AddArc(boxRect.X, boxRect.Y, r * 2, r * 2, 180, 90);
-                            path.AddArc(boxRect.Right - r * 2, boxRect.Y, r * 2, r * 2, 270, 90);
-                            path.AddArc(boxRect.Right - r * 2, boxRect.Bottom - r * 2, r * 2, r * 2, 0, 90);
-                            path.AddArc(boxRect.X, boxRect.Bottom - r * 2, r * 2, r * 2, 90, 90);
-                            path.CloseFigure();
+                        using var path = new GraphicsPath();
+                        int r = 3;
+                        path.AddArc(boxRect.X, boxRect.Y, r * 2, r * 2, 180, 90);
+                        path.AddArc(boxRect.Right - r * 2, boxRect.Y, r * 2, r * 2, 270, 90);
+                        path.AddArc(boxRect.Right - r * 2, boxRect.Bottom - r * 2, r * 2, r * 2, 0, 90);
+                        path.AddArc(boxRect.X, boxRect.Bottom - r * 2, r * 2, r * 2, 90, 90);
+                        path.CloseFigure();
 
-                            using (var pen = new Pen(Color.FromArgb(180, 180, 190), 1.5f))
-                            {
-                                e.Graphics.DrawPath(pen, path);
-                            }
-                        }
+                        using var pen = new Pen(Color.FromArgb(180, 180, 190), 1.5f);
+                        e.Graphics.DrawPath(pen, path);
                     }
 
                     e.Handled = true;
@@ -463,15 +460,13 @@ public class BatchGameSelectionForm : Form
                     }
                     else
                     {
-                        using (var textBrush = new SolidBrush(Color.FromArgb(150, 200, 255)))
-                        using (var font = new Font("Segoe UI", 10, FontStyle.Bold))
+                        using var textBrush = new SolidBrush(Color.FromArgb(150, 200, 255));
+                        using var font = new Font("Segoe UI", 10, FontStyle.Bold);
+                        var sf = new StringFormat
                         {
-                            var sf = new StringFormat
-                            {
-                                Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center
-                            };
-                            e.Graphics.DrawString("ⓘ", font, textBrush, e.CellBounds, sf);
-                        }
+                            Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center
+                        };
+                        e.Graphics.DrawString("ⓘ", font, textBrush, e.CellBounds, sf);
                     }
 
                     e.Handled = true;
@@ -497,17 +492,15 @@ public class BatchGameSelectionForm : Form
                         string pctText = status.Replace("Zipping", "").Trim();
                         if (!string.IsNullOrEmpty(pctText))
                         {
-                            using (var textBrush = new SolidBrush(Color.Cyan))
-                            using (var font = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+                            using var textBrush = new SolidBrush(Color.Cyan);
+                            using var font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+                            var textRect = new RectangleF(iconX + iconWidth + 4, e.CellBounds.Y,
+                                e.CellBounds.Width - iconWidth - 12, e.CellBounds.Height);
+                            var sf = new StringFormat
                             {
-                                var textRect = new RectangleF(iconX + iconWidth + 4, e.CellBounds.Y,
-                                    e.CellBounds.Width - iconWidth - 12, e.CellBounds.Height);
-                                var sf = new StringFormat
-                                {
-                                    Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center
-                                };
-                                e.Graphics.DrawString(pctText, font, textBrush, textRect, sf);
-                            }
+                                Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center
+                            };
+                            e.Graphics.DrawString(pctText, font, textBrush, textRect, sf);
                         }
 
                         e.Handled = true;
@@ -570,15 +563,15 @@ public class BatchGameSelectionForm : Form
 
                 // Check for converting URL (1fichier link during conversion)
                 if (status.StartsWith("Converting") && !string.IsNullOrEmpty(gamePath) &&
-                    convertingUrls.ContainsKey(gamePath))
+                    convertingUrls.TryGetValue(gamePath, out string? url))
                 {
-                    urlToCopy = convertingUrls[gamePath];
+                    urlToCopy = url;
                 }
                 // Check for final URL (PyDrive or 1fichier after completion)
                 else if ((status.Contains("PyDrive") || status.Contains("1fichier")) &&
-                         !string.IsNullOrEmpty(gamePath) && finalUrls.ContainsKey(gamePath))
+                         !string.IsNullOrEmpty(gamePath) && finalUrls.TryGetValue(gamePath, out string? finalUrl))
                 {
-                    urlToCopy = finalUrls[gamePath];
+                    urlToCopy = finalUrl;
                 }
 
                 if (!string.IsNullOrEmpty(urlToCopy))
@@ -606,7 +599,10 @@ public class BatchGameSelectionForm : Form
                         };
                         timer.Start();
                     }
-                    catch { }
+                    catch
+                    {
+                        // ignored
+                    }
                 }
 
                 return;
@@ -642,9 +638,10 @@ public class BatchGameSelectionForm : Form
             if (colName == "Details")
             {
                 string gamePath = gameGrid.Rows[e.RowIndex].Tag?.ToString();
-                if (!string.IsNullOrEmpty(gamePath) && crackDetailsMap.ContainsKey(gamePath))
+                if (!string.IsNullOrEmpty(gamePath) &&
+                    crackDetailsMap.TryGetValue(gamePath, out SteamAppId.CrackDetails? value))
                 {
-                    ShowCrackDetails(crackDetailsMap[gamePath]);
+                    ShowCrackDetails(value);
                 }
                 else
                 {
@@ -674,7 +671,10 @@ public class BatchGameSelectionForm : Form
 
         Image settingsIcon = null;
         try { settingsIcon = Resources.settings_icon; }
-        catch { }
+        catch
+        {
+            // ignored
+        }
 
         settingsBtn.Paint += (s, e) =>
         {
@@ -825,25 +825,27 @@ public class BatchGameSelectionForm : Form
         // Create 3 upload slots (added in reverse order for proper Dock.Top stacking)
         for (int i = MAX_UPLOAD_SLOTS - 1; i >= 0; i--)
         {
-            var slot = new UploadSlot();
-
-            slot.Panel = new Panel
+            var slot = new UploadSlot
             {
-                Dock = DockStyle.Top,
-                Height = 36,
-                BackColor = Color.FromArgb(15, 18, 28),
-                Visible = false,
-                Margin = new Padding(0, 2, 0, 0)
+                Panel =
+                    new Panel
+                    {
+                        Dock = DockStyle.Top,
+                        Height = 36,
+                        BackColor = Color.FromArgb(15, 18, 28),
+                        Visible = false,
+                        Margin = new Padding(0, 2, 0, 0)
+                    },
+                LblGame = new Label
+                {
+                    Location = new Point(5, 2),
+                    Size = new Size(280, 14),
+                    ForeColor = Color.FromArgb(100, 200, 255),
+                    Font = new Font("Segoe UI", 8, FontStyle.Bold),
+                    Text = ""
+                }
             };
 
-            slot.LblGame = new Label
-            {
-                Location = new Point(5, 2),
-                Size = new Size(280, 14),
-                ForeColor = Color.FromArgb(100, 200, 255),
-                Font = new Font("Segoe UI", 8, FontStyle.Bold),
-                Text = ""
-            };
             slot.Panel.Controls.Add(slot.LblGame);
 
             slot.ProgressBar = new NeonProgressBar
@@ -995,7 +997,7 @@ public class BatchGameSelectionForm : Form
 
                 if (crack || zip || upload)
                 {
-                    SelectedGames.Add(new APPID.Services.Interfaces.BatchGameItem
+                    SelectedGames.Add(new BatchGameItem
                     {
                         Name = Path.GetFileName(gamePaths[i]),
                         Path = gamePaths[i],
@@ -1044,7 +1046,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => UpdateStatus(gamePath, status, color)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1077,7 +1082,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => UpdateStatusByIndex(rowIndex, status, color)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1105,7 +1113,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => SetConvertingUrl(gamePath, oneFichierUrl)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1129,15 +1140,15 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => ClearConvertingUrl(gamePath)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
 
-        if (convertingUrls.ContainsKey(gamePath))
-        {
-            convertingUrls.Remove(gamePath);
-        }
+        convertingUrls.Remove(gamePath);
     }
 
     /// <summary>
@@ -1153,7 +1164,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => SetFinalUrl(gamePath, finalUrl)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1218,7 +1232,7 @@ public class BatchGameSelectionForm : Form
     /// </summary>
     public CancellationToken GetSlotCancellationToken(int slotIndex)
     {
-        if (slotIndex >= 0 && slotIndex < MAX_UPLOAD_SLOTS && uploadSlots[slotIndex].Cancellation != null)
+        if (slotIndex is >= 0 and < MAX_UPLOAD_SLOTS && uploadSlots[slotIndex].Cancellation != null)
         {
             return uploadSlots[slotIndex].Cancellation.Token;
         }
@@ -1243,7 +1257,10 @@ public class BatchGameSelectionForm : Form
             {
                 BeginInvoke(() => UpdateSlotProgress(slotIndex, percent, uploadedBytes, totalBytes, bytesPerSecond));
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1287,7 +1304,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => ReleaseUploadSlot(slotIndex)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1350,8 +1370,11 @@ public class BatchGameSelectionForm : Form
 
         if (InvokeRequired)
         {
-            try { BeginInvoke(() => ResetSkipCancelState()); }
-            catch { }
+            try { BeginInvoke(ResetSkipCancelState); }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1399,8 +1422,11 @@ public class BatchGameSelectionForm : Form
 
         if (InvokeRequired)
         {
-            try { BeginInvoke(() => HideUploadDetails()); }
-            catch { }
+            try { BeginInvoke(HideUploadDetails); }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1430,7 +1456,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => ShowCopyAllButton(phpBBLinks)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1447,9 +1476,8 @@ public class BatchGameSelectionForm : Form
 
             // Determine if cracked or clean based on details
             string suffix = "(Cracked)";
-            if (crackDetailsMap.ContainsKey(kvp.Key))
+            if (crackDetailsMap.TryGetValue(kvp.Key, out SteamAppId.CrackDetails? details))
             {
-                var details = crackDetailsMap[kvp.Key];
                 if (details.DllsReplaced.Count == 0 && details.ExesUnpacked.Count == 0)
                 {
                     suffix = "(Clean)";
@@ -1491,7 +1519,10 @@ public class BatchGameSelectionForm : Form
                     };
                     timer.Start();
                 }
-                catch { }
+                catch
+                {
+                    // ignored
+                }
             }
         };
         Controls.Add(copyRinBtn);
@@ -1517,7 +1548,10 @@ public class BatchGameSelectionForm : Form
                     };
                     timer.Start();
                 }
-                catch { }
+                catch
+                {
+                    // ignored
+                }
             }
         };
         Controls.Add(copyDiscordBtn);
@@ -1543,7 +1577,10 @@ public class BatchGameSelectionForm : Form
                     };
                     timer.Start();
                 }
-                catch { }
+                catch
+                {
+                    // ignored
+                }
             }
         };
         Controls.Add(copyPlaintextBtn);
@@ -1567,7 +1604,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => UpdateTitleProgress(percent, phase)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1578,8 +1618,7 @@ public class BatchGameSelectionForm : Form
             title = phase;
         }
 
-        var titleLabel = Controls["titleLabel"] as Label;
-        if (titleLabel != null)
+        if (Controls["titleLabel"] is Label titleLabel)
         {
             titleLabel.Text = title;
         }
@@ -1598,7 +1637,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => UpdateProgressWithEta(percent, etaSeconds)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1606,8 +1648,7 @@ public class BatchGameSelectionForm : Form
         string etaStr = percent >= 99 ? "a few seconds..." : _formatting.FormatEtaLong(etaSeconds);
         string text = $"{percent}% - ETA {etaStr}";
 
-        var titleLabel = Controls["titleLabel"] as Label;
-        if (titleLabel != null)
+        if (Controls["titleLabel"] is Label titleLabel)
         {
             titleLabel.Text = text;
         }
@@ -1615,12 +1656,15 @@ public class BatchGameSelectionForm : Form
         // Update Form1's batch indicator if it exists and form is minimized
         try
         {
-            if (Owner is SteamAppId mainForm && !mainForm.IsDisposed)
+            if (Owner is SteamAppId { IsDisposed: false } mainForm)
             {
                 mainForm.UpdateBatchIndicator(percent);
             }
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
     }
 
     /// <summary>
@@ -1636,13 +1680,15 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => ResetTitle(text)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
 
-        var titleLabel = Controls["titleLabel"] as Label;
-        if (titleLabel != null)
+        if (Controls["titleLabel"] is Label titleLabel)
         {
             titleLabel.Text = text;
         }
@@ -1661,7 +1707,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => SetProcessingMode(processing)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -1672,8 +1721,7 @@ public class BatchGameSelectionForm : Form
         gameGrid.ReadOnly = processing;
 
         // Hide count label and buttons during processing
-        var countLabel = Controls["countLabel"] as Label;
-        if (countLabel != null)
+        if (Controls["countLabel"] is Label countLabel)
         {
             countLabel.Visible = !processing;
         }
@@ -1712,8 +1760,7 @@ public class BatchGameSelectionForm : Form
             }
         }
 
-        var countLabel = Controls["countLabel"] as Label;
-        if (countLabel != null)
+        if (Controls["countLabel"] is Label countLabel)
         {
             string text = $"{crackCount} crack";
             if (zipCount > 0)
@@ -1732,20 +1779,18 @@ public class BatchGameSelectionForm : Form
 
     private void OpenCompressionSettings()
     {
-        using (var form = new CompressionSettingsForm())
+        using var form = new CompressionSettingsForm();
+        form.Owner = this;
+        Hide(); // Hide batch form while settings open
+        if (form.ShowDialog() == DialogResult.OK)
         {
-            form.Owner = this;
-            Hide(); // Hide batch form while settings open
-            if (form.ShowDialog() == DialogResult.OK)
-            {
-                CompressionFormat = form.SelectedFormat;
-                CompressionLevel = form.SelectedLevel;
-                UseRinPassword = form.UseRinPassword;
-                UpdateCompressionLabel();
-            }
-
-            Show(); // Show batch form again
+            CompressionFormat = form.SelectedFormat;
+            CompressionLevel = form.SelectedLevel;
+            UseRinPassword = form.UseRinPassword;
+            UpdateCompressionLabel();
         }
+
+        Show(); // Show batch form again
     }
 
     private void UpdateCompressionLabel()
@@ -1781,6 +1826,7 @@ public class BatchGameSelectionForm : Form
                 }
                 catch
                 {
+                    // ignored
                 }
             }
 
@@ -1833,13 +1879,11 @@ public class BatchGameSelectionForm : Form
 
     private string ShowAppIdSearchDialog(string gameName, string currentAppId)
     {
-        using (var dialog = new AppIdSearchDialog(gameName, currentAppId))
+        using var dialog = new AppIdSearchDialog(gameName, currentAppId);
+        dialog.Owner = this;
+        if (dialog.ShowDialog(this) == DialogResult.OK)
         {
-            dialog.Owner = this;
-            if (dialog.ShowDialog(this) == DialogResult.OK)
-            {
-                return dialog.SelectedAppId;
-            }
+            return dialog.SelectedAppId;
         }
 
         return null; // User cancelled
@@ -1999,7 +2043,10 @@ public class BatchGameSelectionForm : Form
         if (InvokeRequired)
         {
             try { BeginInvoke(() => UpdatePyDriveUrl(gamePath, pydriveUrl)); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             return;
         }
@@ -2187,7 +2234,7 @@ public class BatchGameSelectionForm : Form
             }
         }
 
-        if (!details.HasAnyChanges && details.Errors.Count == 0 && !details.ZipAttempted && !details.UploadAttempted)
+        if (details is { HasAnyChanges: false, Errors.Count: 0, ZipAttempted: false, UploadAttempted: false })
         {
             textBox.SelectionColor = Color.Orange;
             textBox.AppendText("\nNo modifications were made to this game.\n");
@@ -2215,7 +2262,10 @@ public class BatchGameSelectionForm : Form
                 MessageBox.Show("Details copied to clipboard!", "Copied", MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
-            catch { }
+            catch
+            {
+                // ignored
+            }
         };
 
         detailForm.Controls.Add(textBox);
@@ -2234,7 +2284,10 @@ public class BatchGameSelectionForm : Form
             // Use the shared AcrylicHelper for consistent styling
             AcrylicHelper.ApplyAcrylic(this, disableShadow: true);
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void Form_MouseDown(object sender, MouseEventArgs e)
@@ -2251,10 +2304,7 @@ public class BatchGameSelectionForm : Form
         base.OnPaint(e);
 
         // Draw border
-        using (var pen = new Pen(Color.FromArgb(60, 60, 65), 1))
-        {
-            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
-        }
+        using var pen = new Pen(Color.FromArgb(60, 60, 65), 1);
+        e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
     }
-
 }
