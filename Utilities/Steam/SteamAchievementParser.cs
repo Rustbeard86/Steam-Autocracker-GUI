@@ -30,6 +30,11 @@ namespace APPID.Utilities.Steam
                         }
 
                         _httpClient.DefaultRequestHeaders.Add("X-Gbe-Auth", config);
+                        LogHelper.Log("[ACHIEVEMENTS] Auth header configured");
+                    }
+                    else
+                    {
+                        LogHelper.Log("[ACHIEVEMENTS] WARNING: No auth config provided");
                     }
                 }
 
@@ -50,12 +55,20 @@ namespace APPID.Utilities.Steam
 
                     try
                     {
+                        LogHelper.Log($"[ACHIEVEMENTS] Starting parse for AppID: {appId}");
+                        LogHelper.Log($"[ACHIEVEMENTS] Using base URL: {baseUrl}");
+                        LogHelper.Log($"[ACHIEVEMENTS] Output directory: {outputDirectory}");
+
                         var achievements = await FetchSteamSchema(baseUrl, appId, apiKey);
 
                         if (achievements == null || achievements.Count == 0)
                         {
+                            LogHelper.Log($"[ACHIEVEMENTS] No achievements returned from API for AppID: {appId}");
                             return false;
                         }
+
+                        LogHelper.Log($"[ACHIEVEMENTS] Found {achievements.Count} achievements for AppID: {appId}");
+                        LogHelper.Log($"[ACHIEVEMENTS] Creating output directories at: {settingsDir}");
 
                         Directory.CreateDirectory(imagesDir);
 
@@ -63,6 +76,7 @@ namespace APPID.Utilities.Steam
 
                         // Parallel download processing can speed this up significantly
                         var tasks = new List<Task>();
+                        int iconCount = 0;
 
                         foreach (var ach in achievements)
                         {
@@ -72,6 +86,7 @@ namespace APPID.Utilities.Steam
                             // Queue image downloads
                             tasks.Add(DownloadImage(ach.IconUrl, Path.Combine(imagesDir, iconName)));
                             tasks.Add(DownloadImage(ach.IconGrayUrl, Path.Combine(imagesDir, iconGrayName)));
+                            iconCount += 2;
 
                             goldbergList.Add(new GoldbergAchievement
                             {
@@ -84,8 +99,12 @@ namespace APPID.Utilities.Steam
                             });
                         }
 
+                        LogHelper.Log($"[ACHIEVEMENTS] Downloading {iconCount} achievement icons in parallel...");
+
                         // Wait for all images to download
                         await Task.WhenAll(tasks);
+
+                        LogHelper.Log("[ACHIEVEMENTS] All icons downloaded successfully");
 
                         // Serialize and Save JSON
                         var options = new JsonSerializerOptions { WriteIndented = true };
@@ -93,10 +112,15 @@ namespace APPID.Utilities.Steam
 
                         await File.WriteAllTextAsync(jsonPath, jsonOutput);
 
+                        LogHelper.Log($"[ACHIEVEMENTS] Successfully generated achievements.json at: {jsonPath}");
+                        LogHelper.Log($"[ACHIEVEMENTS] Total achievements processed: {goldbergList.Count}");
+
                         return true;
                     }
                     catch (Exception ex)
                     {
+                        LogHelper.LogError($"[ACHIEVEMENTS] Critical error parsing achievements for AppID: {appId}",
+                            ex);
                         return false;
                     }
                 }
@@ -104,34 +128,92 @@ namespace APPID.Utilities.Steam
                 private async Task<List<SteamAchievementDef>> FetchSteamSchema(string baseUrl, string appId,
                     string apiKey)
                 {
-                    // Build URL dynamically based on whether an API key is provided (Direct vs Proxy)
-                    var query = HttpUtility.ParseQueryString(string.Empty);
-                    query["appid"] = appId;
-                    query["l"] = "en";
-
-                    if (!string.IsNullOrEmpty(apiKey))
-                    {
-                        query["key"] = apiKey;
-                    }
-
-                    string requestUrl = $"{baseUrl.TrimEnd('/')}/ISteamUserStats/GetSchemaForGame/v2/?{query}";
-
-                    using var response = await _httpClient.GetAsync(requestUrl);
-
-                    if (!response.IsSuccessStatusCode)
-                    {
-                        return null;
-                    }
-
-                    string json = await response.Content.ReadAsStringAsync();
-
                     try
                     {
+                        // Build URL dynamically based on whether an API key is provided (Direct vs Proxy)
+                        var query = HttpUtility.ParseQueryString(string.Empty);
+                        query["appid"] = appId;
+                        query["l"] = "en";
+
+                        if (!string.IsNullOrEmpty(apiKey))
+                        {
+                            query["key"] = apiKey;
+                            LogHelper.Log("[ACHIEVEMENTS] Using Steam API key for direct access");
+                        }
+                        else
+                        {
+                            LogHelper.Log("[ACHIEVEMENTS] Using proxy mode (no API key)");
+                        }
+
+                        string requestUrl = $"{baseUrl.TrimEnd('/')}/ISteamUserStats/GetSchemaForGame/v2/?{query}";
+
+                        // CRITICAL FIX: Prevent String.Replace("") crash when apiKey is null
+                        string maskedUrl = !string.IsNullOrEmpty(apiKey)
+                            ? requestUrl.Replace(apiKey, "***")
+                            : requestUrl;
+
+                        LogHelper.LogApi("Steam GetSchemaForGame", $"Requesting: {maskedUrl}");
+
+                        using var response = await _httpClient.GetAsync(requestUrl);
+
+                        if (!response.IsSuccessStatusCode)
+                        {
+                            LogHelper.LogNetwork(
+                                $"[ACHIEVEMENTS] API returned HTTP {(int)response.StatusCode} {response.StatusCode} for AppID: {appId}");
+
+                            // Try to get error details
+                            try
+                            {
+                                string errorBody = await response.Content.ReadAsStringAsync();
+                                if (!string.IsNullOrEmpty(errorBody) && errorBody.Length < 500)
+                                {
+                                    LogHelper.Log($"[ACHIEVEMENTS] Error response: {errorBody}");
+                                }
+                            }
+                            catch { }
+
+                            return null;
+                        }
+
+                        LogHelper.LogApi("Steam GetSchemaForGame", $"Success (HTTP {(int)response.StatusCode})");
+
+                        string json = await response.Content.ReadAsStringAsync();
+                        LogHelper.Log($"[ACHIEVEMENTS] Received response, size: {json.Length:N0} bytes");
+
                         var root = JsonSerializer.Deserialize<SteamRootObject>(json);
-                        return root?.Game?.AvailableGameStats?.Achievements;
+
+                        if (root?.Game?.AvailableGameStats?.Achievements != null)
+                        {
+                            int count = root.Game.AvailableGameStats.Achievements.Count;
+                            LogHelper.Log($"[ACHIEVEMENTS] Successfully parsed {count} achievement definitions");
+                            return root.Game.AvailableGameStats.Achievements;
+                        }
+
+                        LogHelper.Log(
+                            $"[ACHIEVEMENTS] Response structure invalid or no achievements in API response for AppID: {appId}");
+                        LogHelper.Log(
+                            $"[ACHIEVEMENTS] Response preview: {json.Substring(0, Math.Min(200, json.Length))}...");
+                        return null;
                     }
                     catch (JsonException ex)
                     {
+                        LogHelper.LogError("[ACHIEVEMENTS] Failed to deserialize Steam API JSON response", ex);
+                        return null;
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        LogHelper.LogError($"[ACHIEVEMENTS] Network error fetching schema for AppID: {appId}", ex);
+                        return null;
+                    }
+                    catch (TaskCanceledException ex)
+                    {
+                        LogHelper.LogError($"[ACHIEVEMENTS] Request timeout for AppID: {appId}", ex);
+                        return null;
+                    }
+                    catch (Exception ex)
+                    {
+                        LogHelper.LogError($"[ACHIEVEMENTS] Unexpected error in FetchSteamSchema for AppID: {appId}",
+                            ex);
                         return null;
                     }
                 }
@@ -140,11 +222,13 @@ namespace APPID.Utilities.Steam
                 {
                     if (string.IsNullOrEmpty(url))
                     {
+                        LogHelper.Log($"[ACHIEVEMENTS] Skipping empty URL for: {Path.GetFileName(localPath)}");
                         return;
                     }
 
                     if (File.Exists(localPath))
                     {
+                        // Silent skip for existing files to reduce log spam
                         return;
                     }
 
@@ -152,10 +236,21 @@ namespace APPID.Utilities.Steam
                     {
                         var data = await _httpClient.GetByteArrayAsync(url);
                         await File.WriteAllBytesAsync(localPath, data);
+
+                        // Only log downloads in debug mode to reduce log spam
+                        if (data.Length > 0)
+                        {
+                            Debug.WriteLine(
+                                $"[ACHIEVEMENTS] Downloaded: {Path.GetFileName(localPath)} ({data.Length:N0} bytes)");
+                        }
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        LogHelper.LogNetwork($"[ACHIEVEMENTS] Failed to download icon from: {url} - {ex.Message}");
                     }
                     catch (Exception ex)
                     {
-                        // ignored
+                        LogHelper.LogError($"[ACHIEVEMENTS] Error downloading icon: {Path.GetFileName(localPath)}", ex);
                     }
                 }
 

@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 namespace APPID.Utilities;
 
 /// <summary>
@@ -128,5 +130,70 @@ internal static class StringTools
         }
 
         return new string(s.Where(char.IsDigit).ToArray());
+    }
+
+    /// <summary>
+    ///     Masks a sensitive value in a string by replacing it with asterisks.
+    ///     Returns the original string if the sensitive value is null or empty.
+    /// </summary>
+    /// <param name="text">The text containing sensitive data.</param>
+    /// <param name="sensitiveValue">The sensitive value to mask (e.g., API key, password).</param>
+    /// <param name="mask">The replacement mask (default: "***").</param>
+    /// <returns>The text with the sensitive value replaced by the mask.</returns>
+    public static string MaskSensitiveData(string text, string sensitiveValue, string mask = "***")
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        if (string.IsNullOrEmpty(sensitiveValue))
+        {
+            return text;
+        }
+
+        return text.Replace(sensitiveValue, mask);
+    }
+
+    /// <summary>
+    ///     Truncates a string to a maximum length, adding an ellipsis if truncated.
+    /// </summary>
+    /// <param name="text">The text to truncate.</param>
+    /// <param name="maxLength">Maximum length (including ellipsis).</param>
+    /// <param name="ellipsis">The ellipsis string to append (default: "...").</param>
+    /// <returns>The truncated string.</returns>
+    public static string Truncate(string text, int maxLength, string ellipsis = "...")
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+        {
+            return text;
+        }
+
+        int truncateAt = maxLength - ellipsis.Length;
+        return truncateAt > 0 ? text[..truncateAt] + ellipsis : text[..maxLength];
+    }
+
+    /// <summary>
+    ///     Sanitizes a URL for logging by masking sensitive query parameters.
+    /// </summary>
+    /// <param name="url">The URL to sanitize.</param>
+    /// <param name="sensitiveParams">List of query parameter names to mask (e.g., "key", "token", "apikey").</param>
+    /// <returns>The URL with sensitive parameters masked.</returns>
+    public static string SanitizeUrlForLogging(string url, params string[] sensitiveParams)
+    {
+        if (string.IsNullOrEmpty(url) || sensitiveParams == null || sensitiveParams.Length == 0)
+        {
+            return url;
+        }
+
+        string result = url;
+        foreach (string param in sensitiveParams)
+        {
+            // Match patterns like: ?key=VALUE or &key=VALUE
+            string pattern = $@"([?&]{Regex.Escape(param)}=)[^&]*";
+            result = Regex.Replace(result, pattern, "$1***", RegexOptions.IgnoreCase);
+        }
+
+        return result;
     }
 }

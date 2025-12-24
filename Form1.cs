@@ -1384,9 +1384,12 @@ public partial class SteamAppId : Form
 
     private void pictureBox1_Click(object sender, EventArgs e)
     {
-        Process.Start("https://github.com/harryeffinpotter/SteamAPPIDFinder");
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = "https://github.com/harryeffinpotter/SteamAPPIDFinder",
+            UseShellExecute = true
+        });
     }
-
 
     private void searchTextBox_Enter(object sender, EventArgs e)
     {
@@ -1740,6 +1743,15 @@ public partial class SteamAppId : Form
 
                 if (Path.GetExtension(file) == ".exe")
                 {
+                    // NEW: Skip utility executables using CrackConstants
+                    string fileName = Path.GetFileName(file);
+                    if (CrackConstants.IsExcludedExecutable(fileName))
+                    {
+                        LogHelper.Log($"[CRACK] Skipping utility executable: {fileName}");
+                        CurrentCrackDetails.ExesSkipped.Add(fileName);
+                        continue; // Skip to next file
+                    }
+
                     // Skip if file path is empty or file doesn't exist
                     if (string.IsNullOrEmpty(file) || !File.Exists(file))
                     {
