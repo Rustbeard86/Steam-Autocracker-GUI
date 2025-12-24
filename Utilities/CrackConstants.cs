@@ -44,6 +44,7 @@ public static class CrackConstants
         "vcredist_x64.exe",
         "vcredist_x86.exe",
         "DirectXSetup.exe",
+        "UEPrereqSetup_x64.exe",
         
         // Anti-cheat (should not be modified)
         "EasyAntiCheat.exe",

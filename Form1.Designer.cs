@@ -187,7 +187,6 @@ namespace APPID
             resinstruccZip.BackColor = System.Drawing.Color.Transparent;
             resinstruccZip.ForeColor = System.Drawing.Color.White;
             resinstruccZip.Name = "resinstruccZip";
-            resinstruccZip.Click += resinstruccZip_Click;
             // 
             // tgDisc
             // 
@@ -195,7 +194,6 @@ namespace APPID
             tgDisc.BackColor = System.Drawing.Color.Transparent;
             tgDisc.ForeColor = System.Drawing.Color.FromArgb(128, 255, 255);
             tgDisc.Name = "tgDisc";
-            tgDisc.Click += label2_Click;
             // 
             // mainPanel
             // 
@@ -448,7 +446,6 @@ namespace APPID
             resources.ApplyResources(label5, "label5");
             label5.ForeColor = System.Drawing.Color.LightSteelBlue;
             label5.Name = "label5";
-            label5.Click += label5_Click;
             label5.DragDrop += mainPanel_DragDrop;
             label5.DragEnter += mainPanel_DragEnter;
             label5.DragLeave += mainPanel_DragLeave;

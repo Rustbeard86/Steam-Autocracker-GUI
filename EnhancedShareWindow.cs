@@ -1054,9 +1054,6 @@ public partial class EnhancedShareWindow : Form
             // Call the main form's cracking method
             if (_parentForm is SteamAppId parentFormTyped)
             {
-                // Suppress status updates on main window while cracking from share window
-                parentFormTyped.SetSuppressStatusUpdates(true);
-
                 // Set the game directory and app ID in the main form
                 parentFormTyped.GameDirectory = installPath;
                 SteamAppId.CurrentAppId = appId;
@@ -1118,9 +1115,6 @@ public partial class EnhancedShareWindow : Form
                     // Unsubscribe
                     parentFormTyped.CrackStatusChanged -= statusHandler;
 
-                    // Re-enable status updates
-                    parentFormTyped.SetSuppressStatusUpdates(false);
-
                     // Remove overlay
                     Controls.Remove(overlay);
                     overlay.Dispose();
@@ -1143,8 +1137,6 @@ public partial class EnhancedShareWindow : Form
                 }
                 catch (Exception ex)
                 {
-                    // Re-enable status updates
-                    parentFormTyped.SetSuppressStatusUpdates(false);
 
                     // Remove overlay
                     Controls.Remove(overlay);
@@ -2612,12 +2604,9 @@ public partial class EnhancedShareWindow : Form
                 {
                     mainForm.GameDirectory = game.path;
                     SteamAppId.CurrentAppId = game.appId;
-                    mainForm.SetSuppressStatusUpdates(true);
 
                     bool success = await mainForm.CrackAsync();
                     crackResults[game.path] = success;
-
-                    mainForm.SetSuppressStatusUpdates(false);
 
                     if (success)
                     {
@@ -2637,7 +2626,6 @@ public partial class EnhancedShareWindow : Form
                 }
                 catch (Exception ex)
                 {
-                    mainForm.SetSuppressStatusUpdates(false);
                     crackResults[game.path] = false;
                     UpdateActionColumn(game.row, "CrackOnly", "❌ Error", Color.Red);
                     Debug.WriteLine($"[BATCH] Crack error for {game.name}: {ex.Message}");

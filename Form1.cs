@@ -45,7 +45,6 @@ public partial class SteamAppId : Form
     private static int CurrentCell;
     private static string Appname = "";
     private static readonly string Appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-    private static bool VrlExists;
     internal static string CurrentAppId;
     private static bool SearchPause;
     private static bool BackPressed;
@@ -70,7 +69,6 @@ public partial class SteamAppId : Form
     private string _parentOfSelection;
     private Timer _resinstruccZipTimer;
     private EnhancedShareWindow _shareWindow;
-    private bool _suppressStatusUpdates;
     private bool _textChanged;
     private CancellationTokenSource _zipCancellationTokenSource;
     private bool AutoCrackEnabled = true;
@@ -79,6 +77,7 @@ public partial class SteamAppId : Form
     private bool EnableLanMultiplayer;
     private bool Goldy;
     private bool Isnumeric;
+    private IGameSearchService _gameSearch;
 
     public SteamAppId()
     {
@@ -101,6 +100,7 @@ public partial class SteamAppId : Form
         InitializeComponent();
 
         _statusService = new StatusUpdateService(this, StatusLabel, currDIrText);
+        _gameSearch = new GameSearchService();
 
         _batchProcessingService = new BatchProcessingService(
             new CrackingService(BinPath),
@@ -226,18 +226,6 @@ public partial class SteamAppId : Form
         btn.Paint += (sender, e) =>
         {
             var b = sender as Button;
-
-            // DISABLED - This causes deadlocks when updating buttons from background threads
-            // Draw the parent's background in the button area first for true transparency
-            /*if (b.Parent != null)
-            {
-                using (var bmp = new Bitmap(b.Parent.Width, b.Parent.Height))
-                {
-                    b.Parent.DrawToBitmap(bmp, new Rectangle(0, 0, b.Parent.Width, b.Parent.Height));
-                    e.Graphics.DrawImage(bmp, new Rectangle(0, 0, b.Width, b.Height),
-                        new Rectangle(b.Left, b.Top, b.Width, b.Height), GraphicsUnit.Pixel);
-                }
-            }*/
 
             // Enable maximum quality anti-aliasing
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -377,7 +365,7 @@ public partial class SteamAppId : Form
         _label5Timer.Start();
     }
 
-    private static void Tit(string message, Color color)
+    private static void Tit(string message, Color color) 
     {
         // Keep for backward compatibility, delegate to service
         Program.Form?._statusService?.UpdateStatus(message, color);
@@ -638,10 +626,6 @@ public partial class SteamAppId : Form
         T1 = new Timer();
         T1.Tick += t1_Tick;
         T1.Interval = 1000;
-        if (Directory.Exists($"{Appdata}\\VRL"))
-        {
-            VrlExists = true;
-        }
 
         dataGridView1.DataSource = DataTableGeneration.DataTableToGenerate;
         dataGridView1.MultiSelect = false;
@@ -762,12 +746,6 @@ public partial class SteamAppId : Form
 
         try
         {
-            if (VrlExists)
-            {
-                string propName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
-                File.WriteAllText($"{Appdata}\\VRL\\ProperName.txt", propName);
-            }
-
             CurrentAppId = dataGridView1[1, e.RowIndex].Value.ToString();
             Appname = dataGridView1[0, e.RowIndex].Value.ToString().Trim();
             Tat($"{Appname} ({CurrentAppId})");
@@ -794,21 +772,11 @@ public partial class SteamAppId : Form
     {
         try
         {
-            if (VrlExists)
-            {
-                string propName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
-                File.WriteAllText($"{Appdata}\\VRL\\ProperName.txt", propName);
-            }
-
             SetSelectedGame(e.RowIndex);
         }
         catch
         {
         }
-    }
-
-    private void label2_Click(object sender, EventArgs e)
-    {
     }
 
     private void dataGridView1_KeyDown(object sender, KeyEventArgs e)
@@ -837,12 +805,6 @@ public partial class SteamAppId : Form
                 if (dataGridView1[1, CurrentCell].Value == null)
                 {
                     return;
-                }
-
-                if (VrlExists)
-                {
-                    string propName = RemoveSpecialCharacters(dataGridView1[0, CurrentCell].Value.ToString());
-                    File.WriteAllText($"{Appdata}\\VRL\\ProperName.txt", propName);
                 }
 
                 CurrentAppId = dataGridView1[1, CurrentCell].Value.ToString();
@@ -1011,327 +973,81 @@ public partial class SteamAppId : Form
 
         try
         {
+            // Debounce rapid typing
             if (_textChanged)
             {
-                await PutTaskDelay();
-                _textChanged = false; // Reset the flag
+                await Task.Delay(1000);
+                _textChanged = false;
                 return;
             }
 
             _textChanged = true;
             string searchText = searchTextBox.Text.Trim();
 
-            // BLIND SPOT DETECTION: Try to catch exact matches that are being missed
-            if (searchText.Length > 2)
-            {
-                // First, let's see if there's an exact match hiding in the full dataset
-                var dt = (DataTable)dataGridView1.DataSource;
-
-                // Check for exact matches manually (case-insensitive)
-                var exactMatches = dt.AsEnumerable().Where(row =>
-                    string.Equals(row.Field<string>("Name"), searchText, StringComparison.OrdinalIgnoreCase)).ToList();
-
-                // JACKBOX DEBUG: Special handling for numbered games that might have filtering issues
-                if (!exactMatches.Any() && searchText.ToLower().Contains("party pack"))
-                {
-                    // Look for all party pack entries and see what's different
-                    var allPartyPacks = dt.AsEnumerable().Where(row =>
-                        row.Field<string>("Name")?.ToLower().Contains("party pack") == true).ToList();
-
-                    // Try to find the exact match by checking each one manually
-                    foreach (var pack in allPartyPacks)
-                    {
-                        string packName = pack.Field<string>("Name");
-                        if (string.Equals(packName, searchText, StringComparison.OrdinalIgnoreCase))
-                        {
-                            exactMatches.Add(pack);
-                            break;
-                        }
-                    }
-                }
-
-                if (exactMatches.Any())
-                {
-                    // Found exact match! Apply filter to show only this
-                    string exactName = exactMatches.First().Field<string>("Name");
-                    ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                        $"Name = '{exactName.Replace("'", "''")}'";
-                    goto SearchComplete;
-                }
-
-                // SOUNDTRACK/DLC PRIORITY FIX: Check if we're finding longer titles when shorter exact ones exist
-                if (searchText.Length > 3)
-                {
-                    var partialMatches = dt.AsEnumerable().Where(row =>
-                        row.Field<string>("Name")?.ToLower().Contains(searchText.ToLower()) == true).ToList();
-
-                    if (partialMatches.Any())
-                    {
-                        // Prioritize shorter matches (base games) over longer ones (soundtracks, DLC, etc.)
-                        var sortedMatches = partialMatches
-                            .OrderBy(row => row.Field<string>("Name")?.Length ?? int.MaxValue).ToList();
-
-                        // Check if the shortest match is actually an exact match or very close
-                        var bestMatch = sortedMatches.First();
-                        string bestMatchName = bestMatch.Field<string>("Name");
-
-                        // If the shortest match equals our search text, use it
-                        if (string.Equals(bestMatchName, searchText, StringComparison.OrdinalIgnoreCase))
-                        {
-                            ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                                $"Name = '{bestMatchName.Replace("'", "''")}'";
-                            goto SearchComplete;
-                        }
-
-                        // If we have multiple matches, prefer the one without extra words like "Soundtrack", "DLC", etc.
-                        if (partialMatches.Count > 1)
-                        {
-                            var baseGameMatches = partialMatches.Where(row =>
-                            {
-                                string name = row.Field<string>("Name")?.ToLower() ?? "";
-                                return !name.Contains("soundtrack") && !name.Contains("dlc") &&
-                                       !name.Contains("season pass") && !name.Contains("expansion") &&
-                                       !name.Contains("demo") && !name.Contains("beta");
-                            }).OrderBy(row => row.Field<string>("Name")?.Length ?? int.MaxValue).ToList();
-
-                            if (baseGameMatches.Any())
-                            {
-                                string baseGameName = baseGameMatches.First().Field<string>("Name");
-                                ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                                    $"Name = '{baseGameName.Replace("'", "''")}'";
-                                goto SearchComplete;
-                            }
-                        }
-                    }
-                }
-
-                // Check for matches with different Unicode normalization
-                var normalizedSearch = searchText.Normalize(NormalizationForm.FormKC);
-                var normalizedMatches = dt.AsEnumerable().Where(row =>
-                    string.Equals(row.Field<string>("Name")?.Normalize(NormalizationForm.FormKC), normalizedSearch,
-                        StringComparison.OrdinalIgnoreCase)).ToList();
-
-                if (normalizedMatches.Any())
-                {
-                    string exactName = normalizedMatches.First().Field<string>("Name");
-                    ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                        $"Name = '{exactName.Replace("'", "''")}'";
-                    goto SearchComplete;
-                }
-
-                // Check for matches ignoring certain problematic characters
-                string cleanSearch = new string(searchText.Where(c =>
-                        !char.IsControl(c) &&
-                        c != '\u00A0' && // Non-breaking space
-                        c != '\u2009' && // Thin space
-                        c != '\u200B' && // Zero-width space
-                        c != '\uFEFF' // Byte order mark
-                ).ToArray()).Trim();
-
-                if (cleanSearch != searchText)
-                {
-                    var cleanMatches = dt.AsEnumerable().Where(row =>
-                    {
-                        string rowName = row.Field<string>("Name");
-                        if (rowName == null)
-                        {
-                            return false;
-                        }
-
-                        string cleanRowName = new string(rowName.Where(c =>
-                            !char.IsControl(c) && c != '\u00A0' && c != '\u2009' && c != '\u200B' && c != '\uFEFF'
-                        ).ToArray()).Trim();
-                        return string.Equals(cleanRowName, cleanSearch, StringComparison.OrdinalIgnoreCase);
-                    }).ToList();
-
-                    if (cleanMatches.Any())
-                    {
-                        string exactName = cleanMatches.First().Field<string>("Name");
-                        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                            $"Name = '{exactName.Replace("'", "''")}'";
-                        goto SearchComplete;
-                    }
-                }
-            }
-
-            // Check if DataSource is ready
-            if (dataGridView1.DataSource == null)
+            // Validate data source
+            if (dataGridView1.DataSource is not DataTable dataTable)
             {
                 return;
             }
 
-            string search = RemoveSpecialCharacters(searchTextBox.Text.ToLower()).Trim();
-            string splitSearch = SplitCamelCase(RemoveSpecialCharacters(searchTextBox.Text)).Trim();
-            ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                string.Format("Name like '" + search.Replace("_", "").Trim() + "'");
+            // Perform search using service
+            var result = _gameSearch.PerformSearch(searchText, dataTable);
 
-            if (dataGridView1.Rows.Count == 0)
-            {
-                ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                    string.Format("Name like '" + splitSearch.Replace("_", "").Trim() + "'");
-            }
+            // Handle results
+            HandleSearchResults(result);
 
-            if (dataGridView1.Rows.Count == 0)
-            {
-                ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-                    splitSearch.ToLower().Replace("_", "").Replace("vr", "").Replace("vrs", "").Trim() + "'");
-            }
+            _textChanged = false;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SEARCH] Error: {ex.Message}");
+            _textChanged = false;
+        }
+    }
 
-            if (dataGridView1.Rows.Count == 0)
-            {
-                ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-                    splitSearch.ToLower().Replace("'", "").Replace("-", "").Replace(";", "").Trim() + "'");
-            }
-
-            if (dataGridView1.Rows.Count == 0)
-            {
-                ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '%" +
-                    search.Replace("_", "").Replace(" ", "%' AND Name LIKE '%").Replace(" and ", " ")
-                        .Replace(" the ", " ").Replace(":", "") + "%'");
-                if (dataGridView1.Rows.Count > 0)
+    private void HandleSearchResults(SearchResult result)
+    {
+        switch (result.Quality)
+        {
+            case SearchMatchQuality.NoMatch:
+                if (searchTextBox.Text.Length > 2)
                 {
-                    Clipboard.SetText($"{dataGridView1.Rows[0].Cells[1].Value}");
+                    Tit($"No matches found for '{searchTextBox.Text}'. Try a different name or use Manual Entry.", Color.Orange);
+                    btnManualEntry.Visible = true;
+                    resinstruccZip.Visible = true;
+                    _resinstruccZipTimer.Start();
+                    mainPanel.Visible = false;
+                    searchTextBox.Enabled = true;
                 }
-                else
-                {
-                    ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string
-                        .Format("Name like '%" + splitSearch.Replace("_", "").Replace(" ", "%' AND Name LIKE '%")
-                            .Replace(" and ", " ").Replace(" the ", " ").Replace(":", "") + "%'").Trim();
-                    if (dataGridView1.Rows.Count > 0)
-                    {
-                        // Don't auto-select here - let it fall through to SearchComplete
-                    }
-                    else
-                    {
-                        search = searchTextBox.Text.ToLower();
-                        if (search.StartsWith("$"))
-                        {
-                            ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-                                search.Replace("$", "").Replace("&", "and").Replace(":", " -") + "'");
-                        }
-                        else
-                        {
-                            search = RemoveSpecialCharacters(searchTextBox.Text.ToLower());
-                            ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '%" +
-                                search.Replace(" ", "%' AND Name LIKE '%").Replace(" and ", "").Replace(" & ", "")
-                                    .Replace(":", "") + "%'");
-                        }
+                break;
 
-                        dataGridView1.Columns[0].SortMode = DataGridViewColumnSortMode.NotSortable;
-                        dataGridView1.Columns[1].SortMode = DataGridViewColumnSortMode.NotSortable;
-                        if (BackPressed)
-                        {
-                            SearchPause = true;
-                            T1.Start();
-                        }
-
-                        dataGridView1.ClearSelection();
-                        dataGridView1.DefaultCellStyle.SelectionBackColor = dataGridView1.DefaultCellStyle.BackColor;
-                        dataGridView1.DefaultCellStyle.SelectionForeColor = dataGridView1.DefaultCellStyle.ForeColor;
-
-                        // ENHANCED FALLBACK: If still no results, try improved cleaning and offer manual input
-                        if (dataGridView1.Rows.Count == 0 && searchTextBox.Text.Length > 2)
-                        {
-                            string improvedClean = ImprovedGameNameCleaning(searchTextBox.Text);
-
-                            // Try with improved cleaning
-                            ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                                string.Format("Name like '%" + improvedClean.Replace(" ", "%' AND Name LIKE '%") +
-                                              "%'");
-
-                            // If still no match, try individual significant words
-                            if (dataGridView1.Rows.Count == 0)
-                            {
-                                string[] words = improvedClean.Split([' '],
-                                    StringSplitOptions.RemoveEmptyEntries);
-                                if (words.Length > 1)
-                                {
-                                    var significantWords = words.Where(w => w.Length > 3)
-                                        .OrderByDescending(w => w.Length).Take(2);
-                                    foreach (string word in significantWords)
-                                    {
-                                        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                                            string.Format("Name like '%" + word + "%'");
-                                        if (dataGridView1.Rows.Count > 0)
-                                        {
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-
-                            // If STILL no match, just show a status message - NO POPUP
-                            if (dataGridView1.Rows.Count == 0)
-                            {
-                                Tit(
-                                    $"No matches found for '{searchTextBox.Text}'. Try a different name or use Manual Entry button.",
-                                    Color.Orange);
-                                btnManualEntry.Visible = true; // Make sure manual entry button is visible
-                                resinstruccZip.Visible = true;
-                                _resinstruccZipTimer.Stop();
-                                _resinstruccZipTimer.Start(); // Start 30 second timer
-                                mainPanel.Visible = false; // Hide main panel so dataGridView is visible
-                                searchTextBox.Enabled = true; // Enable search when AppID panel shows
-                                // Don't show any popup - user can click Manual Entry if they want
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Always go to SearchComplete to handle the results
-
-            SearchComplete:
-            // Only auto-select if this is the INITIAL folder search AND exactly 1 match
-            if (dataGridView1.Rows.Count == 1)
-            {
+            case SearchMatchQuality.ExactMatch:
+            case SearchMatchQuality.SingleMatch:
                 if (_isInitialFolderSearch)
                 {
-                    // This is THE initial folder search with 1 match - auto-select it
+                    // Auto-select on initial folder detection
                     SetSelectedGame(0);
                 }
                 else
                 {
-                    // User is manually searching - don't auto-select
                     Tit($"1 match: {dataGridView1[0, 0].Value} - Press Enter to select", Color.LightGreen);
                 }
-            }
-            else if (dataGridView1.Rows.Count > 1)
-            {
-                Tit($"{dataGridView1.Rows.Count} matches found", Color.LightSkyBlue);
-                // More than 1 match = no perfect match, show manual entry option
+                break;
+
+            case SearchMatchQuality.MultipleMatches:
+                Tit($"{result.MatchCount} matches found", Color.LightSkyBlue);
                 btnManualEntry.Visible = true;
                 resinstruccZip.Visible = true;
-                _resinstruccZipTimer.Stop();
-                _resinstruccZipTimer.Start(); // Start 30 second timer
-            }
-
-            // Clear the initial folder search flag - any further typing is manual
-            _isInitialFolderSearch = false;
-
-            // Fallback: If we still have no game selected but we do have search results, ensure buttons are visible
-            if (string.IsNullOrEmpty(CurrentAppId) && dataGridView1.Rows.Count > 1)
-            {
-                btnManualEntry.Visible = true;
-                resinstruccZip.Visible = true;
-                _resinstruccZipTimer.Stop();
-                _resinstruccZipTimer.Start(); // Start 30 second timer
-            }
-
-            _textChanged = false;
+                _resinstruccZipTimer.Start();
+                break;
         }
-        catch { }
-        // Remove duplicate auto-selection code that was causing issues
+
+        // Clear initial search flag after first search
+        _isInitialFolderSearch = false;
     }
 
     private void dataGridView1_RowHeaderMouseClick(object sender, DataGridViewCellMouseEventArgs e)
     {
-        if (VrlExists)
-        {
-            string propName = RemoveSpecialCharacters(dataGridView1[0, e.RowIndex].Value.ToString());
-            File.WriteAllText($"{Appdata}\\VRL\\ProperName.txt", propName);
-        }
-
         Tit("READY! Click skull folder above to perform crack!", Color.LightSkyBlue);
         CurrentAppId = dataGridView1[1, CurrentCell].Value.ToString();
         Appname = dataGridView1[0, CurrentCell].Value.ToString().Trim();
@@ -2279,11 +1995,6 @@ oLink3.Save";
         {
             throw new Exception($"Network error: {ex.Message}");
         }
-    }
-
-    public void SetSuppressStatusUpdates(bool suppress)
-    {
-        _suppressStatusUpdates = suppress;
     }
 
     private void pictureBox2_Click(object sender, EventArgs e)
@@ -3907,17 +3618,6 @@ oLink3.Save";
         }
     }
 
-    private void resinstruccZip_Click(object sender, EventArgs e)
-    {
-    }
-
-    private void label5_Click(object sender, EventArgs e)
-    {
-    }
-
-    /// <summary>
-    ///     Shows a styled confirmation dialog matching the app's dark theme
-    /// </summary>
     private bool ShowStyledConfirmation(string title, string message, string path, string yesText, string noText)
     {
         bool result = false;
@@ -4612,7 +4312,6 @@ oLink3.Save";
         return null; // Conversion failed, will use 1fichier link
     }
 
-    // Progress handler for upload tracking
     private class ProgressMessageHandler : HttpClientHandler
     {
         public event EventHandler<HttpProgressEventArgs> HttpSendProgress;
