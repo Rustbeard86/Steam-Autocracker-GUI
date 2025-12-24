@@ -1,4 +1,5 @@
 using APPID.Services.Interfaces;
+using APPID.Utilities.Network;
 using Newtonsoft.Json.Linq;
 
 namespace APPID.Services;
@@ -10,8 +11,8 @@ public sealed class DlcService : IDlcService
 {
     public async Task FetchDlcInfoAsync(string appId, string outputFolder, Action<string, Color>? statusCallback = null)
     {
-        using var httpClient = new HttpClient();
-        httpClient.Timeout = TimeSpan.FromSeconds(30);
+        // Use HttpClientFactory instead of creating new HttpClient directly
+        using var httpClient = HttpClientFactory.CreateClient(bypassCertificateValidation: true, timeout: TimeSpan.FromSeconds(30));
 
         try
         {

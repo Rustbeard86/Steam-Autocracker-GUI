@@ -68,29 +68,25 @@ public partial class SteamAppId : Form
         // === STEP 3: Initialize Batch Coordinator (After Batch Processing) ===
         _batchCoordinator = new BatchCoordinatorService(_batchProcessingService);
 
-        // === STEP 4: Configure Network Security ===
-        ServicePointManager.ServerCertificateValidationCallback =
-            (s, certificate, chain, sslPolicyErrors) => true;
-
-        // === STEP 5: Load Critical Settings (Before InitializeComponent) ===
+        // === STEP 4: Load Critical Settings (Before InitializeComponent) ===
         AutoCrackEnabled = _settings.AutoCrack;
         Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {AutoCrackEnabled} from Settings");
 
-        // === STEP 6: Initialize Data Table ===
+        // === STEP 5: Initialize Data Table ===
         DataTableGeneration = new DataTableGeneration();
         Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
 
-        // === STEP 7: Initialize Windows Forms Components ===
+        // === STEP 6: Initialize Windows Forms Components ===
         InitializeComponent();
 
-        // === STEP 8: Initialize Remaining Services (Require UI Components) ===
+        // === STEP 7: Initialize Remaining Services (Require UI Components) ===
         _statusService = new StatusUpdateService(this, StatusLabel, currDIrText);
         _gameSearch = new GameSearchService();
 
-        // === STEP 9: Initialize Timers (After UI components exist) ===
+        // === STEP 8: Initialize Timers (After UI components exist) ===
         InitializeTimers();
 
-        // === STEP 10: Apply UI State from Settings ===
+        // === STEP 9: Apply UI State from Settings ===
         // Auto-crack toggle
         if (AutoCrackEnabled)
         {
@@ -145,7 +141,7 @@ public partial class SteamAppId : Form
         ApplyRoundedCornersToButton(ZipToShare);
         ApplyRoundedCornersToButton(btnManualEntry);
 
-        // === STEP 11: Configure Window Behavior ===
+        // === STEP 10: Configure Window Behavior ===
         // Force taskbar refresh after form is fully loaded
         Shown += (s, e) =>
         {
@@ -162,7 +158,7 @@ public partial class SteamAppId : Form
             timer.Start();
         };
 
-        // === STEP 12: Initialize Batch Progress Indicator ===
+        // === STEP 11: Initialize Batch Progress Indicator ===
         InitializeBatchIndicator();
     }
 
@@ -491,11 +487,9 @@ public partial class SteamAppId : Form
         }
 
         Tit("Checking for Internet... ", Color.LightSkyBlue);
-        ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
         bool check = await Updater.CheckForNetAsync();
         if (check)
         {
-            ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
             Tit("Checking for updates", Color.LightSkyBlue);
             await Updater.CheckGitHubNewerVersion("atom0s", "Steamless");
             await Updater.UpdateGoldBergAsync();
