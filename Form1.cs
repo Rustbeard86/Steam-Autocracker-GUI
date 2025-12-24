@@ -7,7 +7,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using APPID.Dialogs;
 using APPID.Models;
@@ -15,13 +14,12 @@ using APPID.Properties;
 using APPID.Services;
 using APPID.Services.Interfaces;
 using APPID.Utilities;
+using APPID.Utilities.Http;
 using APPID.Utilities.Steam;
 using APPID.Utilities.Steam.SteamTools.SteamTools;
 using APPID.Utilities.UI;
 using Newtonsoft.Json.Linq;
 using BatchGameItem = APPID.Models.BatchGameItem;
-using BatchProcessingSettings = APPID.Models.BatchProcessingSettings;
-using BatchProgress = APPID.Models.BatchProgress;
 using Clipboard = System.Windows.Forms.Clipboard;
 using DataFormats = System.Windows.Forms.DataFormats;
 using DragDropEffects = System.Windows.Forms.DragDropEffects;
@@ -33,70 +31,6 @@ namespace APPID;
 
 public partial class SteamAppId : Form
 {
-    #region Class Vars
-    // === Windows API Constants ===
-    private const int DwmwaWindowCornerPreference = 33;
-    private const int DwmwcpRound = 2;
-    private const int WcaAccentPolicy = 19;
-    private const int AccentEnableAcrylicblurbehind = 4;
-    private const int WsMinimizebox = 0x20000;
-    private const int CsDblclks = 0x8;
-
-    // === Static Path Configuration ===
-    private static readonly string ExeDir =
-        Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
-
-    private static readonly string BinPath = Path.Combine(ExeDir, "_bin");
-    private static readonly string Appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-
-    // === Static Application State ===
-    internal static string CurrentAppId;
-    private static string Appname = "";
-    private static int CurrentCell;
-    private static bool SearchPause;
-    private static bool BackPressed;
-    private static Timer T1;
-
-    // === Core Services (Dependency Injection) ===
-    private readonly IBatchProcessingService _batchProcessingService;
-    private readonly IFileSystemService _fileSystem;
-    private readonly IGameDetectionService _gameDetection;
-    private readonly IManifestParsingService _manifestParsing;
-    private readonly ISettingsService _settings;
-    private readonly IStatusUpdateService _statusService;
-    private readonly IUrlConversionService _urlConversion;
-
-    // === Batch Processing Components ===
-    private BatchGameSelectionForm _activeBatchForm;
-    private Image _batchIconBase;
-    private PictureBox _batchIndicator;
-    private ToolTip _batchIndicatorTooltip;
-
-    // === Game Processing State ===
-    private string _gameDir;
-    private string _gameDirName;
-    private readonly IGameSearchService _gameSearch;
-    private bool _isFirstClickAfterSelection;
-    private bool _isInitialFolderSearch;
-
-    // === UI State & Controls ===
-    private Timer _label5Timer;
-    private Point _mouseDownPoint = Point.Empty;
-    private string _parentOfSelection;
-    private Timer _resinstruccZipTimer;
-
-    // === Share & Upload Components ===
-    private EnhancedShareWindow _shareWindow;
-    private bool _textChanged;
-    private CancellationTokenSource _zipCancellationTokenSource;
-    private bool AutoCrackEnabled = true;
-    private bool Cracking;
-    private DataTableGeneration DataTableGeneration;
-    private bool EnableLanMultiplayer;
-    private bool Goldy;
-    private bool Isnumeric;
-    #endregion
-
     public SteamAppId()
     {
         // === STEP 1: Initialize Core Services ===
@@ -105,6 +39,7 @@ public partial class SteamAppId : Form
         _gameDetection = new GameDetectionService(_fileSystem);
         _manifestParsing = new ManifestParsingService(_fileSystem);
         _urlConversion = new UrlConversionService();
+        _batchCoordinator = new BatchCoordinatorService(_batchProcessingService);
 
         // === STEP 2: Configure Network Security ===
         ServicePointManager.ServerCertificateValidationCallback =
@@ -218,9 +153,9 @@ public partial class SteamAppId : Form
         }
     }
 
-    public CrackDetails CurrentCrackDetails { get; private set; }
+    private CrackDetails CurrentCrackDetails { get; set; }
 
-    public List<CrackDetails> CrackHistory { get; } = [];
+    private List<CrackDetails> CrackHistory { get; } = [];
 
     public event EventHandler<string> CrackStatusChanged;
 
@@ -302,7 +237,7 @@ public partial class SteamAppId : Form
         try
         {
             int preference = DwmwcpRound;
-            DwmSetWindowAttribute(Handle, DwmwaWindowCornerPreference, ref preference, sizeof(int));
+            WindowEffects.ApplyRoundedCorners(Handle);
         }
         catch { }
 
@@ -465,93 +400,6 @@ public partial class SteamAppId : Form
                 Tit("READY! Click skull folder above to perform crack!", Color.HotPink);
             }
         }
-    }
-
-    private bool PerformImprovedFuzzySearch(string gameFolderName)
-    {
-        // Try original search method first
-        string search = RemoveSpecialCharacters(gameFolderName.ToLower()).Trim();
-        string splitSearch = SplitCamelCase(RemoveSpecialCharacters(gameFolderName)).Trim();
-
-        // Level 1: Exact match attempts
-        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-            string.Format("Name like '" + search.Replace("_", "").Trim() + "'");
-        if (dataGridView1.Rows.Count > 0)
-        {
-            return true;
-        }
-
-        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-            string.Format("Name like '" + splitSearch.Replace("_", "").Trim() + "'");
-        if (dataGridView1.Rows.Count > 0)
-        {
-            return true;
-        }
-
-        // Level 2: Remove common gaming terms
-        string improvedClean = ImprovedGameNameCleaning(gameFolderName);
-        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-            string.Format("Name like '%" + improvedClean.Replace(" ", "%' AND Name LIKE '%") + "%'");
-        if (dataGridView1.Rows.Count > 0)
-        {
-            return true;
-        }
-
-        // Level 3: Original fallback patterns
-        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-            splitSearch.ToLower().Replace("_", "").Replace("vr", "").Replace("vrs", "").Trim() + "'");
-        if (dataGridView1.Rows.Count > 0)
-        {
-            return true;
-        }
-
-        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '" +
-            splitSearch.ToLower().Replace("'", "").Replace("-", "").Replace(";", "").Trim() + "'");
-        if (dataGridView1.Rows.Count > 0)
-        {
-            return true;
-        }
-
-        // Level 4: Partial word matching
-        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter = string.Format("Name like '%" +
-            search.Replace("_", "").Replace(" ", "%' AND Name LIKE '%").Replace(" and ", " ").Replace(" the ", " ")
-                .Replace(":", "") + "%'");
-        if (dataGridView1.Rows.Count > 0)
-        {
-            return true;
-        }
-
-        // Level 5: Try individual words for partial matches
-        string[] words = improvedClean.Split([' '], StringSplitOptions.RemoveEmptyEntries);
-        if (words.Length > 1)
-        {
-            // Try matching with the longest word first
-            var sortedWords = words.OrderByDescending(w => w.Length).Where(w => w.Length > 3).Take(3);
-            foreach (string word in sortedWords)
-            {
-                ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-                    string.Format("Name like '%" + word + "%'");
-                if (dataGridView1.Rows.Count > 0)
-                {
-                    return true;
-                }
-            }
-        }
-
-        // Level 6: Last resort - refresh data and try again
-        DataTableGeneration = new DataTableGeneration();
-        Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
-        dataGridView1.DataSource = DataTableGeneration.DataTableToGenerate;
-
-        ((DataTable)dataGridView1.DataSource).DefaultView.RowFilter =
-            string.Format("Name like '%" + improvedClean.Replace(" ", "%' AND Name LIKE '%") + "%'");
-        if (dataGridView1.Rows.Count > 0)
-        {
-            return true;
-        }
-
-        // No good match found
-        return false;
     }
 
     private async void SteamAppId_Load(object sender, EventArgs e)
@@ -980,11 +828,6 @@ public partial class SteamAppId : Form
         T1.Stop();
     }
 
-    private async Task PutTaskDelay()
-    {
-        await Task.Delay(1000);
-    }
-
     private async void searchTextBox_TextChanged(object sender, EventArgs e)
     {
         if (SearchPause && searchTextBox.Text.Length > 0)
@@ -1201,37 +1044,6 @@ public partial class SteamAppId : Form
         // Delegate to cracking service for file comparison
         var crackingService = new CrackingService(BinPath);
         return crackingService.AreFilesIdentical(file1, file2);
-    }
-
-    private void RestoreAllBakFiles(string directory)
-    {
-        try
-        {
-            var bakFiles = Directory.GetFiles(directory, "*.bak", SearchOption.AllDirectories);
-            foreach (var bakFile in bakFiles)
-            {
-                var originalFile = bakFile.Substring(0, bakFile.Length - 4); // Remove .bak
-                try
-                {
-                    if (File.Exists(originalFile))
-                    {
-                        File.Delete(originalFile);
-                    }
-
-                    File.Move(bakFile, originalFile);
-                    Debug.WriteLine(
-                        $"[CRACK] Restored {Path.GetFileName(bakFile)} -> {Path.GetFileName(originalFile)}");
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[CRACK] Failed to restore {bakFile}: {ex.Message}");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[CRACK] Error in RestoreAllBakFiles: {ex.Message}");
-        }
     }
 
     private async Task<bool> CrackCoreAsync()
@@ -4134,248 +3946,83 @@ oLink3.Save";
         bool usePassword,
         BatchGameSelectionForm batchForm)
     {
-        var settings = new BatchProcessingSettings
-        {
-            CompressionFormat = compressionFormat,
-            CompressionLevel = compressionLevel,
-            UsePassword = usePassword,
-            UseGoldberg = Goldy,
-            ConvertToPyDrive = !Settings.Default.SkipPyDriveConversion,
-            MaxConcurrentUploads = 3,
-            MaxRetries = 3,
-            RetryDelayMs = 2000
-        };
-
-        var progress = new Progress<BatchProgress>(p =>
-        {
-            batchForm.UpdateTitleProgress(p.OverallPercentage);
-            batchForm.UpdateProgressWithEta(p.OverallPercentage, p.EstimatedSecondsRemaining);
-            UpdateBatchIndicator(p.OverallPercentage);
-
-            if (!string.IsNullOrEmpty(p.GameName))
-            {
-                Color color = p.Phase switch
-                {
-                    "Cracking" => Color.Yellow,
-                    "Compressing" => Color.Cyan,
-                    "Uploading" => Color.Magenta,
-                    "Converting" => Color.Orange,
-                    _ => Color.White
-                };
-                batchForm.UpdateStatus(p.GameName, p.Message, color);
-            }
-        });
-
-        batchForm.SetProcessingMode(true);
-
-        var result = await _batchProcessingService.ProcessBatchGamesAsync(games, settings, progress);
-
-        batchForm.SetProcessingMode(false);
-        batchForm.ResetTitle("Complete ✓");
-        UpdateBatchIndicator(100);
-        HideBatchIndicator();
-
-        // Show summary
-        Tit($"Batch complete! {result.GetSummary()}", Color.LightGreen);
-
-        // Show copy all button with upload URLs (enhanced cs.rin.ru format with manifest info)
-        if (result.UploadResults.Count > 0)
-        {
-            var linksWithManifestInfo = new List<string>();
-
-            foreach (var upload in result.UploadResults)
-            {
-                // Find the corresponding BatchGameItem to get manifest info
-                var gameItem = games.FirstOrDefault(g => g.Name == upload.GameName);
-
-                if (gameItem != null && !string.IsNullOrEmpty(gameItem.BuildId))
-                {
-                    // Format version date from Unix timestamp
-                    string versionDate = "Unknown";
-                    if (gameItem.LastUpdated > 0)
-                    {
-                        var dt = DateTimeOffset.FromUnixTimeSeconds(gameItem.LastUpdated).UtcDateTime;
-                        versionDate = $"{dt:MMM dd, yyyy - HH:mm:ss} UTC [Build {gameItem.BuildId}]";
-                    }
-
-                    // Build depot list
-                    var depotLines = new List<string>();
-                    foreach (var depot in gameItem.InstalledDepots)
-                    {
-                        depotLines.Add($"{depot.Key} [Manifest {depot.Value.manifest}]");
-                    }
-
-                    string depotsText = depotLines.Count > 0 ? string.Join("\n", depotLines) : "No depot info";
-
-                    // Full phpBB format for cs.rin.ru
-                    string formattedLink =
-                        $"[url={upload.FinalUrl}][color=white][b]{gameItem.Name} [{gameItem.Platform}] [Branch: {gameItem.Branch}] (Clean Steam Files)[/b][/color][/url]\n" +
-                        $"[size=85][color=white][b]Version:[/b] [i]{versionDate}[/i][/color][/size]\n\n" +
-                        $"[spoiler=\"[color=white]Depots & Manifests[/color]\"][code=text]{depotsText}[/code][/spoiler]" +
-                        $"[color=white][b]Uploaded version:[/b] [i]{versionDate}[/i][/color]";
-
-                    linksWithManifestInfo.Add(formattedLink);
-                }
-                else
-                {
-                    // Fallback to simple format if no manifest info
-                    linksWithManifestInfo.Add($"[url={upload.FinalUrl}]{upload.GameName}[/url]");
-                }
-            }
-
-            string allLinks = string.Join("\n\n", linksWithManifestInfo);
-            batchForm.ShowCopyAllButton(allLinks);
-        }
-
-        // Show failures if any
-        if (result.HasFailures && result.Failures.Count > 0)
-        {
-            var failureMessages = string.Join("\n", result.Failures.Take(10).Select(f =>
-                $"- {f.gameName}: {f.reason}"));
-            if (result.Failures.Count > 10)
-            {
-                failureMessages += $"\n... and {result.Failures.Count - 10} more";
-            }
-
-            MessageBox.Show($"Some operations failed:\n\n{failureMessages}",
-                "Batch Processing Failures", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
+        await _batchCoordinator.ProcessBatchGamesAsync(
+            games,
+            compressionFormat,
+            compressionLevel,
+            usePassword,
+            Goldy,
+            !Settings.Default.SkipPyDriveConversion,
+            batchForm,
+            Tit,
+            UpdateBatchIndicator
+        );
     }
 
-    private async Task<string> ConvertOneFichierToPydrive(string oneFichierUrl, long fileSizeBytes = 0,
-        Action<string> statusUpdate = null)
-    {
-        if (oneFichierUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
-        {
-            oneFichierUrl = "https://" + oneFichierUrl.Substring(7);
-        }
+    #region Class Vars
 
-        // Calculate wait time based on file size (12 seconds per GB, capped at 30 hours)
-        int initialWaitSeconds = 30;
-        if (fileSizeBytes > 5L * 1024 * 1024 * 1024) // 5GB+
-        {
-            long sizeInGb = fileSizeBytes / (1024 * 1024 * 1024);
-            initialWaitSeconds = (int)(sizeInGb * 12);
-            initialWaitSeconds = Math.Min(initialWaitSeconds, 108000); // Cap at 30 hours
-            initialWaitSeconds = Math.Max(initialWaitSeconds, 30);
-        }
+    // === Windows API Constants ===
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwcpRound = 2;
+    private const int WcaAccentPolicy = 19;
+    private const int AccentEnableAcrylicblurbehind = 4;
+    private const int WsMinimizebox = 0x20000;
+    private const int CsDblclks = 0x8;
 
-        // Calculate retries: enough to cover estimated wait time plus buffer
-        int maxRetries = Math.Max(10, (initialWaitSeconds / 30) + 5);
-        int retryDelay = 30000;
+    // === Static Path Configuration ===
+    private static readonly string ExeDir =
+        Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
 
-        double sizeGb = fileSizeBytes / (1024.0 * 1024.0 * 1024.0);
-        Console.WriteLine($"[CONVERT] Starting conversion for {oneFichierUrl}");
-        Console.WriteLine(
-            $"[CONVERT] File size: {sizeGb:F2} GB, Initial wait: {initialWaitSeconds}s, Max retries: {maxRetries}");
+    private static readonly string BinPath = Path.Combine(ExeDir, "_bin");
+    private static readonly string Appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
-        {
-            try
-            {
-                int remainingSeconds = Math.Max(0, initialWaitSeconds - ((attempt - 1) * 30));
-                string timeStr = remainingSeconds > 60 ? $"~{remainingSeconds / 60}m" : $"~{remainingSeconds}s";
-                statusUpdate?.Invoke($"Converting {attempt}/{maxRetries} ({timeStr})");
+    // === Static Application State ===
+    internal static string CurrentAppId;
+    private static string Appname = "";
+    private static int CurrentCell;
+    private static bool SearchPause;
+    private static bool BackPressed;
+    private static Timer T1;
 
-                Console.WriteLine($"[CONVERT] Attempt {attempt}/{maxRetries} - estimated {timeStr} remaining");
+    // === Core Services (Dependency Injection) ===
+    private readonly IBatchProcessingService _batchProcessingService;
+    private readonly IFileSystemService _fileSystem;
+    private readonly IGameDetectionService _gameDetection;
+    private readonly IManifestParsingService _manifestParsing;
+    private readonly ISettingsService _settings;
+    private readonly IStatusUpdateService _statusService;
+    private readonly IUrlConversionService _urlConversion;
+    private readonly IBatchCoordinatorService _batchCoordinator;
 
-                using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(30); // Match EnhancedShareWindow
+    // === Batch Processing Components ===
+    private BatchGameSelectionForm _activeBatchForm;
+    private Image _batchIconBase;
+    private PictureBox _batchIndicator;
+    private ToolTip _batchIndicatorTooltip;
 
-                var requestBody = new { link = oneFichierUrl };
-                var json = JsonSerializer.Serialize(requestBody);
-                var content = new StringContent(json, Encoding.UTF8, "application/json");
+    // === Game Processing State ===
+    private string _gameDir;
+    private string _gameDirName;
+    private readonly IGameSearchService _gameSearch;
+    private bool _isFirstClickAfterSelection;
+    private bool _isInitialFolderSearch;
 
-                var response = await client
-                    .PostAsync("https://pydrive.harryeffingpotter.com/convert-1fichier", content)
-                    .ConfigureAwait(false);
+    // === UI State & Controls ===
+    private Timer _label5Timer;
+    private Point _mouseDownPoint = Point.Empty;
+    private string _parentOfSelection;
+    private Timer _resinstruccZipTimer;
 
-                Console.WriteLine($"[CONVERT] Response status: {(int)response.StatusCode} {response.StatusCode}");
+    // === Share & Upload Components ===
+    private EnhancedShareWindow _shareWindow;
+    private bool _textChanged;
+    private CancellationTokenSource _zipCancellationTokenSource;
+    private bool AutoCrackEnabled = true;
+    private bool Cracking;
+    private DataTableGeneration DataTableGeneration;
+    private bool EnableLanMultiplayer;
+    private bool Goldy;
+    private bool Isnumeric;
 
-                if (response.IsSuccessStatusCode)
-                {
-                    var responseJson = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    Console.WriteLine($"[CONVERT] Response body: {responseJson}");
-
-                    // API returns {"link": "..."} - same as EnhancedShareWindow
-                    using var doc = JsonDocument.Parse(responseJson);
-                    if (doc.RootElement.TryGetProperty("link", out var linkProp))
-                    {
-                        string pydriveUrl = linkProp.GetString();
-                        Console.WriteLine($"[CONVERT] SUCCESS! PyDrive URL: {pydriveUrl}");
-                        return pydriveUrl;
-                    }
-
-                    Console.WriteLine("[CONVERT] No 'link' in response, will retry...");
-                }
-                else
-                {
-                    var errorBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    Console.WriteLine($"[CONVERT] Error response: {errorBody}");
-
-                    // Check if it's a "still processing" error - keep retrying
-                    if (errorBody.Contains("LINK_DOWN") || errorBody.Contains("wait"))
-                    {
-                        Console.WriteLine("[CONVERT] 1fichier still scanning file, waiting...");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[CONVERT] Exception on attempt {attempt}: {ex.Message}");
-            }
-
-            if (attempt < maxRetries)
-            {
-                Console.WriteLine($"[CONVERT] Waiting {retryDelay / 1000}s before retry...");
-                await Task.Delay(retryDelay).ConfigureAwait(false);
-            }
-        }
-
-        Console.WriteLine($"[CONVERT] FAILED after {maxRetries} attempts, will use 1fichier link");
-        return null; // Conversion failed, will use 1fichier link
-    }
-
-    private class ProgressMessageHandler : HttpClientHandler
-    {
-        public event EventHandler<HttpProgressEventArgs> HttpSendProgress;
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
-            CancellationToken cancellationToken)
-        {
-            // For now, just send without progress tracking
-            // Full implementation would require tracking the request stream
-            var response = await base.SendAsync(request, cancellationToken);
-
-            // Simulate progress complete
-            HttpSendProgress?.Invoke(this, new HttpProgressEventArgs(0, 100, 100));
-
-            return response;
-        }
-    }
-
-    public class HttpProgressEventArgs(int progressPercentage, long bytesTransferred, long? totalBytes)
-        : EventArgs
-    {
-        public long BytesTransferred { get; } = bytesTransferred;
-        public long? TotalBytes { get; } = totalBytes;
-        public int ProgressPercentage { get; } = progressPercentage;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct WindowCompositionAttribData
-    {
-        public int Attribute;
-        public IntPtr Data;
-        public int SizeOfData;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct AccentPolicy
-    {
-        public int AccentState;
-        public int AccentFlags;
-        public int GradientColor;
-        public int AnimationId;
-    }
+    #endregion
 }
