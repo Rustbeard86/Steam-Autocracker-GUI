@@ -1,4 +1,5 @@
 using APPID.Services.Interfaces;
+using APPID.Utilities.Steam;
 
 namespace APPID.Services;
 
@@ -46,8 +47,8 @@ public sealed class GameFolderService(IFileSystemService fileSystem, IGameDetect
 
         string folderName = Path.GetFileName(selectedPath);
 
-        // Check if current folder name matches a subfolder pattern
-        if (IsSubfolder(folderName))
+        // Use centralized subfolder detection
+        if (SteamFolderStructureHelper.IsGameSubfolder(folderName))
         {
             var parent = Directory.GetParent(selectedPath);
             if (parent != null && _gameDetection.IsGameFolder(parent.FullName))
@@ -83,10 +84,8 @@ public sealed class GameFolderService(IFileSystemService fileSystem, IGameDetect
             return false;
         }
 
-        // Case-insensitive check against known patterns
-        return SubfolderPatterns.Any(pattern =>
-            folderName.EndsWith(pattern, StringComparison.OrdinalIgnoreCase) ||
-            folderName.Equals(pattern, StringComparison.OrdinalIgnoreCase));
+        // Use centralized helper for subfolder detection
+        return SteamFolderStructureHelper.IsGameSubfolder(folderName);
     }
 
     public string? GetParentFolder(string folderPath)

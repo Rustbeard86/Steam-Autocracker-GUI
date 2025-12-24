@@ -48,7 +48,8 @@ public class BatchGameSelectionForm : Form
         // Initialize services - use provided or create defaults
         var fileSystem = new FileSystemService();
         var manifestParsing = new ManifestParsingService(fileSystem);
-        _appIdDetection = appIdDetection ?? new AppIdDetectionService(fileSystem, manifestParsing);
+        var cache = new SteamCacheManager();
+        _appIdDetection = appIdDetection ?? new AppIdDetectionService(fileSystem, manifestParsing, cache);
         _gameData = gameData ?? new BatchGameDataService(fileSystem);
         _formatting = formatting ?? new FormattingService();
 

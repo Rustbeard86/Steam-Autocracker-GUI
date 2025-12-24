@@ -57,7 +57,8 @@ public class DataTableGeneration
                 {
                     foreach (var item in cachedGames.Apps)
                     {
-                        if (item.Name.ToLower().Contains("demo") || item.Name.ToLower().Contains("soundtrack"))
+                        // Use centralized keyword filtering from SteamApiConstants
+                        if (SteamApiConstants.ContainsExcludedKeyword(item.Name))
                         {
                             continue;
                         }
@@ -74,7 +75,7 @@ public class DataTableGeneration
                         try
                         {
                             using var client = HttpClientFactory.CreateClient(true);
-                            client.Timeout = TimeSpan.FromSeconds(60);
+                            client.Timeout = TimeSpan.FromSeconds(SteamApiConstants.LongOperationTimeoutSeconds);
                             string freshContent =
                                 await client.GetStringAsync(
                                     "https://pydrive.harryeffingpotter.com/sacgui/steam-applist");
@@ -100,7 +101,7 @@ public class DataTableGeneration
         try
         {
             using var httpClient = HttpClientFactory.CreateClient(true);
-            httpClient.Timeout = TimeSpan.FromSeconds(60);
+            httpClient.Timeout = TimeSpan.FromSeconds(SteamApiConstants.LongOperationTimeoutSeconds);
             string content =
                 await httpClient.GetStringAsync("https://pydrive.harryeffingpotter.com/sacgui/steam-applist");
 
@@ -110,7 +111,8 @@ public class DataTableGeneration
             SteamGames steamGames = JsonConvert.DeserializeObject<SteamGames>(content);
             foreach (var item in steamGames.Apps)
             {
-                if (item.Name.ToLower().Contains("demo") || item.Name.ToLower().Contains("soundtrack"))
+                // Use centralized keyword filtering from SteamApiConstants
+                if (SteamApiConstants.ContainsExcludedKeyword(item.Name))
                 {
                     continue;
                 }

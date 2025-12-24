@@ -39,6 +39,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Dialogs\BatchGameSelectionForm.resx" />
     <EmbeddedResource Include="Dialogs\CompressionSettingsForm.resx">
       <DependentUpon>CompressionSettingsForm.cs</DependentUpon>
     </EmbeddedResource>

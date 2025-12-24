@@ -6,7 +6,7 @@ namespace APPID.Services;
 
 /// <summary>
 ///     Implementation of manifest parsing service for Steam ACF files.
-///     Delegates to SteamManifestParser for actual parsing logic.
+///     Uses centralized AcfFileParser for parsing logic.
 /// </summary>
 public sealed class ManifestParsingService(IFileSystemService fileSystem) : IManifestParsingService
 {
@@ -22,7 +22,9 @@ public sealed class ManifestParsingService(IFileSystemService fileSystem) : IMan
             }
 
             var content = _fileSystem.ReadAllTextAsync(manifestPath).GetAwaiter().GetResult();
-            var manifest = ParseAcfFile(content);
+            
+            // Use centralized ACF parser
+            var manifest = AcfFileParser.ParseFlat(content);
 
             if (!manifest.ContainsKey("appid") || !manifest.ContainsKey("installdir"))
             {
@@ -66,116 +68,255 @@ public sealed class ManifestParsingService(IFileSystemService fileSystem) : IMan
 
     public List<string> DetectSteamLibraryFolders()
     {
-        var paths = new List<string>();
-
-        // Default Steam installation paths
-        var defaultPaths = new[]
-        {
-            @"C:\Program Files (x86)\Steam", @"C:\Program Files\Steam",
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"),
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Steam")
-        };
-
-        // Add default paths that exist
-        foreach (var path in defaultPaths)
-        {
-            if (_fileSystem.DirectoryExists(path) && !paths.Contains(path))
-            {
-                paths.Add(path);
-            }
-        }
-
-        // Try to find additional library folders from Steam's libraryfolders.vdf
-        foreach (var steamPath in paths.ToList())
-        {
-            var vdfPath = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
-            if (_fileSystem.FileExists(vdfPath))
-            {
-                try
-                {
-                    var vdfContent = _fileSystem.ReadAllTextAsync(vdfPath).GetAwaiter().GetResult();
-                    // Look for path entries in the VDF file
-                    var pathMatches = Regex.Matches(vdfContent, @"""path""\s+""([^""]*)""");
-
-                    foreach (Match match in pathMatches)
-                    {
-                        if (match.Groups.Count > 1)
-                        {
-                            string libPath = match.Groups[1].Value.Replace(@"\\", @"\");
-                            if (_fileSystem.DirectoryExists(libPath) && !paths.Contains(libPath))
-                            {
-                                paths.Add(libPath);
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    LogHelper.LogError($"Failed to parse libraryfolders.vdf: {vdfPath}", ex);
-                }
-            }
-        }
-
-        return paths;
+        // Use centralized folder structure helper
+        return SteamFolderStructureHelper.FindAllLibraries();
     }
 
     public (string appId, string gameName, long sizeOnDisk)? GetAppIdFromManifest(string droppedPath)
     {
-        // Delegate to static SteamManifestParser for now
-        return SteamManifestParser.GetAppIdFromManifest(droppedPath);
+        // Check if path is in Steam library
+        if (!SteamFolderStructureHelper.IsInSteamLibrary(droppedPath))
+        {
+            Debug.WriteLine("[MANIFEST] Path doesn't contain 'steamapps', skipping manifest check");
+            return null;
+        }
+
+        // Get install directory name
+        string gameFolderName = SteamFolderStructureHelper.GetInstallDirectoryName(droppedPath);
+        Debug.WriteLine($"[MANIFEST] Checking for game folder: {gameFolderName}");
+
+        // Find the steamapps directory
+        string? steamappsPath = SteamFolderStructureHelper.FindSteamappsDirectory(droppedPath);
+        if (string.IsNullOrEmpty(steamappsPath))
+        {
+            Debug.WriteLine("[MANIFEST] Could not find steamapps directory");
+            return null;
+        }
+
+        Debug.WriteLine($"[MANIFEST] Steamapps directory: {steamappsPath}");
+
+        // Look for all appmanifest_*.acf files
+        var acfFiles = Directory.GetFiles(steamappsPath, "appmanifest_*.acf");
+        Debug.WriteLine($"[MANIFEST] Found {acfFiles.Length} ACF files");
+
+        foreach (var acfFile in acfFiles)
+        {
+            try
+            {
+                string content = File.ReadAllText(acfFile);
+                var manifest = AcfFileParser.ParseFlat(content);
+
+                // Check if this manifest's installdir matches our game folder
+                if (manifest.ContainsKey("installdir") &&
+                    string.Equals(manifest["installdir"], gameFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    string appId = manifest.GetValueOrDefault("appid");
+                    string gameName = manifest.GetValueOrDefault("name", gameFolderName);
+                    long sizeOnDisk = 0;
+
+                    if (manifest.TryGetValue("SizeOnDisk", out string? value2))
+                    {
+                        long.TryParse(value2, out sizeOnDisk);
+                    }
+
+                    Debug.WriteLine("[MANIFEST] ✅ Found match!");
+                    Debug.WriteLine($"[MANIFEST] AppID: {appId}");
+                    Debug.WriteLine($"[MANIFEST] Name: {gameName}");
+                    Debug.WriteLine($"[MANIFEST] Size: {sizeOnDisk / (1024 * 1024)} MB");
+
+                    return (appId, gameName, sizeOnDisk);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MANIFEST] Error parsing {acfFile}: {ex.Message}");
+            }
+        }
+
+        Debug.WriteLine("[MANIFEST] No matching manifest found");
+        return null;
     }
 
     public (string gameName, string appId, long sizeOnDisk, string buildId, long lastUpdated,
         Dictionary<string, (string manifest, long size)> depots)? GetFullManifestInfo(string gameInstallPath)
     {
-        // Delegate to static SteamManifestParser for now
-        return SteamManifestParser.GetFullManifestInfo(gameInstallPath);
+        var basicInfo = GetAppIdFromManifest(gameInstallPath);
+        if (!basicInfo.HasValue)
+        {
+            return null;
+        }
+
+        var (appId, gameName, sizeOnDisk) = basicInfo.Value;
+
+        // Find the manifest file again to get extended info
+        string? steamappsPath = SteamFolderStructureHelper.FindSteamappsDirectory(gameInstallPath);
+        if (string.IsNullOrEmpty(steamappsPath))
+        {
+            return null;
+        }
+
+        string gameFolderName = SteamFolderStructureHelper.GetInstallDirectoryName(gameInstallPath);
+        var acfFiles = Directory.GetFiles(steamappsPath, "appmanifest_*.acf");
+
+        foreach (var acfFile in acfFiles)
+        {
+            try
+            {
+                string content = File.ReadAllText(acfFile);
+                var manifest = AcfFileParser.ParseFlat(content);
+
+                if (manifest.TryGetValue("installdir", out var installDir) &&
+                    string.Equals(installDir, gameFolderName, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Extract build ID and timestamp
+                    string buildId = manifest.GetValueOrDefault("buildid", "0");
+                    long lastUpdated = 0;
+                    if (manifest.TryGetValue("LastUpdated", out var lastUpdatedStr))
+                    {
+                        long.TryParse(lastUpdatedStr, out lastUpdated);
+                    }
+
+                    // Parse installed depots using centralized parser
+                    var depots = AcfFileParser.ParseInstalledDepots(content);
+
+                    return (gameName, appId, sizeOnDisk, buildId, lastUpdated, depots);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MANIFEST] Error parsing full info from {acfFile}: {ex.Message}");
+            }
+        }
+
+        return null;
     }
 
     public List<(string appId, string gameName, string installPath)> FindAllInstalledGames()
     {
-        // Delegate to static SteamManifestParser for now
-        return SteamManifestParser.FindAllInstalledGames();
+        var games = new List<(string, string, string)>();
+        var steamPaths = SteamFolderStructureHelper.FindAllLibraries();
+
+        foreach (var steamPath in steamPaths)
+        {
+            var steamappsPath = Path.Combine(steamPath, "steamapps");
+            if (!Directory.Exists(steamappsPath))
+            {
+                continue;
+            }
+
+            var acfFiles = Directory.GetFiles(steamappsPath, "appmanifest_*.acf");
+
+            foreach (var acfFile in acfFiles)
+            {
+                try
+                {
+                    string content = File.ReadAllText(acfFile);
+                    var manifest = AcfFileParser.ParseFlat(content);
+
+                    if (manifest.ContainsKey("appid") && manifest.ContainsKey("name") &&
+                        manifest.TryGetValue("installdir", out string? value))
+                    {
+                        string installPath = Path.Combine(steamappsPath, "common", value);
+                        if (Directory.Exists(installPath))
+                        {
+                            games.Add((manifest["appid"], manifest["name"], installPath));
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        return games;
     }
 
     public string? GetAppIdFromManifestFile(string acfFilePath)
     {
-        // Delegate to static SteamManifestParser for now
-        return SteamManifestParser.GetAppIdFromManifestFile(acfFilePath);
+        try
+        {
+            string content = File.ReadAllText(acfFilePath);
+            var manifest = AcfFileParser.ParseFlat(content);
+            return manifest.GetValueOrDefault("appid");
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     public bool VerifyGameSize(string gamePath, long manifestSize, long toleranceBytes = 10485760)
     {
-        // Delegate to static SteamManifestParser for now
-        return SteamManifestParser.VerifyGameSize(gamePath, manifestSize, toleranceBytes);
+        long actualSize = GetDirectorySize(gamePath);
+        long difference = Math.Abs(actualSize - manifestSize);
+
+        Debug.WriteLine("[MANIFEST] Size verification:");
+        Debug.WriteLine($"[MANIFEST] Manifest size: {manifestSize / (1024 * 1024)} MB");
+        Debug.WriteLine($"[MANIFEST] Actual size: {actualSize / (1024 * 1024)} MB");
+        Debug.WriteLine($"[MANIFEST] Difference: {difference / (1024 * 1024)} MB");
+
+        return difference <= toleranceBytes;
     }
 
     public string DetectGamePlatform(string gamePath)
     {
-        // Delegate to static SteamManifestParser for now
-        return SteamManifestParser.DetectGamePlatform(gamePath);
-    }
-
-    private static Dictionary<string, string> ParseAcfFile(string content)
-    {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        // Regular expressions for parsing VDF/ACF format
-        var keyValuePattern = @"""(\w+)""\s+""([^""]*)""";
-        var matches = Regex.Matches(content, keyValuePattern);
-
-        foreach (Match match in matches)
+        try
         {
-            if (match.Groups.Count == 3)
+            // Look for exe files
+            var exeFiles = Directory.GetFiles(gamePath, "*.exe", SearchOption.AllDirectories);
+            foreach (var exeFile in exeFiles)
             {
-                string key = match.Groups[1].Value;
-                string value = match.Groups[2].Value;
+                try
+                {
+                    // Read PE header to determine architecture
+                    using var fs = new FileStream(exeFile, FileMode.Open, FileAccess.Read);
+                    using var br = new BinaryReader(fs);
 
-                // Only store the first occurrence of each key (ignores nested structures)
-                result.TryAdd(key, value);
+                    // Check for MZ header
+                    if (br.ReadUInt16() != 0x5A4D)
+                    {
+                        continue; // "MZ"
+                    }
+
+                    fs.Seek(0x3C, SeekOrigin.Begin);
+                    int peOffset = br.ReadInt32();
+                    fs.Seek(peOffset, SeekOrigin.Begin);
+
+                    // Check PE signature
+                    if (br.ReadUInt32() != 0x00004550)
+                    {
+                        continue; // "PE\0\0"
+                    }
+
+                    // Read machine type
+                    ushort machineType = br.ReadUInt16();
+                    if (machineType == 0x8664)
+                    {
+                        return "Win64"; // AMD64
+                    }
+
+                    if (machineType == 0x014C)
+                    {
+                        return "Win32"; // i386
+                    }
+                }
+                catch { }
             }
         }
+        catch { }
 
-        return result;
+        return "Win64"; // Default to Win64
+    }
+
+    private static long GetDirectorySize(string path)
+    {
+        try
+        {
+            var dir = new DirectoryInfo(path);
+            return dir.EnumerateFiles("*", SearchOption.AllDirectories).Sum(file => file.Length);
+        }
+        catch
+        {
+            return 0;
+        }
     }
 }

@@ -1,5 +1,4 @@
 using System.Data;
-using System.Text.RegularExpressions;
 using APPID.Models;
 using APPID.Services.Interfaces;
 using APPID.Utilities.Network;
@@ -10,15 +9,23 @@ namespace APPID.Services;
 
 /// <summary>
 ///     Implementation of AppID detection service for Steam games.
-///     Provides multiple detection methods with fallbacks.
+///     Provides multiple detection methods with fallbacks and caching.
 /// </summary>
-public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManifestParsingService manifestParsing)
-    : IAppIdDetectionService
+public sealed class AppIdDetectionService : IAppIdDetectionService
 {
-    private readonly IFileSystemService _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+    private readonly ISteamCacheManager _cache;
+    private readonly IFileSystemService _fileSystem;
+    private readonly IManifestParsingService _manifestParsing;
 
-    private readonly IManifestParsingService _manifestParsing =
-        manifestParsing ?? throw new ArgumentNullException(nameof(manifestParsing));
+    public AppIdDetectionService(
+        IFileSystemService fileSystem,
+        IManifestParsingService manifestParsing,
+        ISteamCacheManager cache)
+    {
+        _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+        _manifestParsing = manifestParsing ?? throw new ArgumentNullException(nameof(manifestParsing));
+        _cache = cache ?? throw new ArgumentNullException(nameof(cache));
+    }
 
     public string? DetectAppId(string gamePath)
     {
@@ -28,10 +35,10 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
             gamePath = gamePath.TrimEnd('\\', '/');
 
             // Try manifest first - walk up directory tree to find steamapps folder
-            string? steamappsPath = FindSteamappsPath(gamePath);
+            string? steamappsPath = SteamFolderStructureHelper.FindSteamappsDirectory(gamePath);
             if (steamappsPath != null)
             {
-                string gameFolderName = Path.GetFileName(gamePath);
+                string gameFolderName = SteamFolderStructureHelper.GetInstallDirectoryName(gamePath);
                 var manifestFiles = _manifestParsing.FindManifestFiles(steamappsPath);
 
                 foreach (var manifestPath in manifestFiles)
@@ -70,7 +77,7 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
             // Try to find appmanifest directly by scanning steamapps folder (backup method)
             if (steamappsPath != null)
             {
-                string gameFolderName = Path.GetFileName(gamePath);
+                string gameFolderName = SteamFolderStructureHelper.GetInstallDirectoryName(gamePath);
                 var acfFiles = _fileSystem.GetFiles(steamappsPath, "appmanifest_*.acf", SearchOption.TopDirectoryOnly);
                 foreach (var acf in acfFiles)
                 {
@@ -80,11 +87,11 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
                         // Look for installdir that matches (case insensitive, partial match)
                         if (content.IndexOf($"\"{gameFolderName}\"", StringComparison.OrdinalIgnoreCase) >= 0)
                         {
-                            // Extract appid from this file
-                            var match = Regex.Match(content, @"""appid""\s+""(\d+)""");
-                            if (match.Success)
+                            // Extract appid from this file using centralized parser
+                            var manifest = AcfFileParser.ParseFlat(content);
+                            if (manifest.TryGetValue("appid", out var appId))
                             {
-                                return match.Groups[1].Value;
+                                return appId;
                             }
                         }
                     }
@@ -116,6 +123,15 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
     {
         try
         {
+            // Check cache first
+            string cacheKey = $"store_search_{gameName.ToLowerInvariant()}";
+            var cachedResult = _cache.Get<string>(cacheKey);
+            if (cachedResult != null)
+            {
+                Debug.WriteLine($"[STEAM API] Cache hit for '{gameName}'");
+                return cachedResult;
+            }
+
             // Clean up the search term
             string searchTerm = gameName
                 .Replace("_", " ")
@@ -123,9 +139,8 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
                 .Replace(".", " ")
                 .Trim();
 
-            // URL encode the search term
-            string encodedTerm = Uri.EscapeDataString(searchTerm);
-            string url = $"https://store.steampowered.com/api/storesearch?term={encodedTerm}&cc=us&l=en-us";
+            // Build URL using constants
+            string url = SteamApiConstants.BuildStoreSearchUrl(searchTerm);
 
             // Use HttpClient instead of obsolete WebClient
             using var client = HttpClientFactory.CreateClient();
@@ -144,104 +159,42 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
                 return null;
             }
 
-            // Filter out unwanted results (soundtracks, DLC, demos, etc.)
+            // Filter out unwanted results using centralized constant
             var filteredItems = response.Items.Where(item =>
             {
-                if (item.Type != "app")
+                if (item.Type != SteamApiConstants.AppTypeGame)
                 {
                     return false;
                 }
 
                 string nameLower = item.Name?.ToLower() ?? "";
 
-                // Filter out common non-game content
-                if (nameLower.Contains("soundtrack"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("dlc"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("demo"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("beta"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("test"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("server"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("playtest"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("dedicated"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("sdk"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("editor"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("tool"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("artbook"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("art book"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("original score"))
-                {
-                    return false;
-                }
-
-                if (nameLower.Contains("ost"))
-                {
-                    return false;
-                }
-
-                return true;
+                // Use centralized exclusion check
+                return !SteamApiConstants.ContainsExcludedKeyword(nameLower);
             }).ToList();
 
             if (filteredItems.Count == 0)
             {
                 // If all results were filtered, try the first app-type result
-                var firstApp = response.Items.FirstOrDefault(i => i.Type == "app");
-                return firstApp?.Id.ToString();
+                var firstApp = response.Items.FirstOrDefault(i => i.Type == SteamApiConstants.AppTypeGame);
+                var appId = firstApp?.Id.ToString();
+
+                // Cache the result
+                if (appId != null)
+                {
+                    _cache.Set(cacheKey, appId, TimeSpan.FromMinutes(SteamApiConstants.CacheDurationMinutes));
+                }
+
+                return appId;
             }
 
             // Return the first (best) match
-            return filteredItems[0].Id.ToString();
+            var resultAppId = filteredItems[0].Id.ToString();
+
+            // Cache the result
+            _cache.Set(cacheKey, resultAppId, TimeSpan.FromMinutes(SteamApiConstants.CacheDurationMinutes));
+
+            return resultAppId;
         }
         catch (Exception ex)
         {
@@ -292,31 +245,6 @@ public sealed class AppIdDetectionService(IFileSystemService fileSystem, IManife
             }
         }
         catch { }
-
-        return null;
-    }
-
-    /// <summary>
-    ///     Walks up the directory tree from the game path to find the steamapps folder.
-    /// </summary>
-    private string? FindSteamappsPath(string gamePath)
-    {
-        var dir = new DirectoryInfo(gamePath);
-
-        while (dir != null)
-        {
-            if (dir.Name.Equals("steamapps", StringComparison.OrdinalIgnoreCase))
-            {
-                return dir.FullName;
-            }
-
-            if (dir.Name.Equals("common", StringComparison.OrdinalIgnoreCase) && dir.Parent != null)
-            {
-                return dir.Parent.FullName;
-            }
-
-            dir = dir.Parent;
-        }
 
         return null;
     }
