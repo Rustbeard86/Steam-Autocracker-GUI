@@ -33,22 +33,31 @@ namespace APPID;
 
 public partial class SteamAppId : Form
 {
+    #region Class Vars
+    // === Windows API Constants ===
     private const int DwmwaWindowCornerPreference = 33;
     private const int DwmwcpRound = 2;
     private const int WcaAccentPolicy = 19;
     private const int AccentEnableAcrylicblurbehind = 4;
     private const int WsMinimizebox = 0x20000;
     private const int CsDblclks = 0x8;
+
+    // === Static Path Configuration ===
     private static readonly string ExeDir =
         Path.GetDirectoryName(Environment.ProcessPath) ?? Environment.CurrentDirectory;
+
     private static readonly string BinPath = Path.Combine(ExeDir, "_bin");
-    private static int CurrentCell;
-    private static string Appname = "";
     private static readonly string Appdata = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+
+    // === Static Application State ===
     internal static string CurrentAppId;
+    private static string Appname = "";
+    private static int CurrentCell;
     private static bool SearchPause;
     private static bool BackPressed;
     private static Timer T1;
+
+    // === Core Services (Dependency Injection) ===
     private readonly IBatchProcessingService _batchProcessingService;
     private readonly IFileSystemService _fileSystem;
     private readonly IGameDetectionService _gameDetection;
@@ -56,18 +65,27 @@ public partial class SteamAppId : Form
     private readonly ISettingsService _settings;
     private readonly IStatusUpdateService _statusService;
     private readonly IUrlConversionService _urlConversion;
+
+    // === Batch Processing Components ===
     private BatchGameSelectionForm _activeBatchForm;
     private Image _batchIconBase;
     private PictureBox _batchIndicator;
     private ToolTip _batchIndicatorTooltip;
+
+    // === Game Processing State ===
     private string _gameDir;
     private string _gameDirName;
+    private readonly IGameSearchService _gameSearch;
     private bool _isFirstClickAfterSelection;
     private bool _isInitialFolderSearch;
+
+    // === UI State & Controls ===
     private Timer _label5Timer;
     private Point _mouseDownPoint = Point.Empty;
     private string _parentOfSelection;
     private Timer _resinstruccZipTimer;
+
+    // === Share & Upload Components ===
     private EnhancedShareWindow _shareWindow;
     private bool _textChanged;
     private CancellationTokenSource _zipCancellationTokenSource;
@@ -77,31 +95,35 @@ public partial class SteamAppId : Form
     private bool EnableLanMultiplayer;
     private bool Goldy;
     private bool Isnumeric;
-    private IGameSearchService _gameSearch;
+    #endregion
 
     public SteamAppId()
     {
-        // Initialize services for SOLID architecture
+        // === STEP 1: Initialize Core Services ===
         _fileSystem = new FileSystemService();
         _settings = new SettingsService();
         _gameDetection = new GameDetectionService(_fileSystem);
         _manifestParsing = new ManifestParsingService(_fileSystem);
         _urlConversion = new UrlConversionService();
 
+        // === STEP 2: Configure Network Security ===
         ServicePointManager.ServerCertificateValidationCallback =
             (s, certificate, chain, sslPolicyErrors) => true;
 
-        // Load auto-crack setting FIRST before anything else - directly assign the value
+        // === STEP 3: Load Critical Settings (Before InitializeComponent) ===
         AutoCrackEnabled = _settings.AutoCrack;
         Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {AutoCrackEnabled} from Settings");
 
+        // === STEP 4: Initialize Data Table ===
         DataTableGeneration = new DataTableGeneration();
         Task.Run(async () => await DataTableGeneration.GetDataTableAsync(DataTableGeneration)).Wait();
+
+        // === STEP 5: Initialize Windows Forms Components ===
         InitializeComponent();
 
+        // === STEP 6: Initialize Remaining Services (Require UI Components) ===
         _statusService = new StatusUpdateService(this, StatusLabel, currDIrText);
         _gameSearch = new GameSearchService();
-
         _batchProcessingService = new BatchProcessingService(
             new CrackingService(BinPath),
             new CompressionService(BinPath),
@@ -110,7 +132,8 @@ public partial class SteamAppId : Form
             _fileSystem
         );
 
-        // Set auto-crack UI immediately after InitializeComponent so it's ready BEFORE Form_Load
+        // === STEP 7: Apply UI State from Settings ===
+        // Auto-crack toggle
         if (AutoCrackEnabled)
         {
             autoCrackOn.BringToFront();
@@ -120,7 +143,7 @@ public partial class SteamAppId : Form
             autoCrackOff.BringToFront();
         }
 
-        // Apply saved pin state
+        // Pin state
         if (_settings.Pinned)
         {
             TopMost = true;
@@ -132,20 +155,23 @@ public partial class SteamAppId : Form
             pin.BringToFront();
         }
 
+        // === STEP 8: Initialize Timers ===
         InitializeTimers();
 
-        // Make form background draggable (click empty space to drag)
+        // === STEP 9: Configure Form Dragging ===
         MouseDown += TitleBar_MouseDown;
-
-        // Make main panel draggable too if it exists
         if (mainPanel != null)
         {
             mainPanel.MouseDown += TitleBar_MouseDown;
         }
 
-        // Apply rounded corners
+        // === STEP 10: Apply Visual Effects ===
         Load += (s, e) => ApplyAcrylicEffect();
+        ApplyRoundedCornersToButton(OpenDir);
+        ApplyRoundedCornersToButton(ZipToShare);
+        ApplyRoundedCornersToButton(btnManualEntry);
 
+        // === STEP 11: Configure Window Behavior ===
         // Force taskbar refresh after form is fully loaded
         Shown += (s, e) =>
         {
@@ -162,12 +188,7 @@ public partial class SteamAppId : Form
             timer.Start();
         };
 
-        // Apply rounded corners to buttons
-        ApplyRoundedCornersToButton(OpenDir);
-        ApplyRoundedCornersToButton(ZipToShare);
-        ApplyRoundedCornersToButton(btnManualEntry);
-
-        // Initialize batch progress indicator (hidden by default)
+        // === STEP 12: Initialize Batch Progress Indicator ===
         InitializeBatchIndicator();
     }
 
@@ -365,7 +386,7 @@ public partial class SteamAppId : Form
         _label5Timer.Start();
     }
 
-    private static void Tit(string message, Color color) 
+    private static void Tit(string message, Color color)
     {
         // Keep for backward compatibility, delegate to service
         Program.Form?._statusService?.UpdateStatus(message, color);
@@ -1012,13 +1033,15 @@ public partial class SteamAppId : Form
             case SearchMatchQuality.NoMatch:
                 if (searchTextBox.Text.Length > 2)
                 {
-                    Tit($"No matches found for '{searchTextBox.Text}'. Try a different name or use Manual Entry.", Color.Orange);
+                    Tit($"No matches found for '{searchTextBox.Text}'. Try a different name or use Manual Entry.",
+                        Color.Orange);
                     btnManualEntry.Visible = true;
                     resinstruccZip.Visible = true;
                     _resinstruccZipTimer.Start();
                     mainPanel.Visible = false;
                     searchTextBox.Enabled = true;
                 }
+
                 break;
 
             case SearchMatchQuality.ExactMatch:
@@ -1032,6 +1055,7 @@ public partial class SteamAppId : Form
                 {
                     Tit($"1 match: {dataGridView1[0, 0].Value} - Press Enter to select", Color.LightGreen);
                 }
+
                 break;
 
             case SearchMatchQuality.MultipleMatches:
@@ -2429,7 +2453,7 @@ oLink3.Save";
 
     private void SteamAppId_FormClosing(object sender, FormClosingEventArgs e)
     {
-        Program.CmdKill("APPID");
+        ProcessManager.TerminateProcessesByName("APPID");
     }
 
     private void OpenDir_Click(object sender, EventArgs e)
