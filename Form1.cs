@@ -183,17 +183,12 @@ public partial class SteamAppId : Form
 
     private List<CrackDetails> CrackHistory { get; } = [];
 
-    [DllImport("user32.dll")]
-    private static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttribData data);
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool SetForegroundWindow(IntPtr hWnd);
 
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
-
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetDesktopWindow();
+    [LibraryImport("user32.dll")]
+    private static partial IntPtr GetDesktopWindow();
 
     public event EventHandler<string> CrackStatusChanged;
 
