@@ -119,9 +119,17 @@ namespace SteamAppIdIdentifier
         // Crack details tracking
         private Dictionary<string, APPID.SteamAppId.CrackDetails> crackDetailsMap = new Dictionary<string, APPID.SteamAppId.CrackDetails>();
 
-        public EnhancedShareWindow(Form parent)
+        // Service dependencies
+        private readonly APPID.Services.Interfaces.IBatchGameDataService _gameData;
+        private readonly APPID.Services.Interfaces.IFormattingService _formatting;
+
+        public EnhancedShareWindow(Form parent, APPID.Services.Interfaces.IBatchGameDataService gameData = null, APPID.Services.Interfaces.IFormattingService formatting = null)
         {
             parentForm = parent;
+
+            // Initialize services - use provided or create defaults
+            _gameData = gameData ?? new APPID.Services.BatchGameDataService(new APPID.Services.FileSystemService());
+            _formatting = formatting ?? new APPID.Services.FormattingService();
 
             // Set dark background BEFORE InitializeComponent to prevent white flash
             this.BackColor = Color.FromArgb(5, 8, 20);
@@ -578,7 +586,7 @@ namespace SteamAppIdIdentifier
                                 gamesGrid.Rows[rowIndex].Visible = false;
                                 return;
                             }
-                            gamesGrid.Rows[rowIndex].Cells["GameSize"].Value = FormatFileSize(dirSize);
+                            gamesGrid.Rows[rowIndex].Cells["GameSize"].Value = _gameData.FormatFileSize(dirSize);
                             gamesGrid.Rows[rowIndex].Cells["GameSize"].Tag = dirSize; // Store actual bytes for sorting
                         }
                     }));
@@ -586,19 +594,6 @@ namespace SteamAppIdIdentifier
             }
         }
 
-
-        private string FormatFileSize(long bytes)
-        {
-            string[] sizes = { "B", "KB", "MB", "GB", "TB" };
-            double len = bytes;
-            int order = 0;
-            while (len >= 1024 && order < sizes.Length - 1)
-            {
-                order++;
-                len = len / 1024;
-            }
-            return $"{len:0.##} {sizes[order]}";
-        }
 
         private async void GamesGrid_CellClick(object sender, DataGridViewCellEventArgs e)
         {
@@ -3804,7 +3799,7 @@ namespace SteamAppIdIdentifier
                                                     {
                                                         if (long.TryParse(manifest["SizeOnDisk"], out long sizeBytes))
                                                         {
-                                                            row.Cells["GameSize"].Value = FormatSize(sizeBytes);
+                                                            row.Cells["GameSize"].Value = _gameData.FormatFileSize(sizeBytes);
                                                             row.Cells["GameSize"].Tag = sizeBytes;
                                                         }
                                                         else
@@ -3888,7 +3883,7 @@ namespace SteamAppIdIdentifier
                                         {
                                             if (rowIndex < gamesGrid.Rows.Count)
                                             {
-                                                gamesGrid.Rows[rowIndex].Cells["GameSize"].Value = FormatSize(size);
+                                                gamesGrid.Rows[rowIndex].Cells["GameSize"].Value = _gameData.FormatFileSize(size);
                                                 gamesGrid.Rows[rowIndex].Cells["GameSize"].Tag = size;
                                             }
                                         }));
@@ -3991,19 +3986,6 @@ namespace SteamAppIdIdentifier
             {
                 return 0;
             }
-        }
-
-        // Helper method to format file size
-        private string FormatSize(long bytes)
-        {
-            if (bytes >= 1073741824)
-                return $"{bytes / 1073741824.0:F1} GB";
-            else if (bytes >= 1048576)
-                return $"{bytes / 1048576.0:F1} MB";
-            else if (bytes >= 1024)
-                return $"{bytes / 1024.0:F1} KB";
-            else
-                return $"{bytes} B";
         }
 
         private void gamesGrid_CellContentClick(object sender, DataGridViewCellEventArgs e)
@@ -4148,7 +4130,7 @@ namespace SteamAppIdIdentifier
 
             uploadDetailsPanel.Visible = true;
             lblUploadGame.Text = $"Uploading: {gameName}";
-            lblUploadSize.Text = $"0 / {FormatBytesForUpload(totalBytes)}";
+            lblUploadSize.Text = $"0 / {_gameData.FormatFileSize(totalBytes)}";
             lblUploadSpeed.Text = "";
             lblUploadEta.Text = "";
             uploadProgressBar.Value = 0;
@@ -4180,17 +4162,17 @@ namespace SteamAppIdIdentifier
 
             uploadProgressBar.Value = Math.Min(percent, 100);
             uploadProgressBar.Invalidate();
-            lblUploadSize.Text = $"{FormatBytesForUpload(uploadedBytes)} / {FormatBytesForUpload(totalBytes)}";
+            lblUploadSize.Text = $"{_gameData.FormatFileSize(uploadedBytes)} / {_gameData.FormatFileSize(totalBytes)}";
 
             if (bytesPerSecond > 0)
             {
-                lblUploadSpeed.Text = $"{FormatBytesForUpload((long)bytesPerSecond)}/s";
+                lblUploadSpeed.Text = $"{_gameData.FormatFileSize((long)bytesPerSecond)}/s";
 
                 long remainingBytes = totalBytes - uploadedBytes;
                 if (remainingBytes > 0)
                 {
                     double secondsRemaining = remainingBytes / bytesPerSecond;
-                    lblUploadEta.Text = FormatUploadEta(secondsRemaining);
+                    lblUploadEta.Text = _formatting.FormatEta(secondsRemaining);
                 }
                 else
                 {
@@ -4216,26 +4198,6 @@ namespace SteamAppIdIdentifier
             }
 
             uploadDetailsPanel.Visible = false;
-        }
-
-        private string FormatBytesForUpload(long bytes)
-        {
-            if (bytes >= 1024L * 1024 * 1024)
-                return $"{bytes / (1024.0 * 1024 * 1024):F2} GB";
-            if (bytes >= 1024L * 1024)
-                return $"{bytes / (1024.0 * 1024):F1} MB";
-            if (bytes >= 1024)
-                return $"{bytes / 1024.0:F0} KB";
-            return $"{bytes} B";
-        }
-
-        private string FormatUploadEta(double seconds)
-        {
-            if (seconds < 60)
-                return $"{seconds:F0}s";
-            if (seconds < 3600)
-                return $"{(int)(seconds / 60)}:{(int)(seconds % 60):D2}";
-            return $"{(int)(seconds / 3600)}:{(int)((seconds % 3600) / 60):D2}:{(int)(seconds % 60):D2}";
         }
 
         #endregion
