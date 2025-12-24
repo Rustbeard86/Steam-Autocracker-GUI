@@ -71,6 +71,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="Steamless.Library">
+      <HintPath>..\Steamless\publish\Steamless.Library\Steamless.Library.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Update="Properties\Resources.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>

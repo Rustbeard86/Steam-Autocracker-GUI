@@ -41,6 +41,9 @@ public partial class SteamAppId : Form
         _dialogService = new DialogService();
         _gameDetection = new GameDetectionService(_fileSystem);
         _manifestParsing = new ManifestParsingService(_fileSystem);
+        _gameDetection = new GameDetectionService(_fileSystem);
+        _gameFolderService = new GameFolderService(_fileSystem, _gameDetection);
+        _steamlessService = new SteamlessService();
 
         // === STEP 2: Initialize Batch Processing Service (Before Coordinator) ===
         IBatchProcessingService batchProcessingService = new BatchProcessingService(
@@ -163,7 +166,7 @@ public partial class SteamAppId : Form
             // Also set gameDirName when gameDir is set
             if (!string.IsNullOrEmpty(_gameDir))
             {
-                _gameDirName = Path.GetFileName(_gameDir);
+                _gameDirName = _gameFolderService.GetGameName(_gameDir);
             }
         }
     }
@@ -1243,26 +1246,13 @@ public partial class SteamAppId : Form
                     {
                         LogHelper.Log($"[CRACK] Skipping utility executable: {fileName}");
                         CurrentCrackDetails.ExesSkipped.Add(fileName);
-                        continue; // Skip to next file
+                        continue;
                     }
 
                     // Skip if file path is empty or file doesn't exist
                     if (string.IsNullOrEmpty(file) || !File.Exists(file))
                     {
                         Debug.WriteLine($"[CRACK] Invalid or missing file, skipping: {file}");
-                        continue;
-                    }
-
-                    // Check if Steamless CLI exists before trying to use it (CLI version runs without GUI)
-                    string steamlessPath = $"{BinPath}\\Steamless\\Steamless.CLI.exe";
-                    Debug.WriteLine($"[CRACK] Checking for Steamless CLI at: {steamlessPath}");
-                    Debug.WriteLine($"[CRACK] Steamless CLI exists: {File.Exists(steamlessPath)}");
-
-                    if (!File.Exists(steamlessPath))
-                    {
-                        Debug.WriteLine($"[CRACK] Steamless CLI not found, skipping EXE unpacking for: {file}");
-                        LogHelper.Log($"[STEAMLESS] ERROR: Steamless.CLI.exe not found at {steamlessPath}");
-                        Tit($"Steamless.CLI.exe not found at {steamlessPath}, skipping EXE unpacking", Color.Yellow);
                         continue;
                     }
 
@@ -1273,61 +1263,28 @@ public partial class SteamAppId : Form
                     // Track all EXEs we attempt to process
                     CurrentCrackDetails.ExesTried.Add(Path.GetFileName(file));
 
-                    // Restore .bak if it exists (apply Steamless to clean exe)
-                    if (File.Exists($"{file}.bak"))
-                    {
-                        Debug.WriteLine("[CRACK] Found existing .bak, restoring clean exe first");
-                        File.Delete(file);
-                        File.Move($"{file}.bak", file);
-                    }
+                    // Use SteamlessService instead of CLI
+                    var steamlessService = new SteamlessService();
+                    var result = await steamlessService.UnpackExeAsync(file, parentdir,
+                        status => CrackStatusChanged?.Invoke(this, status));
 
-                    string exeparent = Directory.GetParent(file).FullName;
-                    var x2 = new Process();
-                    var pro = new ProcessStartInfo
-                    {
-                        WindowStyle = ProcessWindowStyle.Hidden,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardError = true,
-                        RedirectStandardOutput = true,
-                        WorkingDirectory = parentdir,
-                        FileName = steamlessPath,
-                        Arguments = $"\"{file}\""
-                    };
-
-                    Debug.WriteLine("[CRACK] Starting Steamless process");
-                    Debug.WriteLine($"[CRACK] Working Directory: {parentdir}");
-                    Debug.WriteLine($"[CRACK] Command: {pro.Arguments}");
-
-                    x2.StartInfo = pro;
-                    x2.Start();
-
-                    // Read output asynchronously to avoid blocking
-                    var outputTask = x2.StandardOutput.ReadToEndAsync();
-                    var errorTask = x2.StandardError.ReadToEndAsync();
-
-                    await Task.Run(() => x2.WaitForExit());
-
-                    string output = await errorTask + await outputTask;
-
-                    Debug.WriteLine($"[CRACK] Steamless output: {output}");
-                    Debug.WriteLine($"[CRACK] Steamless exit code: {x2.ExitCode}");
-                    LogHelper.Log($"[STEAMLESS] Exit code: {x2.ExitCode}, Output: {output.Trim()}");
-
-                    if (File.Exists($"{file}.unpacked.exe"))
+                    if (result is { Success: true, UnpackedFileCreated: true })
                     {
                         Debug.WriteLine($"[CRACK] Successfully unpacked: {file}");
                         LogHelper.Log($"[STEAMLESS] SUCCESS - Unpacked: {Path.GetFileName(file)}");
-                        Tit($"Unpacked {file} successfully!", Color.LightSkyBlue);
-                        File.Move(file, file + ".bak");
-                        File.Move($"{file}.unpacked.exe", file);
-                        steamlessUnpacked = true; // Mark that we unpacked something
+                        Tit($"Unpacked {Path.GetFileName(file)} successfully!", Color.LightSkyBlue);
+                        steamlessUnpacked = true;
                         CurrentCrackDetails.ExesUnpacked.Add(file);
+                    }
+                    else if (result is { Success: true, UnpackedFileCreated: false })
+                    {
+                        Debug.WriteLine($"[CRACK] No stub detected for: {file}");
+                        LogHelper.Log($"[STEAMLESS] No stub detected: {Path.GetFileName(file)}");
                     }
                     else
                     {
-                        Debug.WriteLine($"[CRACK] No unpacked file created for: {file}");
-                        LogHelper.Log($"[STEAMLESS] No stub detected: {Path.GetFileName(file)}");
+                        Debug.WriteLine($"[CRACK] Failed to process: {file}");
+                        LogHelper.Log($"[STEAMLESS] FAILED: {result.ErrorMessage}");
                     }
                 }
 
@@ -1738,158 +1695,180 @@ oLink3.Save";
         await _dlcService.FetchDlcInfoAsync(appId, outputFolder, Tit);
     }
 
-    private void pictureBox2_Click(object sender, EventArgs e)
+    private async void pictureBox2_Click(object sender, EventArgs e)
     {
-        var folderSelectDialog = new FolderSelectDialog { Title = "Select the game's main folder." };
-
-        if (_settings.LastDir.Length > 0)
+        try
         {
-            folderSelectDialog.InitialDirectory = _settings.LastDir;
-        }
+            var folderSelectDialog = new FolderSelectDialog { Title = "Select the game's main folder." };
 
-        if (folderSelectDialog.Show(Handle))
-        {
-            _gameDir = folderSelectDialog.FileName;
-
-            // Hide crack buttons when starting new game selection
-            _crackButtonManager.HideCrackButtons();
-
-            // Always remember parent folder for next time
-            try
+            if (_settings.LastDir.Length > 0)
             {
-                var parent = Directory.GetParent(_gameDir);
-                if (parent != null)
+                folderSelectDialog.InitialDirectory = _settings.LastDir;
+            }
+
+            if (folderSelectDialog.Show(Handle))
+            {
+                string selectedPath = folderSelectDialog.FileName;
+
+                // Auto-correct to game root if subfolder was selected
+                _gameDir = _gameFolderService.FindGameRootFolder(selectedPath);
+
+                // Show feedback if we auto-corrected
+                if (_gameDir != selectedPath)
                 {
-                    _settings.LastDir = parent.FullName;
-                    AppSettings.Default.Save();
+                    string selectedName = Path.GetFileName(selectedPath);
+                    string correctedName = Path.GetFileName(_gameDir);
+                    Tit($"Detected subfolder '{selectedName}' → corrected to game root: {correctedName}", Color.Yellow);
+                    await Task.Delay(2000);
                 }
-            }
-            catch { }
 
-            // Check if this is a folder containing multiple games (batch mode)
-            var gamesInFolder = DetectGamesInFolder(_gameDir);
-            if (gamesInFolder.Count > 1)
-            {
-                // Multiple games detected - batch folder
-                _settings.LastDir = _gameDir;
-                AppSettings.Default.Save();
-                ShowBatchGameSelection(gamesInFolder);
-                return;
-            }
+                // Now extract the game name using the service
+                _gameDirName = _gameFolderService.GetGameName(_gameDir);
 
-            if (gamesInFolder.Count == 1)
-            {
-                // Contains exactly one game subfolder - use that
-                _gameDir = gamesInFolder[0];
-                _gameDirName = Path.GetFileName(_gameDir);
-            }
-            else if (!IsGameFolder(_gameDir))
-            {
-                // Not a game folder, not a batch folder - check if they selected something weird
+                // Hide crack buttons when starting new game selection
+                _crackButtonManager.HideCrackButtons();
+
+                // Always remember parent folder for next time
                 try
                 {
-                    var steamApiFiles = Directory.GetFiles(_gameDir, "steam_api*.dll", SearchOption.AllDirectories)
-                        .Where(f => !f.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)).ToList();
-
-                    if (steamApiFiles.Count > 2)
+                    var parent = Directory.GetParent(_gameDir);
+                    if (parent != null)
                     {
-                        // Has steam_api DLLs but we couldn't detect game structure - might be root drive
-                        bool continueAnyway = ShowStyledConfirmation(
-                            "Unusual Folder Structure",
-                            $"Found {steamApiFiles.Count} steam_api DLLs but couldn't detect game folders.\n" +
-                            $"Did you accidentally select a root drive or system folder?",
-                            _gameDir,
-                            "Continue anyway",
-                            "Cancel");
-
-                        if (!continueAnyway)
-                        {
-                            return;
-                        }
+                        _settings.LastDir = parent.FullName;
+                        AppSettings.Default.Save();
                     }
                 }
                 catch { }
-            }
 
-            // Hide OpenDir and ZipToShare when new directory selected
-            OpenDir.Visible = false;
-            OpenDir.SendToBack();
-            ZipToShare.Visible = false;
-            _parentOfSelection = Directory.GetParent(_gameDir)?.FullName;
-            _gameDirName = Path.GetFileName(_gameDir);
-
-            // Try to get AppID from Steam manifest files
-            var manifestInfo = _manifestParsing.GetAppIdFromManifest(_gameDir);
-            if (manifestInfo.HasValue)
-            {
-                // We found the AppID from manifest!
-                CurrentAppId = manifestInfo.Value.appId;
-                string manifestGameName = manifestInfo.Value.gameName;
-                long sizeOnDisk = manifestInfo.Value.sizeOnDisk;
-
-                Debug.WriteLine("[MANIFEST] Auto-detected from Steam manifest:");
-                Debug.WriteLine($"[MANIFEST] AppID: {CurrentAppId}");
-                Debug.WriteLine($"[MANIFEST] Game: {manifestGameName}");
-                Debug.WriteLine($"[MANIFEST] Size: {sizeOnDisk / (1024 * 1024)} MB");
-
-                // Skip the search UI entirely - we already have the AppID!
-                // Just show main panel - it will cover all the search UI elements
-                searchTextBox.Enabled = false;
-                mainPanel.Visible = true;
-                resinstruccZip.Visible = true;
-                _resinstruccZipTimer.Stop();
-                _resinstruccZipTimer.Start();
-                startCrackPic.Visible = true;
-
-                // Skip the search entirely
-                IsFirstClickAfterSelection = false;
-                IsInitialFolderSearch = false;
-
-                // Auto-crack if enabled
-                if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
+                // Check if this is a folder containing multiple games (batch mode)
+                var gamesInFolder = DetectGamesInFolder(_gameDir);
+                if (gamesInFolder.Count > 1)
                 {
-                    Debug.WriteLine("[MANIFEST] Auto-crack enabled, starting crack...");
-                    Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Auto-cracking...",
-                        Color.Yellow);
-                    // Trigger crack just like clicking the button
-                    startCrackPic_Click(null, null);
+                    // Multiple games detected - batch folder
+                    _settings.LastDir = _gameDir;
+                    AppSettings.Default.Save();
+                    ShowBatchGameSelection(gamesInFolder);
+                    return;
+                }
+
+                if (gamesInFolder.Count == 1)
+                {
+                    // Contains exactly one game subfolder - use that
+                    _gameDir = gamesInFolder[0];
+                    _gameDirName = _gameFolderService.GetGameName(_gameDir);
+                }
+                else if (!IsGameFolder(_gameDir))
+                {
+                    // Not a game folder, not a batch folder - check if they selected something weird
+                    try
+                    {
+                        var steamApiFiles = Directory.GetFiles(_gameDir, "steam_api*.dll", SearchOption.AllDirectories)
+                            .Where(f => !f.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)).ToList();
+
+                        if (steamApiFiles.Count > 2)
+                        {
+                            // Has steam_api DLLs but we couldn't detect game structure - might be root drive
+                            bool continueAnyway = ShowStyledConfirmation(
+                                "Unusual Folder Structure",
+                                $"Found {steamApiFiles.Count} steam_api DLLs but couldn't detect game folders.\n" +
+                                $"Did you accidentally select a root drive or system folder?",
+                                _gameDir,
+                                "Continue anyway",
+                                "Cancel");
+
+                            if (!continueAnyway)
+                            {
+                                return;
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // Hide OpenDir and ZipToShare when new directory selected
+                OpenDir.Visible = false;
+                OpenDir.SendToBack();
+                ZipToShare.Visible = false;
+                _parentOfSelection = Directory.GetParent(_gameDir)?.FullName;
+                _gameDirName = _gameFolderService.GetGameName(_gameDir);
+
+                // Try to get AppID from Steam manifest files
+                var manifestInfo = _manifestParsing.GetAppIdFromManifest(_gameDir);
+                if (manifestInfo.HasValue)
+                {
+                    // We found the AppID from manifest!
+                    CurrentAppId = manifestInfo.Value.appId;
+                    string manifestGameName = manifestInfo.Value.gameName;
+                    long sizeOnDisk = manifestInfo.Value.sizeOnDisk;
+
+                    Debug.WriteLine("[MANIFEST] Auto-detected from Steam manifest:");
+                    Debug.WriteLine($"[MANIFEST] AppID: {CurrentAppId}");
+                    Debug.WriteLine($"[MANIFEST] Game: {manifestGameName}");
+                    Debug.WriteLine($"[MANIFEST] Size: {sizeOnDisk / (1024 * 1024)} MB");
+
+                    // Skip the search UI entirely - we already have the AppID!
+                    // Just show main panel - it will cover all the search UI elements
+                    searchTextBox.Enabled = false;
+                    mainPanel.Visible = true;
+                    resinstruccZip.Visible = true;
+                    _resinstruccZipTimer.Stop();
+                    _resinstruccZipTimer.Start();
+                    startCrackPic.Visible = true;
+
+                    // Skip the search entirely
+                    IsFirstClickAfterSelection = false;
+                    IsInitialFolderSearch = false;
+
+                    // Auto-crack if enabled
+                    if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
+                    {
+                        Debug.WriteLine("[MANIFEST] Auto-crack enabled, starting crack...");
+                        Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Auto-cracking...",
+                            Color.Yellow);
+                        // Trigger crack just like clicking the button
+                        startCrackPic_Click(null, null);
+                    }
+                    else
+                    {
+                        // Update the title with game info
+                        Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Ready to crack!",
+                            Color.LightGreen);
+                    }
                 }
                 else
                 {
-                    // Update the title with game info
-                    Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Ready to crack!",
-                        Color.LightGreen);
+                    // No manifest found, proceed with normal search flow
+                    btnManualEntry.Visible = true;
+                    resinstruccZip.Visible = true;
+                    _resinstruccZipTimer.Stop();
+                    _resinstruccZipTimer.Start(); // Start 30 second timer
+                    mainPanel.Visible = false; // Hide mainPanel so dataGridView is visible
+                    searchTextBox.Enabled = true; // Enable search when AppID panel shows
+
+                    startCrackPic.Visible = true;
+                    Tit("Please select the correct game from the list!! (if list empty do manual search!)",
+                        Color.LightSkyBlue);
+
+                    // Trigger the search
+                    IsFirstClickAfterSelection = true; // Set before changing text
+                    IsInitialFolderSearch = true; // This is the initial search from folder
+                    searchTextBox.Text = _gameDirName;
                 }
+
+                // Stop label5 timer when game dir is selected
+                _label5Timer.Stop();
+                label5.Visible = false;
+                _settings.LastDir = _parentOfSelection;
+                AppSettings.Default.Save();
             }
             else
             {
-                // No manifest found, proceed with normal search flow
-                btnManualEntry.Visible = true;
-                resinstruccZip.Visible = true;
-                _resinstruccZipTimer.Stop();
-                _resinstruccZipTimer.Start(); // Start 30 second timer
-                mainPanel.Visible = false; // Hide mainPanel so dataGridView is visible
-                searchTextBox.Enabled = true; // Enable search when AppID panel shows
-
-                startCrackPic.Visible = true;
-                Tit("Please select the correct game from the list!! (if list empty do manual search!)",
-                    Color.LightSkyBlue);
-
-                // Trigger the search
-                IsFirstClickAfterSelection = true; // Set before changing text
-                IsInitialFolderSearch = true; // This is the initial search from folder
-                searchTextBox.Text = _gameDirName;
+                MessageBox.Show("You must select a folder to continue...");
             }
-
-            // Stop label5 timer when game dir is selected
-            _label5Timer.Stop();
-            label5.Visible = false;
-            _settings.LastDir = _parentOfSelection;
-            AppSettings.Default.Save();
         }
-        else
+        catch (Exception)
         {
-            MessageBox.Show("You must select a folder to continue...");
+            // TODO: Handle exceptions.
         }
     }
 
@@ -2038,7 +2017,7 @@ oLink3.Save";
                 OpenDir.Visible = false;
                 ZipToShare.Visible = false;
                 _parentOfSelection = Directory.GetParent(_gameDir)?.FullName;
-                _gameDirName = Path.GetFileName(_gameDir);
+                _gameDirName = _gameFolderService.GetGameName(_gameDir);
 
                 // Try to get AppID from Steam manifest files
                 var manifestInfo = _manifestParsing.GetAppIdFromManifest(_gameDir);
@@ -3637,6 +3616,8 @@ oLink3.Save";
     private readonly IIniFileService _iniFileService;
     private readonly IDlcService _dlcService;
     private readonly IDialogService _dialogService;
+    private readonly IGameFolderService _gameFolderService;
+    private readonly ISteamlessService _steamlessService;
 
     // === Batch Processing Components ===
     private BatchGameSelectionForm _activeBatchForm;

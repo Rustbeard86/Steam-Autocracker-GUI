@@ -102,8 +102,6 @@ public static class LogHelper
     private static void WriteSessionHeader(string logFile)
     {
         string separator = $"""
-
-
                             =================================
                             SACGUI LAUNCHED
                             {DateTime.Now:yyyy-MM-dd HH:mm:ss}
