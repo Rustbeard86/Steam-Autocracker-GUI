@@ -3863,10 +3863,7 @@ oLink3.Save";
     #region Class Vars
 
     // === Windows API Constants ===
-    //private const int DwmwaWindowCornerPreference = 33;
     private const int DwmwcpRound = 2;
-    //private const int WcaAccentPolicy = 19;
-    //private const int AccentEnableAcrylicblurbehind = 4;
     private const int WsMinimizebox = 0x20000;
     private const int CsDblclks = 0x8;
 
