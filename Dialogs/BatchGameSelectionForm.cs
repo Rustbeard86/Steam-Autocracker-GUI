@@ -17,12 +17,12 @@ public class BatchGameSelectionForm : Form
 
     // Service dependencies
     private readonly IAppIdDetectionService _appIdDetection;
-    private readonly IFormattingService _formatting;
-    private readonly IBatchGameDataService _gameData;
     private readonly Dictionary<string, string> _convertingUrls = []; // gamePath -> 1fichier URL during conversion
     private readonly Dictionary<string, CrackDetails> _crackDetailsMap = []; // gamePath -> crack details
     private readonly Dictionary<int, string> _detectedAppIds = [];
     private readonly Dictionary<string, string> _finalUrls = []; // gamePath -> final URL (pydrive or 1fichier)
+    private readonly IFormattingService _formatting;
+    private readonly IBatchGameDataService _gameData;
     private readonly List<string> _gamePaths;
     private readonly UploadSlot[] _uploadSlots = new UploadSlot[MaxUploadSlots];
 
@@ -1990,7 +1990,8 @@ public class BatchGameSelectionForm : Form
         if (!_crackDetailsMap.ContainsKey(gamePath))
         {
             // Create a minimal CrackDetails if one doesn't exist
-            _crackDetailsMap[gamePath] = new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
+            _crackDetailsMap[gamePath] =
+                new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
         }
 
         var details = _crackDetailsMap[gamePath];
@@ -2014,7 +2015,8 @@ public class BatchGameSelectionForm : Form
         if (!_crackDetailsMap.ContainsKey(gamePath))
         {
             // Create a minimal CrackDetails if one doesn't exist
-            _crackDetailsMap[gamePath] = new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
+            _crackDetailsMap[gamePath] =
+                new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
         }
 
         var details = _crackDetailsMap[gamePath];
@@ -2048,7 +2050,8 @@ public class BatchGameSelectionForm : Form
 
         if (!_crackDetailsMap.ContainsKey(gamePath))
         {
-            _crackDetailsMap[gamePath] = new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
+            _crackDetailsMap[gamePath] =
+                new CrackDetails { GameName = Path.GetFileName(gamePath), GamePath = gamePath };
         }
 
         _crackDetailsMap[gamePath].PyDriveUrl = pydriveUrl;

@@ -1,4 +1,4 @@
-namespace APPID.Models;
+﻿namespace APPID.Models;
 
 /// <summary>
 ///     Tracks details about what was cracked during a crack operation

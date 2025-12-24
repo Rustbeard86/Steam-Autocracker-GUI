@@ -39,13 +39,13 @@ public partial class EnhancedShareWindow : Form
     // Cache info icon for cell painting
     private static Image _infoIcon;
     private static bool _infoIconLoaded;
+
+    // Crack details tracking
+    private readonly Dictionary<string, CrackDetails> _crackDetailsMap = new();
     private readonly IFormattingService _formatting;
 
     // Service dependencies
     private readonly IBatchGameDataService _gameData;
-
-    // Crack details tracking
-    private readonly Dictionary<string, CrackDetails> _crackDetailsMap = new();
 
     private readonly Form _parentForm;
 

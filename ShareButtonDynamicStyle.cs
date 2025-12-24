@@ -273,7 +273,8 @@ public class CommunityStatusBar : StatusStrip
     {
         BackColor = Color.FromArgb(30, 30, 30);
 
-        _requestLabel = new ToolStripLabel("Requests: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
+        _requestLabel =
+            new ToolStripLabel("Requests: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
 
         _honorLabel = new ToolStripLabel("Honored: --") { ForeColor = Color.White, Margin = new Padding(5, 3, 5, 3) };
 

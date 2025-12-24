@@ -16,8 +16,7 @@ using APPID.Services;
 using APPID.Services.Interfaces;
 using APPID.Utilities;
 using APPID.Utilities.Steam;
-using CliWrap;
-using CliWrap.Buffered;
+using APPID.Utilities.Steam.SteamTools.SteamTools;
 using Newtonsoft.Json.Linq;
 using Clipboard = System.Windows.Forms.Clipboard;
 using DataFormats = System.Windows.Forms.DataFormats;
@@ -48,17 +47,10 @@ public partial class SteamAppId : Form
     private readonly IManifestParsingService _manifestParsing;
     private readonly ISettingsService _settings;
     private readonly IUrlConversionService _urlConversion;
-    public bool AutoCrackEnabled = true; // Default to ON
-    public bool Cracking;
-
-    protected DataTableGeneration DataTableGeneration;
-    public bool EnableLanMultiplayer;
     private string _gameDir;
     private string _gameDirName;
-    public bool Goldy;
     private bool _isFirstClickAfterSelection; // Track first click after folder/file selection
     private bool _isInitialFolderSearch; // Track if this is the FIRST search after folder selection
-    public bool Isnumeric;
     private Timer _label5Timer;
 
     // Custom title bar drag functionality
@@ -73,6 +65,13 @@ public partial class SteamAppId : Form
     private bool _textChanged;
 
     private CancellationTokenSource _zipCancellationTokenSource;
+    public bool AutoCrackEnabled = true; // Default to ON
+    public bool Cracking;
+
+    protected DataTableGeneration DataTableGeneration;
+    public bool EnableLanMultiplayer;
+    public bool Goldy;
+    public bool Isnumeric;
 
     public SteamAppId()
     {
@@ -2133,36 +2132,39 @@ oLink3.Save";
                         catch { }
                     }
 
-                    // Get achievements data using achievements_parser
-                    string achievementsParserPath = $"{BinPath}\\achievements_parser.exe";
-                    if (File.Exists(achievementsParserPath))
+                    Tit("Fetching achievements...", Color.Cyan);
+                    try
                     {
-                        Tit("Getting achievements data...", Color.Cyan);
-                        try
-                        {
-                            var achievementsResult = await Cli.Wrap(achievementsParserPath)
-                                .WithValidation(CommandResultValidation.None)
-                                .WithArguments($"--appid {CurrentAppId}")
-                                .WithWorkingDirectory(Environment.CurrentDirectory)
-                                .ExecuteBufferedAsync();
+                        // IYKYK
+                        const string config = "YWI3MTE0MzItMzYzMS00ODgyLWI2YzAtODY4ZmYzMzMxNzcx";
+                        var parserConfig = Encoding.UTF8.GetString(Convert.FromBase64String(config));
 
-                            if (!string.IsNullOrWhiteSpace(achievementsResult.StandardOutput))
-                            {
-                                // Save achievements to the steam_settings folder
-                                string achievementsPath = $"{parentdir}\\steam_settings\\achievements.ini";
-                                File.WriteAllText(achievementsPath, achievementsResult.StandardOutput);
-                                Tit("Found and saved achievement data!", Color.Green);
-                            }
-                            else
-                            {
-                                Tit("No achievements found for this game", Color.Yellow);
-                            }
-                        }
-                        catch (Exception ex)
+                        const string baseUrl = "aHR0cHM6Ly9hcGkucnVzdGJlYXJkLmNvbQ==";
+                        var baseConfig = Encoding.UTF8.GetString(Convert.FromBase64String(baseUrl));
+                        using var httpClient = new HttpClient();
+                        httpClient.DefaultRequestHeaders.Add("X-Gbe-Auth", parserConfig);
+
+                        var parser = new SteamAchievementParser(httpClient, parserConfig);
+
+                        bool achievementSuccess = await parser.GenerateAchievementsFileAsync(baseConfig,
+                            null,
+                            CurrentAppId,
+                            parentdir
+                        );
+
+                        if (achievementSuccess)
                         {
-                            Tit($"Failed to get achievements: {ex.Message}", Color.Yellow);
-                            Debug.WriteLine($"[Achievements] Exception: {ex.Message}");
+                            Tit("Achievement data saved!", Color.Green);
                         }
+                        else
+                        {
+                            Tit("No achievements found for this game", Color.Yellow);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Tit($"Failed to fetch achievements: {ex.Message}", Color.Yellow);
+                        Debug.WriteLine($"[ACHIEVEMENTS] Exception: {ex.Message}");
                     }
 
                     // Get DLC info from Steam Store API (no API key needed)

@@ -15,14 +15,14 @@ public class RgbProgressWindow : Form
     private DateTime _countdownStartTime;
     private long _currentFileSize;
     private Label _lblScrollingInfo;
-    internal Label LblStatus;
-
-    internal ProgressBar ProgressBar;
     private Timer _rgbTimer;
     private int _scrollOffset;
     private string _scrollText = "";
     private Timer _scrollTimer;
     private int _totalCountdownMinutes;
+    internal Label LblStatus;
+
+    internal ProgressBar ProgressBar;
 
     public RgbProgressWindow(string gameName, string type)
     {

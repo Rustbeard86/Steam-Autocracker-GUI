@@ -21,8 +21,8 @@ public class CompressionSettingsFormExtended : Form
 
     public CompressionSettingsFormExtended(string gameName, bool isCracked)
     {
-        this._gameName = gameName;
-        this._isCracked = isCracked;
+        _gameName = gameName;
+        _isCracked = isCracked;
         InitializeComponent();
         InitializeTimers();
     }

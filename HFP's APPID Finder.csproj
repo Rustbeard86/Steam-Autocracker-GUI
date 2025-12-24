@@ -1,90 +1,86 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <Project Sdk="Microsoft.NET.Sdk">
-	<PropertyGroup>
-		<OutputType>WinExe</OutputType>
-		<TargetFramework>net10.0-windows</TargetFramework>
-		<UseWindowsForms>true</UseWindowsForms>
-		<RootNamespace>APPID</RootNamespace>
-		<AssemblyName>SACGUI</AssemblyName>
-		<StartupObject>APPID.Program</StartupObject>
-		<ApplicationIcon>sac.ico</ApplicationIcon>
-		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-		<EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
-		<BaseOutputPath>bin\</BaseOutputPath>
-		<OutputPath>bin\$(Configuration)\SACGUI\</OutputPath>
-		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>APPID</RootNamespace>
+    <AssemblyName>SACGUI</AssemblyName>
+    <StartupObject>APPID.Program</StartupObject>
+    <ApplicationIcon>sac.ico</ApplicationIcon>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
+    <BaseOutputPath>bin\</BaseOutputPath>
+    <OutputPath>bin\$(Configuration)\SACGUI\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
-		<!-- Suppress platform compatibility warnings (this is Windows-only) -->
-		<NoWarn>$(NoWarn);CA1416;CS1591</NoWarn>
+    <!-- Suppress platform compatibility warnings (this is Windows-only) -->
+    <NoWarn>$(NoWarn);CA1416;CS1591</NoWarn>
 
-		<!-- Force designer to use DPI unaware mode (fixes scaling issues in VS designer) -->
-		<ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
+    <!-- Force designer to use DPI unaware mode (fixes scaling issues in VS designer) -->
+    <ForceDesignerDpiUnaware>true</ForceDesignerDpiUnaware>
 
-		<!-- Single file publish settings -->
-		<PublishSingleFile>true</PublishSingleFile>
-		<SelfContained>true</SelfContained>
-		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
-		<EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
-		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
-		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-		<DebugType>none</DebugType>
-		<DebugSymbols>false</DebugSymbols>
-	</PropertyGroup>
+    <!-- Single file publish settings -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
 
-	<ItemGroup>
-		<None Include="LICENSE" />
-		<None Include="README.md" />
-	</ItemGroup>
+  <ItemGroup>
+    <None Include="LICENSE" />
+    <None Include="README.md" />
+  </ItemGroup>
 
-	<ItemGroup>
-		<EmbeddedResource Include="Dialogs\CompressionSettingsForm.resx">
-			<DependentUpon>CompressionSettingsForm.cs</DependentUpon>
-		</EmbeddedResource>
-		<Content Include="sac.ico" />
-		<Content Include="_bin\**\*.*" Exclude="_bin\test_*\**;_bin\steam_settings\**;_bin\*.png">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-			<ExcludeFromSingleFile>true</ExcludeFromSingleFile>
-		</Content>
-		<Compile Remove="releases\**" />
-		<None Remove="releases\**" />
-		<EmbeddedResource Include="Dialogs\RGBProgressWindow.resx" />
-		<EmbeddedResource Include="EnhancedShareWindow.resx">
-			<DependentUpon>EnhancedShareWindow.cs</DependentUpon>
-		</EmbeddedResource>
-		<EmbeddedResource Include="Form1.resx">
-			<DependentUpon>Form1.cs</DependentUpon>
-			<LogicalName>APPID.SteamAppId.resources</LogicalName>
-		</EmbeddedResource>
-		<EmbeddedResource Include="Properties\Resources.resx">
-			<Generator>ResXFileCodeGenerator</Generator>
-			<LastGenOutput>Resources.Designer.cs</LastGenOutput>
-		</EmbeddedResource>
-	</ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Dialogs\CompressionSettingsForm.resx">
+      <DependentUpon>CompressionSettingsForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <Content Include="sac.ico" />
+    <Content Include="_bin\**\*.*" Exclude="_bin\test_*\**;_bin\steam_settings\**;_bin\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Compile Remove="releases\**" />
+    <None Remove="releases\**" />
+    <EmbeddedResource Include="Dialogs\RGBProgressWindow.resx" />
+    <EmbeddedResource Include="EnhancedShareWindow.resx">
+      <DependentUpon>EnhancedShareWindow.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Form1.resx">
+      <DependentUpon>Form1.cs</DependentUpon>
+      <LogicalName>APPID.SteamAppId.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
 
-	<ItemGroup>
-		<!-- Core dependencies -->
-		<PackageReference Include="System.Management" Version="10.0.1" />
-		<PackageReference Include="CliWrap" Version="3.10.0" />
-		<PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
-		<PackageReference Include="PuppeteerSharp" Version="20.2.5" />
-		<PackageReference Include="MouseKeyHook" Version="5.7.1" />
-		<PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-		<PackageReference Include="RestSharp" Version="113.0.0" />
-	</ItemGroup>
+  <ItemGroup>
+    <!-- Core dependencies -->
+    <PackageReference Include="System.Management" Version="10.0.1" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
 
-	<ItemGroup>
-	  <Compile Update="Properties\Resources.Designer.cs">
-	    <DesignTime>True</DesignTime>
-	    <AutoGen>True</AutoGen>
-	    <DependentUpon>Resources.resx</DependentUpon>
-	  </Compile>
-	  <Compile Update="EnhancedShareWindow.Designer.cs">
-	    <DependentUpon>EnhancedShareWindow.cs</DependentUpon>
-	  </Compile>
-	  <Compile Update="Dialogs\CompressionSettingsForm.Designer.cs">
-	    <DependentUpon>CompressionSettingsForm.cs</DependentUpon>
-	  </Compile>
-	</ItemGroup>
+  <ItemGroup>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Update="EnhancedShareWindow.Designer.cs">
+      <DependentUpon>EnhancedShareWindow.cs</DependentUpon>
+    </Compile>
+    <Compile Update="Dialogs\CompressionSettingsForm.Designer.cs">
+      <DependentUpon>CompressionSettingsForm.cs</DependentUpon>
+    </Compile>
+  </ItemGroup>
 
 </Project>
