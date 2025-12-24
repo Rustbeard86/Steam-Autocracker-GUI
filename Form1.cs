@@ -3,7 +3,6 @@ using System.Data;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.IO.Compression;
-using System.Net;
 using System.Net.Http.Headers;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -14,6 +13,7 @@ using APPID.Services;
 using APPID.Services.Interfaces;
 using APPID.Utilities;
 using APPID.Utilities.Http;
+using APPID.Utilities.Network;
 using APPID.Utilities.Steam;
 using APPID.Utilities.Steam.SteamTools.SteamTools;
 using APPID.Utilities.UI;
@@ -1011,7 +1011,8 @@ public partial class SteamAppId : Form
             }
             catch (Exception ex)
             {
-                SafeMessageBox.ShowWarning(this, $"Failed to copy game: {ex.Message}", "Copy Error", MessageBoxButtons.OK,
+                SafeMessageBox.ShowWarning(this, $"Failed to copy game: {ex.Message}", "Copy Error",
+                    MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return false;
             }
@@ -1299,7 +1300,7 @@ public partial class SteamAppId : Form
                         "-CORRECT-\nD:\\SteamLibrary\\Common\\SomeGameName\n\n" +
                         "-INCORRECT-\nD:\\SteamLibrary\\Common\n\n" +
                         "If you think this message is wrong, verify the path on bottom left and hit YES to continue..",
-                        "Somethings wrong..., continue?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                        "Somethings wrong..., continue?", MessageBoxButtons.YesNo);
                     if (diagg == DialogResult.Yes)
                     {
                         execount = -600;
@@ -2005,8 +2006,9 @@ oLink3.Save";
                 if (Path.GetPathRoot(d) == d || d.Length <= 3)
                 {
                     Tit("You can't select a root drive! Pick a game folder.", Color.OrangeRed);
-                    SafeMessageBox.ShowWarning(this, "Nope! You can't crack an entire drive. Please select a game folder instead.",
-                        "Nice Try", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    SafeMessageBox.ShowWarning(this,
+                        "Nope! You can't crack an entire drive. Please select a game folder instead.",
+                        "Nice Try");
                     continue;
                 }
 
@@ -2209,7 +2211,8 @@ oLink3.Save";
                 bool crackSuccess = await CrackAsync();
                 if (!crackSuccess)
                 {
-                    SafeMessageBox.ShowWarning(this, $"Failed to crack {gameName}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    SafeMessageBox.ShowWarning(this, $"Failed to crack {gameName}", "Error", MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                     _gameDir = originalGameDir;
                     return;
                 }
@@ -2245,7 +2248,8 @@ oLink3.Save";
         }
         catch (Exception ex)
         {
-            SafeMessageBox.ShowWarning(this, $"Error sharing game: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            SafeMessageBox.ShowWarning(this, $"Error sharing game: {ex.Message}", "Error", MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
         }
     }
 
@@ -2354,7 +2358,8 @@ oLink3.Save";
                         return true;
                     }
 
-                    SafeMessageBox.Show(this,"7-Zip not found! Please install 7-Zip for advanced compression.", "Error",
+                    SafeMessageBox.Show(this, "7-Zip not found! Please install 7-Zip for advanced compression.",
+                        "Error",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return false;
                 }
@@ -2608,7 +2613,7 @@ oLink3.Save";
             {
                 parentForm.Invoke(() =>
                 {
-                    SafeMessageBox.Show(this,"Upload failed: Request timed out (file too large or slow connection)",
+                    SafeMessageBox.Show(this, "Upload failed: Request timed out (file too large or slow connection)",
                         "Upload Timeout", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
             }
@@ -3125,7 +3130,7 @@ oLink3.Save";
         }
         else
         {
-            SafeMessageBox.Show(this,"Enter APPID or press ESC to cancel!", "No APPID entered!");
+            SafeMessageBox.Show(this, "Enter APPID or press ESC to cancel!", "No APPID entered!");
         }
     }
 
@@ -3155,9 +3160,9 @@ oLink3.Save";
     {
         try
         {
-            using var client = new WebClient();
+            using var client = HttpClientFactory.Default;
             string url = $"https://store.steampowered.com/api/appdetails?appids={appId}";
-            string json = await client.DownloadStringTaskAsync(url);
+            string json = await client.GetStringAsync(url);
 
             // Simple JSON parsing without external libraries
             if (json.Contains($"\"{appId}\":{{\"success\":true"))
@@ -3226,7 +3231,7 @@ oLink3.Save";
             }
             else
             {
-                SafeMessageBox.Show(this,"Enter APPID or press ESC to cancel!");
+                SafeMessageBox.Show(this, "Enter APPID or press ESC to cancel!");
             }
         }
 
