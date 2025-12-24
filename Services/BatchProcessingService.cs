@@ -1,11 +1,11 @@
+using APPID.Models;
 using APPID.Services.Interfaces;
 
 namespace APPID.Services;
 
 /// <summary>
 ///     Implementation of batch processing service for coordinating game cracking, compression, and upload workflows.
-///     Note: This is a simplified initial extraction. Full implementation would require additional refactoring
-///     to remove UI dependencies (forms, progress callbacks, etc.)
+///     Supports concurrent uploads, retry logic, progress tracking with time estimation, and URL conversion.
 /// </summary>
 public sealed class BatchProcessingService(
     ICrackingService crackingService,
@@ -35,16 +35,22 @@ public sealed class BatchProcessingService(
         IProgress<BatchProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        var startTime = DateTime.Now;
         var result = new BatchProcessingResult();
         var uploadResults = new List<UploadResultInfo>();
+        var failures = new List<(string gameName, string reason)>();
+
+        // Initialize progress tracker
+        var progressTracker = new BatchProgressTracker(games, settings);
 
         try
         {
             // Phase 0: Clean up old crack artifacts
             await CleanupCrackArtifactsAsync(games, cancellationToken).ConfigureAwait(false);
 
-            // Phase 1: Crack games
-            int currentIndex = 0;
+            // Phase 1: Crack games (sequential due to shared state)
+            int crackedCount = 0;
+            int crackFailedCount = 0;
             foreach (var game in games.Where(g => g.ShouldCrack))
             {
                 if (cancellationToken.IsCancellationRequested)
@@ -52,14 +58,9 @@ public sealed class BatchProcessingService(
                     break;
                 }
 
-                currentIndex++;
                 progress?.Report(new BatchProgress
                 {
-                    Phase = "Cracking",
-                    GameName = game.Name,
-                    CurrentGameIndex = currentIndex,
-                    TotalGames = games.Count,
-                    Message = $"Cracking {game.Name}..."
+                    Phase = "Cracking", GameName = game.Name, Message = $"Cracking {game.Name}..."
                 });
 
                 try
@@ -75,39 +76,49 @@ public sealed class BatchProcessingService(
 
                     if (crackResult.Success)
                     {
-                        result = result with { CrackedCount = result.CrackedCount + 1 };
+                        crackedCount++;
                         LogHelper.Log($"[BATCH] Successfully cracked: {game.Name}");
                     }
                     else
                     {
-                        result = result with { CrackFailedCount = result.CrackFailedCount + 1 };
+                        crackFailedCount++;
+                        failures.Add((game.Name, crackResult.ErrorMessage ?? "Unknown crack error"));
                         LogHelper.Log($"[BATCH] Failed to crack: {game.Name} - {crackResult.ErrorMessage}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    result = result with { CrackFailedCount = result.CrackFailedCount + 1 };
+                    crackFailedCount++;
+                    failures.Add((game.Name, $"Crack exception: {ex.Message}"));
                     LogHelper.LogError($"[BATCH] Exception cracking {game.Name}", ex);
                 }
+
+                // Update progress after each crack
+                var progressUpdate = progressTracker.UpdateForCrackComplete();
+                progress?.Report(progressUpdate);
             }
 
-            // Phase 2: Compress games
-            currentIndex = 0;
-            foreach (var game in games.Where(g => g.ShouldZip))
+            // Phase 2 & 3: Compression + Upload Pipeline
+            // Pipeline: compress sequentially, upload concurrently (max 3 at once)
+            var gamesToZip = games.Where(g => g.ShouldZip).ToList();
+            var uploadSemaphore = new SemaphoreSlim(settings.MaxConcurrentUploads, settings.MaxConcurrentUploads);
+            var uploadTasks = new List<Task<(bool success, UploadResultInfo? info, string? error)>>();
+            var archivePaths = new Dictionary<string, string>();
+
+            int zippedCount = 0;
+            int zipFailedCount = 0;
+
+            // Compress each game sequentially
+            foreach (var game in gamesToZip)
             {
                 if (cancellationToken.IsCancellationRequested)
                 {
                     break;
                 }
 
-                currentIndex++;
                 progress?.Report(new BatchProgress
                 {
-                    Phase = "Compressing",
-                    GameName = game.Name,
-                    CurrentGameIndex = currentIndex,
-                    TotalGames = games.Count(g => g.ShouldZip),
-                    Message = $"Compressing {game.Name}..."
+                    Phase = "Compressing", GameName = game.Name, Message = $"Compressing {game.Name}..."
                 });
 
                 try
@@ -117,6 +128,7 @@ public sealed class BatchProcessingService(
                         ? ".7z"
                         : ".zip";
                     string outputPath = Path.Combine(parentDir, game.Name + extension);
+                    archivePaths[game.Path] = outputPath;
 
                     bool compressResult = await _compressionService.CompressAsync(
                         game.Path,
@@ -124,65 +136,224 @@ public sealed class BatchProcessingService(
                         settings.CompressionFormat,
                         settings.CompressionLevel,
                         settings.UsePassword,
-                        percent => progress?.Report(new BatchProgress
+                        percent =>
                         {
-                            Phase = "Compressing",
-                            GameName = game.Name,
-                            PercentComplete = percent,
-                            Message = $"Compressing {game.Name}... {percent}%"
-                        })).ConfigureAwait(false);
+                            var progressUpdate = progressTracker.UpdateForZipProgress(game.Path, percent);
+                            progress?.Report(progressUpdate with
+                            {
+                                GameName = game.Name, Message = $"Compressing {game.Name}... {percent}%"
+                            });
+                        }).ConfigureAwait(false);
 
                     if (compressResult)
                     {
-                        result = result with { ZippedCount = result.ZippedCount + 1 };
+                        zippedCount++;
                         LogHelper.Log($"[BATCH] Successfully compressed: {game.Name}");
+
+                        // Fire off upload immediately if requested
+                        if (game.ShouldUpload)
+                        {
+                            var uploadTask = UploadGameAsync(
+                                game,
+                                outputPath,
+                                settings,
+                                uploadSemaphore,
+                                progressTracker,
+                                progress,
+                                cancellationToken);
+                            uploadTasks.Add(uploadTask);
+                        }
                     }
                     else
                     {
-                        result = result with { ZipFailedCount = result.ZipFailedCount + 1 };
+                        zipFailedCount++;
+                        failures.Add((game.Name, "Compression failed"));
                         LogHelper.Log($"[BATCH] Failed to compress: {game.Name}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    result = result with { ZipFailedCount = result.ZipFailedCount + 1 };
+                    zipFailedCount++;
+                    failures.Add((game.Name, $"Compression exception: {ex.Message}"));
                     LogHelper.LogError($"[BATCH] Exception compressing {game.Name}", ex);
                 }
             }
 
-            // Phase 3: Upload games (placeholder - full upload logic requires form integration)
-            // This would need to be implemented with proper upload service integration
-            currentIndex = 0;
-            foreach (var game in games.Where(g => g.ShouldUpload))
+            // Wait for all uploads to complete
+            if (uploadTasks.Count > 0)
             {
-                if (cancellationToken.IsCancellationRequested)
+                var uploadTaskResults = await Task.WhenAll(uploadTasks).ConfigureAwait(false);
+
+                int uploadedCount = 0;
+                int uploadFailedCount = 0;
+
+                foreach (var (success, info, error) in uploadTaskResults)
                 {
-                    break;
+                    if (success && info != null)
+                    {
+                        uploadedCount++;
+                        uploadResults.Add(info);
+                    }
+                    else
+                    {
+                        uploadFailedCount++;
+                        if (!string.IsNullOrEmpty(error))
+                        {
+                            failures.Add(("Unknown game", error));
+                        }
+                    }
                 }
 
-                currentIndex++;
-                progress?.Report(new BatchProgress
-                {
-                    Phase = "Uploading",
-                    GameName = game.Name,
-                    CurrentGameIndex = currentIndex,
-                    TotalGames = games.Count(g => g.ShouldUpload),
-                    Message = $"Uploading {game.Name}..."
-                });
-
-                // Note: Upload implementation would go here
-                // For now, we increment the uploaded count as placeholder
-                LogHelper.Log($"[BATCH] Upload placeholder for: {game.Name}");
+                result = result with { UploadedCount = uploadedCount, UploadFailedCount = uploadFailedCount };
             }
 
-            result = result with { UploadResults = uploadResults };
+            // Final progress update
+            progress?.Report(progressTracker.GetFinalProgress());
+
+            // Build final result
+            result = result with
+            {
+                CrackedCount = crackedCount,
+                CrackFailedCount = crackFailedCount,
+                ZippedCount = zippedCount,
+                ZipFailedCount = zipFailedCount,
+                UploadResults = uploadResults,
+                Failures = failures,
+                ProcessingTime = DateTime.Now - startTime
+            };
 
             return result;
         }
         catch (Exception ex)
         {
             LogHelper.LogError("[BATCH] Fatal error in batch processing", ex);
-            return result;
+            failures.Add(("Batch", $"Fatal error: {ex.Message}"));
+            return result with { Failures = failures, ProcessingTime = DateTime.Now - startTime };
+        }
+    }
+
+    /// <summary>
+    ///     Uploads a single game with retry logic and URL conversion
+    /// </summary>
+    private async Task<(bool success, UploadResultInfo? info, string? error)> UploadGameAsync(
+        BatchGameItem game,
+        string archivePath,
+        BatchProcessingSettings settings,
+        SemaphoreSlim uploadSemaphore,
+        BatchProgressTracker progressTracker,
+        IProgress<BatchProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        await uploadSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            if (!_fileSystem.FileExists(archivePath))
+            {
+                return (false, null, $"{game.Name}: Archive not found");
+            }
+
+            var fileInfo = new FileInfo(archivePath);
+            long fileSize = fileInfo.Length;
+            string? oneFichierUrl = null;
+            string? pyDriveUrl = null;
+            string? lastError = null;
+
+            // Retry logic for upload
+            for (int attempt = 1; attempt <= settings.MaxRetries; attempt++)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return (false, null, $"{game.Name}: Cancelled");
+                }
+
+                try
+                {
+                    progress?.Report(new BatchProgress
+                    {
+                        Phase = "Uploading",
+                        GameName = game.Name,
+                        Message = attempt > 1
+                            ? $"Retry {attempt}: Uploading {game.Name}..."
+                            : $"Uploading {game.Name}..."
+                    });
+
+                    // Upload to 1fichier
+                    var uploadProgress = new Progress<(long bytesTransferred, long totalBytes, double speed)>(p =>
+                    {
+                        var progressUpdate =
+                            progressTracker.UpdateForUploadProgress(game.Path, p.bytesTransferred, p.totalBytes,
+                                p.speed);
+                        progress?.Report(progressUpdate with
+                        {
+                            GameName = game.Name,
+                            Message = $"⬆ {p.bytesTransferred * 100 / p.totalBytes}% | {p.speed / 1_000_000:F1}MB/s"
+                        });
+                    });
+
+                    oneFichierUrl = await _uploadService.UploadToOneFichierAsync(
+                        archivePath,
+                        uploadProgress,
+                        cancellationToken).ConfigureAwait(false);
+
+                    if (!string.IsNullOrEmpty(oneFichierUrl))
+                    {
+                        LogHelper.Log($"[BATCH] Uploaded to 1fichier: {game.Name}");
+
+                        // Convert to PyDrive if enabled
+                        if (settings.ConvertToPyDrive)
+                        {
+                            progress?.Report(new BatchProgress
+                            {
+                                Phase = "Converting",
+                                GameName = game.Name,
+                                Message = $"Converting {game.Name} to PyDrive..."
+                            });
+
+                            var conversionProgress = progressTracker.UpdateForConversionProgress(game.Path);
+                            progress?.Report(conversionProgress with { GameName = game.Name });
+
+                            pyDriveUrl = await _urlConversionService.ConvertOneFichierToPyDriveAsync(
+                                oneFichierUrl,
+                                fileSize,
+                                status => progress?.Report(new BatchProgress
+                                {
+                                    Phase = "Converting", GameName = game.Name, Message = status
+                                }),
+                                cancellationToken).ConfigureAwait(false);
+
+                            if (!string.IsNullOrEmpty(pyDriveUrl))
+                            {
+                                LogHelper.Log($"[BATCH] Converted to PyDrive: {game.Name}");
+                            }
+                        }
+
+                        return (true,
+                            new UploadResultInfo
+                            {
+                                GameName = game.Name, OneFichierUrl = oneFichierUrl, PyDriveUrl = pyDriveUrl
+                            }, null);
+                    }
+
+                    lastError = "No URL returned from upload";
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex.Message;
+                    LogHelper.LogError($"[BATCH] Upload attempt {attempt} failed for {game.Name}", ex);
+
+                    if (attempt < settings.MaxRetries)
+                    {
+                        await Task.Delay(settings.RetryDelayMs * attempt, cancellationToken).ConfigureAwait(false);
+                    }
+                }
+            }
+
+            return (false, null, $"{game.Name}: Upload failed after {settings.MaxRetries} attempts - {lastError}");
+        }
+        finally
+        {
+            uploadSemaphore.Release();
         }
     }
 
@@ -284,8 +455,28 @@ public sealed class BatchProcessingService(
     {
         try
         {
-            var dirs = _fileSystem.GetFiles(basePath, searchPattern, SearchOption.AllDirectories);
-            foreach (var dir in dirs)
+            // Get all directories first
+            var allDirs = _fileSystem.GetDirectories(basePath);
+
+            // Find matching directories recursively
+            var matchingDirs = new List<string>();
+            foreach (var dir in allDirs)
+            {
+                if (Path.GetFileName(dir).Equals(searchPattern, StringComparison.OrdinalIgnoreCase))
+                {
+                    matchingDirs.Add(dir);
+                }
+
+                // Check subdirectories recursively
+                try
+                {
+                    matchingDirs.AddRange(FindMatchingDirectoriesRecursive(dir, searchPattern));
+                }
+                catch { }
+            }
+
+            // Delete all matching directories
+            foreach (var dir in matchingDirs)
             {
                 try
                 {
@@ -295,5 +486,31 @@ public sealed class BatchProcessingService(
             }
         }
         catch { }
+    }
+
+    private List<string> FindMatchingDirectoriesRecursive(string basePath, string searchPattern)
+    {
+        var results = new List<string>();
+        try
+        {
+            var subdirs = _fileSystem.GetDirectories(basePath);
+            foreach (var subdir in subdirs)
+            {
+                if (Path.GetFileName(subdir).Equals(searchPattern, StringComparison.OrdinalIgnoreCase))
+                {
+                    results.Add(subdir);
+                }
+
+                // Recurse into subdirectory
+                try
+                {
+                    results.AddRange(FindMatchingDirectoriesRecursive(subdir, searchPattern));
+                }
+                catch { }
+            }
+        }
+        catch { }
+
+        return results;
     }
 }

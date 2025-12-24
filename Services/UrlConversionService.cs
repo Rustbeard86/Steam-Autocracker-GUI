@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using APPID.Services.Interfaces;
 
@@ -121,6 +122,98 @@ public sealed class UrlConversionService : IUrlConversionService
         LogHelper.Log("[URL_CONVERT] All retry attempts exhausted, returning original URL");
         // If conversion fails after all retries, return original link
         return oneFichierUrl;
+    }
+
+    public async Task<string?> ConvertOneFichierToPyDriveAsync(
+        string oneFichierUrl,
+        long fileSizeBytes,
+        Action<string>? statusCallback = null,
+        CancellationToken cancellationToken = default)
+    {
+        // Normalize URL to HTTPS
+        if (oneFichierUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            oneFichierUrl = "https://" + oneFichierUrl.Substring(7);
+        }
+
+        // Calculate wait time based on file size (12 seconds per GB, capped at 30 hours)
+        int initialWaitSeconds = 30;
+        if (fileSizeBytes > 5L * 1024 * 1024 * 1024) // 5GB+
+        {
+            long sizeInGb = fileSizeBytes / (1024 * 1024 * 1024);
+            initialWaitSeconds = (int)(sizeInGb * 12);
+            initialWaitSeconds = Math.Min(initialWaitSeconds, 108000); // Cap at 30 hours
+            initialWaitSeconds = Math.Max(initialWaitSeconds, 30);
+        }
+
+        // Calculate retries: enough to cover estimated wait time plus buffer
+        int maxRetries = Math.Max(10, (initialWaitSeconds / 30) + 5);
+        int retryDelay = 30000; // 30 seconds
+
+        double sizeGb = fileSizeBytes / (1024.0 * 1024.0 * 1024.0);
+        LogHelper.Log($"[CONVERT] Starting conversion for {oneFichierUrl}");
+        LogHelper.Log($"[CONVERT] File size: {sizeGb:F2} GB, Initial wait: {initialWaitSeconds}s, Max retries: {maxRetries}");
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return null;
+            }
+
+            try
+            {
+                int remainingSeconds = Math.Max(0, initialWaitSeconds - ((attempt - 1) * 30));
+                string timeStr = remainingSeconds > 60 ? $"~{remainingSeconds / 60}m" : $"~{remainingSeconds}s";
+                statusCallback?.Invoke($"Converting {attempt}/{maxRetries} ({timeStr})");
+
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(30);
+
+                var requestBody = new { link = oneFichierUrl };
+                var json = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var response = await client
+                    .PostAsync(ConversionApiUrl, content, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    using var doc = JsonDocument.Parse(responseJson);
+                    
+                    if (doc.RootElement.TryGetProperty("link", out var linkProp))
+                    {
+                        string? pydriveUrl = linkProp.GetString();
+                        LogHelper.Log($"[CONVERT] SUCCESS! PyDrive URL: {pydriveUrl}");
+                        return pydriveUrl;
+                    }
+                }
+                else
+                {
+                    var errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    
+                    // Check if it's a "still processing" error - keep retrying
+                    if (errorBody.Contains("LINK_DOWN") || errorBody.Contains("wait"))
+                    {
+                        LogHelper.Log("[CONVERT] 1fichier still scanning file, waiting...");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogHelper.LogError($"[CONVERT] Exception on attempt {attempt}", ex);
+            }
+
+            if (attempt < maxRetries)
+            {
+                await Task.Delay(retryDelay, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        LogHelper.Log($"[CONVERT] FAILED after {maxRetries} attempts, will use 1fichier link");
+        return null; // Conversion failed, will use 1fichier link
     }
 
     public bool IsOneFichierUrl(string url)

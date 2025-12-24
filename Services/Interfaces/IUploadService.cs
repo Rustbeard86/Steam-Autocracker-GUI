@@ -13,4 +13,16 @@ public interface IUploadService
     /// <param name="progressCallback">Optional callback for upload progress (0-100).</param>
     /// <returns>A task that returns the upload URL if successful, or null if failed.</returns>
     Task<string?> UploadFileAsync(string filePath, string gameName, Action<int>? progressCallback = null);
+
+    /// <summary>
+    /// Uploads a file to 1fichier with detailed progress reporting
+    /// </summary>
+    /// <param name="filePath">Path to file to upload</param>
+    /// <param name="progress">Progress callback (bytesTransferred, totalBytes, speed in bytes/sec)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Download URL or null if failed</returns>
+    Task<string?> UploadToOneFichierAsync(
+        string filePath,
+        IProgress<(long bytesTransferred, long totalBytes, double speed)>? progress = null,
+        CancellationToken cancellationToken = default);
 }

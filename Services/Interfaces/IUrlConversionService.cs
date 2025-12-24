@@ -17,6 +17,20 @@ public interface IUrlConversionService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    ///     Converts a 1fichier URL to a PyDrive URL with file size for better estimation
+    /// </summary>
+    /// <param name="oneFichierUrl">The 1fichier download URL</param>
+    /// <param name="fileSizeBytes">File size in bytes for wait time calculation</param>
+    /// <param name="statusCallback">Optional callback for status updates</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>The converted PyDrive URL, or null if conversion fails</returns>
+    Task<string?> ConvertOneFichierToPyDriveAsync(
+        string oneFichierUrl,
+        long fileSizeBytes,
+        Action<string>? statusCallback = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     ///     Checks if a URL is a 1fichier URL.
     /// </summary>
     /// <param name="url">The URL to check.</param>

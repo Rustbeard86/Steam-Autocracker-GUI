@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using APPID.Services.Interfaces;
+using APPID.Utilities.Steam;
 
 namespace APPID.Services;
 
@@ -73,6 +74,68 @@ public sealed class UploadService : IUploadService
         catch (Exception ex)
         {
             LogHelper.LogError("Upload failed", ex);
+            return null;
+        }
+    }
+
+    public async Task<string?> UploadToOneFichierAsync(
+        string filePath,
+        IProgress<(long bytesTransferred, long totalBytes, double speed)>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!File.Exists(filePath))
+        {
+            LogHelper.LogError("[UPLOAD] File not found", null);
+            return null;
+        }
+
+        try
+        {
+            var fileInfo = new FileInfo(filePath);
+            long totalBytes = fileInfo.Length;
+            long bytesTransferred = 0;
+            DateTime lastUpdate = DateTime.Now;
+            double smoothedSpeed = 0;
+
+            LogHelper.Log($"[UPLOAD] Starting 1fichier upload: {Path.GetFileName(filePath)} ({totalBytes / BytesToMb:F2} MB)");
+
+            using var uploader = new OneFichierUploader();
+            
+            var uploadProgress = new Progress<double>(percentComplete =>
+            {
+                long currentBytes = (long)(percentComplete * totalBytes);
+                long bytesDelta = currentBytes - bytesTransferred;
+                double timeDelta = (DateTime.Now - lastUpdate).TotalSeconds;
+
+                if (timeDelta > 0.1 && bytesDelta > 0)
+                {
+                    double currentSpeed = bytesDelta / timeDelta;
+                    smoothedSpeed = smoothedSpeed > 0 
+                        ? smoothedSpeed * 0.7 + currentSpeed * 0.3 
+                        : currentSpeed;
+
+                    progress?.Report((currentBytes, totalBytes, smoothedSpeed));
+                    
+                    bytesTransferred = currentBytes;
+                    lastUpdate = DateTime.Now;
+                }
+            });
+
+            var result = await uploader.UploadFileAsync(filePath, uploadProgress, null, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (result != null && !string.IsNullOrEmpty(result.DownloadUrl))
+            {
+                LogHelper.Log($"[UPLOAD] SUCCESS - 1fichier URL: {result.DownloadUrl}");
+                return result.DownloadUrl;
+            }
+
+            LogHelper.Log("[UPLOAD] FAILED - No URL returned from 1fichier");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            LogHelper.LogError($"[UPLOAD] Failed to upload {Path.GetFileName(filePath)}", ex);
             return null;
         }
     }
