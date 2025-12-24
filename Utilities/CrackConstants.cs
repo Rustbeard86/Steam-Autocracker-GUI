@@ -25,6 +25,9 @@ public static class CrackConstants
         "CrashSender.exe",
         "CrashSender1403.exe",
         "WerFault.exe",
+        "crashpad_handler.exe",
+        "ReportCrash.exe",
+        "ErrorReporter.exe",
         
         // Installers and uninstallers
         "unins000.exe",
@@ -45,15 +48,12 @@ public static class CrackConstants
         "vcredist_x86.exe",
         "DirectXSetup.exe",
         "UEPrereqSetup_x64.exe",
+        "EpicOnlineServicesInstaller.exe",
         
         // Anti-cheat (should not be modified)
         "EasyAntiCheat.exe",
         "BEService.exe",
-        "BattlEye.exe",
-        
-        // Other utilities
-        "ReportCrash.exe",
-        "ErrorReporter.exe"
+        "BattlEye.exe"
     ];
 
     /// <summary>

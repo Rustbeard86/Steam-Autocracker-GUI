@@ -5,11 +5,14 @@ using Timer = System.Windows.Forms.Timer;
 
 namespace APPID.Dialogs;
 
-// RGB Progress Window
+/// <summary>
+///     RGB-animated progress window for upload/compression operations
+/// </summary>
 public class RgbProgressWindow : Form
 {
     private const int WmNclbuttondown = 0xA1;
     private const int Htcaption = 0x2;
+
     private Button _btnCancel;
     private int _colorStep;
     private DateTime _countdownStartTime;
@@ -20,14 +23,22 @@ public class RgbProgressWindow : Form
     private string _scrollText = "";
     private Timer _scrollTimer;
     private int _totalCountdownMinutes;
-    internal Label LblStatus;
 
+    internal Label LblStatus;
     internal ProgressBar ProgressBar;
 
-    public RgbProgressWindow(string gameName, string type)
+    public RgbProgressWindow(string gameName, string type, Form parent = null)
     {
         GameName = gameName;
         InitializeWindow(gameName, type);
+
+        // Set parent relationship and centering
+        if (parent != null)
+        {
+            Owner = parent;
+            StartPosition = FormStartPosition.CenterParent;
+            TopMost = parent.TopMost; // Match parent's TopMost state
+        }
 
         // Enable dragging the form
         MouseDown += RGBProgressWindow_MouseDown;
@@ -46,24 +57,13 @@ public class RgbProgressWindow : Form
     [DllImport("user32.dll")]
     private static extern int SendMessage(IntPtr hWnd, int msg, int wParam, int lParam);
 
-    public void CenterOverParent(Form parent)
-    {
-        if (parent is { IsHandleCreated: true })
-        {
-            // Calculate center position
-            int x = parent.Left + (parent.Width - Width) / 2;
-            int y = parent.Top + (parent.Height - Height) / 2;
-            Location = new Point(x, y);
-        }
-    }
-
     private void InitializeWindow(string gameName, string type)
     {
         Text = $"Sharing {gameName} ({type})";
-        Size = new Size(500, 260); // Increased height for scrolling text
-        StartPosition = FormStartPosition.Manual; // We'll set position manually
+        Size = new Size(500, 260);
         FormBorderStyle = FormBorderStyle.None;
         BackColor = Color.FromArgb(5, 8, 20);
+        ShowInTaskbar = false;
 
         // Apply rounded corners when form loads
         Load += (s, e) =>
@@ -75,6 +75,8 @@ public class RgbProgressWindow : Form
                     ref preference, sizeof(int));
             }
             catch { }
+
+            ApplyAcrylicToProgressWindow();
         };
 
         // Scrolling info label - hidden by default
@@ -82,7 +84,7 @@ public class RgbProgressWindow : Form
         {
             Text = "",
             Font = new Font("Segoe UI", 9, FontStyle.Italic),
-            ForeColor = Color.FromArgb(120, 192, 255), // Soft cyan
+            ForeColor = Color.FromArgb(120, 192, 255),
             Location = new Point(25, 25),
             Size = new Size(450, 20),
             AutoSize = false,
@@ -93,7 +95,7 @@ public class RgbProgressWindow : Form
         {
             Text = "Preparing...",
             Font = new Font("Segoe UI", 11),
-            ForeColor = Color.Cyan, // Start with a color, will be animated
+            ForeColor = Color.Cyan,
             Location = new Point(25, 70),
             Size = new Size(450, 30)
         };
@@ -134,9 +136,6 @@ public class RgbProgressWindow : Form
 
         // RGB effect
         SetupRgbEffect();
-
-        // Apply acrylic on load
-        Load += (s, e) => ApplyAcrylicToProgressWindow();
     }
 
     private void ApplyAcrylicToProgressWindow()
@@ -150,21 +149,18 @@ public class RgbProgressWindow : Form
         _rgbTimer.Tick += (s, e) =>
         {
             _colorStep = (_colorStep + 5) % 360;
-            var color = HslToRgb(_colorStep, 1.0, 0.72); // Bright vibrant colors
-            // Apply RGB effect to the text
+            var color = HslToRgb(_colorStep, 1.0, 0.72);
+
             LblStatus.ForeColor = color;
 
-            // Apply RGB to scrolling info text too
             if (_lblScrollingInfo is { Visible: true })
             {
                 _lblScrollingInfo.ForeColor = color;
             }
 
-            // Try to color the progress bar (might not work on all Windows versions)
             try
             {
                 ProgressBar.ForeColor = color;
-                // For Windows 10+, we can try to use visual styles
                 ProgressBar.Style = ProgressBarStyle.Continuous;
             }
             catch { }
@@ -269,32 +265,27 @@ public class RgbProgressWindow : Form
         {
             Invoke(() =>
             {
-                // Set up countdown
                 _countdownStartTime = DateTime.Now;
                 _totalCountdownMinutes = estimatedMinutes;
                 _currentFileSize = fileSizeBytes;
 
-                // Update scrolling text
                 UpdateCountdownText();
                 _lblScrollingInfo.Visible = true;
 
-                // Start scrolling animation with countdown updates
                 if (_scrollTimer == null)
                 {
-                    _scrollTimer = new Timer();
-                    _scrollTimer.Interval = 1000; // Update every second for countdown
+                    _scrollTimer = new Timer { Interval = 1000 };
                     _scrollTimer.Tick += (s, e) =>
                     {
                         UpdateCountdownText();
 
-                        // Do scrolling effect
                         if (!string.IsNullOrEmpty(_scrollText))
                         {
                             _scrollOffset = (_scrollOffset + 2) % _scrollText.Length;
                             string displayText = _scrollText.Substring(_scrollOffset) +
                                                  _scrollText.Substring(0, _scrollOffset);
                             _lblScrollingInfo.Text =
-                                displayText.Substring(0, Math.Min(displayText.Length, 60)); // Show 60 chars
+                                displayText.Substring(0, Math.Min(displayText.Length, 60));
                         }
                     };
                 }
@@ -310,14 +301,13 @@ public class RgbProgressWindow : Form
         var remaining = _totalCountdownMinutes - (int)elapsed.TotalMinutes;
         if (remaining < 1)
         {
-            remaining = 1; // Always show at least 1 minute
+            remaining = 1;
         }
 
         string minuteText = remaining == 1 ? "minute" : "minutes";
 
-        // Only show compression tip for files over 10GB
         string compressionTip = "";
-        if (_currentFileSize > 10L * 1024 * 1024 * 1024) // 10GB
+        if (_currentFileSize > 10L * 1024 * 1024 * 1024)
         {
             compressionTip = "     💡 Tip: 7z ultra compression can make processing up to 40% faster!";
         }

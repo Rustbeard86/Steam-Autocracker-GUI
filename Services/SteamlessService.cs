@@ -1,6 +1,5 @@
 using APPID.Services.Interfaces;
 using Steamless.API.Events;
-using Steamless.API.Model;
 using Steamless.API.Services;
 using Steamless.Library;
 
@@ -39,6 +38,7 @@ public sealed class SteamlessService : ISteamlessService
 
                 // Create logging service to capture Steamless output
                 var logService = new LoggingService();
+                bool hasStubDetection = false;
                 bool hasError = false;
 
                 logService.AddLogMessage += (_, e) =>
@@ -46,11 +46,12 @@ public sealed class SteamlessService : ISteamlessService
                     string message = $"[STEAMLESS-LIB] [{e.MessageType}] {e.Message}";
                     LogHelper.Log(message);
 
-                    // Track if stub was detected
-                    if (e.Message.Contains("SteamStub") ||
-                        e.Message.Contains("variant", StringComparison.OrdinalIgnoreCase))
+                    // Track if stub was detected (indicates EXE has Steam protection)
+                    if (e.Message.Contains("SteamStub", StringComparison.OrdinalIgnoreCase) ||
+                        e.Message.Contains("variant", StringComparison.OrdinalIgnoreCase) ||
+                        e.Message.Contains("detected", StringComparison.OrdinalIgnoreCase))
                     {
-                        bool hasStubDetection = true;
+                        hasStubDetection = true;
                     }
 
                     // Track errors
@@ -69,21 +70,8 @@ public sealed class SteamlessService : ISteamlessService
                 // Create the unpacker instance
                 var unpacker = new SteamlessLibrary();
 
-                // Configure options - optimized for game EXEs
-                var options = new SteamlessOptions
-                {
-                    VerboseOutput = false, // Reduce log spam
-                    KeepBindSection = false, // Remove .bind section
-                    ZeroDosStubData = true, // Zero out DOS stub
-                    RecalculateFileChecksum = true, // Ensure valid PE checksum
-                    DontRealignSections = true, // Keep original alignment
-                    DumpPayloadToDisk = false, // Don't dump payload separately
-                    DumpSteamDrmpToDisk = false, // Don't dump SteamDRMP.dll
-                    UseExperimentalFeatures = false // Stable mode only
-                };
-
                 // Process the file
-                bool success = unpacker.ProcessFile(exePath, options, logService);
+                bool success = unpacker.Unpack(exePath);
 
                 // Check if unpacked file was created
                 string unpackedPath = $"{exePath}.unpacked.exe";
@@ -110,11 +98,28 @@ public sealed class SteamlessService : ISteamlessService
                     };
                 }
 
-                // Failed to process
-                string errorMsg = hasError ? "Unpacking failed - see log for details" : "Unknown error occurred";
-                LogHelper.Log($"[STEAMLESS] FAILED: {errorMsg}");
+                // Failed to process - but check if stub was detected first
+                if (hasStubDetection && !unpackedExists)
+                {
+                    // Stub was detected but unpacking failed - this is a real error
+                    string errorMsg = "Steam Stub detected but unpacking failed - see log for details";
+                    LogHelper.Log($"[STEAMLESS] FAILED: {errorMsg}");
+                    return new SteamlessResult
+                    {
+                        Success = false, UnpackedFileCreated = false, ErrorMessage = errorMsg
+                    };
+                }
 
-                return new SteamlessResult { Success = false, UnpackedFileCreated = false, ErrorMessage = errorMsg };
+                // No stub detected and processing failed - not really an error
+                string noStubMsg = hasError ? "Unpacking failed - see log for details" : "No Steam Stub found in EXE";
+                LogHelper.Log($"[STEAMLESS] {noStubMsg}");
+
+                return new SteamlessResult
+                {
+                    Success = true, // Not an error if there's just no stub
+                    UnpackedFileCreated = false,
+                    ErrorMessage = noStubMsg
+                };
             }
             catch (Exception ex)
             {

@@ -154,6 +154,7 @@ public partial class SteamAppId : Form
 
         // === STEP 11: Initialize Batch Progress Indicator ===
         InitializeBatchIndicator();
+        StartPosition = FormStartPosition.CenterScreen;
     }
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -979,12 +980,11 @@ public partial class SteamAppId : Form
     {
         Tit("Showing permission error dialog...", Color.Yellow);
 
-        DialogResult result = MessageBox.Show(
+        DialogResult result = SafeMessageBox.ShowWarning(this,
             "Permission error: Unable to modify files in the selected game folder.\n\n" +
             "Would you like to copy the game folder to your desktop and perform the action there?",
             "Permission Error",
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Warning);
+            MessageBoxButtons.YesNo);
 
         if (result == DialogResult.Yes)
         {
@@ -1011,7 +1011,7 @@ public partial class SteamAppId : Form
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to copy game: {ex.Message}", "Copy Error", MessageBoxButtons.OK,
+                SafeMessageBox.ShowWarning(this, $"Failed to copy game: {ex.Message}", "Copy Error", MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 return false;
             }
@@ -1290,7 +1290,7 @@ public partial class SteamAppId : Form
 
                 if (steamcount > 1 || execount > 1 || steam64Count > 1)
                 {
-                    DialogResult diagg = MessageBox.Show(
+                    DialogResult diagg = SafeMessageBox.ShowWarning(this,
                         "This is the 2nd steam_api64.dll on this run - something is broken. " +
                         "The APPID has to match the ini/txt files or the cracks will not work.\n\n" +
                         "This usually happens when SACGUI determines the wrong parent dir " +
@@ -1863,7 +1863,7 @@ oLink3.Save";
             }
             else
             {
-                MessageBox.Show("You must select a folder to continue...");
+                SafeMessageBox.ShowWarning(this, "You must select a folder to continue...");
             }
         }
         catch (Exception)
@@ -2005,7 +2005,7 @@ oLink3.Save";
                 if (Path.GetPathRoot(d) == d || d.Length <= 3)
                 {
                     Tit("You can't select a root drive! Pick a game folder.", Color.OrangeRed);
-                    MessageBox.Show("Nope! You can't crack an entire drive. Please select a game folder instead.",
+                    SafeMessageBox.ShowWarning(this, "Nope! You can't crack an entire drive. Please select a game folder instead.",
                         "Nice Try", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     continue;
                 }
@@ -2095,7 +2095,7 @@ oLink3.Save";
             {
                 //FILE - reject all files
                 Tit("Please drag and drop a FOLDER, not a file!", Color.LightSkyBlue);
-                MessageBox.Show("Drag and drop a game folder, not individual files!");
+                SafeMessageBox.ShowWarning(this, "Drag and drop a game folder, not individual files!");
             }
         }
 
@@ -2209,7 +2209,7 @@ oLink3.Save";
                 bool crackSuccess = await CrackAsync();
                 if (!crackSuccess)
                 {
-                    MessageBox.Show($"Failed to crack {gameName}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    SafeMessageBox.ShowWarning(this, $"Failed to crack {gameName}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     _gameDir = originalGameDir;
                     return;
                 }
@@ -2245,7 +2245,7 @@ oLink3.Save";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Error sharing game: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            SafeMessageBox.ShowWarning(this, $"Error sharing game: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
@@ -2326,7 +2326,7 @@ oLink3.Save";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Compression/Upload failed: {ex.Message}", "Error", MessageBoxButtons.OK,
+            SafeMessageBox.Show(this, $"Compression/Upload failed: {ex.Message}", "Error", MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
     }
@@ -2354,7 +2354,7 @@ oLink3.Save";
                         return true;
                     }
 
-                    MessageBox.Show("7-Zip not found! Please install 7-Zip for advanced compression.", "Error",
+                    SafeMessageBox.Show(this,"7-Zip not found! Please install 7-Zip for advanced compression.", "Error",
                         MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return false;
                 }
@@ -2491,7 +2491,7 @@ oLink3.Save";
                 {
                     parentForm.Invoke(() =>
                     {
-                        MessageBox.Show(
+                        SafeMessageBox.Show(this,
                             $"File is {fileSizeMb:F0}MB. The server may reject files over 500MB.\n\nConsider using higher compression settings.",
                             "Large File Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     });
@@ -2594,7 +2594,7 @@ oLink3.Save";
             {
                 parentForm.Invoke(() =>
                 {
-                    MessageBox.Show(
+                    SafeMessageBox.Show(this,
                         $"Upload failed (HTTP Error):\n{httpEx.Message}\n\nInner: {httpEx.InnerException?.Message}",
                         "Upload Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
@@ -2608,7 +2608,7 @@ oLink3.Save";
             {
                 parentForm.Invoke(() =>
                 {
-                    MessageBox.Show("Upload failed: Request timed out (file too large or slow connection)",
+                    SafeMessageBox.Show(this,"Upload failed: Request timed out (file too large or slow connection)",
                         "Upload Timeout", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
             }
@@ -2624,7 +2624,7 @@ oLink3.Save";
             {
                 parentForm.Invoke(() =>
                 {
-                    MessageBox.Show(
+                    SafeMessageBox.Show(this,
                         $"Upload failed:\n{ex.Message}\n\nType: {ex.GetType().Name}\n\nInner: {ex.InnerException?.Message}",
                         "Upload Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 });
@@ -3125,7 +3125,7 @@ oLink3.Save";
         }
         else
         {
-            MessageBox.Show("Enter APPID or press ESC to cancel!", "No APPID entered!");
+            SafeMessageBox.Show(this,"Enter APPID or press ESC to cancel!", "No APPID entered!");
         }
     }
 
@@ -3226,7 +3226,7 @@ oLink3.Save";
             }
             else
             {
-                MessageBox.Show("Enter APPID or press ESC to cancel!");
+                SafeMessageBox.Show(this,"Enter APPID or press ESC to cancel!");
             }
         }
 

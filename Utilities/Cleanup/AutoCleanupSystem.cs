@@ -1,3 +1,5 @@
+using APPID.Utilities.UI;
+
 namespace APPID.Utilities.Cleanup;
 
 public static class AutoCleanupSystem
@@ -62,11 +64,10 @@ public static class AutoCleanupSystem
         message += "After cleanup, you'll have clean files ready to share.\n\n";
         message += "Clean up now?";
 
-        var result = MessageBox.Show(
+        var result = SafeMessageBox.ShowWarning(parentForm,
             message,
             "Clean Install Not Found - Auto Cleanup Available",
-            MessageBoxButtons.YesNoCancel,
-            MessageBoxIcon.Warning
+            MessageBoxButtons.YesNoCancel
         );
 
         if (result == DialogResult.Cancel)
@@ -76,7 +77,7 @@ public static class AutoCleanupSystem
 
         if (result == DialogResult.No)
         {
-            MessageBox.Show(
+            SafeMessageBox.ShowWarning(parentForm,
                 "Cannot upload cracked files as clean.\n\n" +
                 "To share clean files, you must either:\n" +
                 "• Let us clean it up automatically, or\n" +
@@ -94,11 +95,11 @@ public static class AutoCleanupSystem
 
         if (!cleanupResult.Success)
         {
-            ShowCleanupErrorDialog(cleanupResult);
+            ShowCleanupErrorDialog(cleanupResult, parentForm);
             return false;
         }
 
-        ShowCleanupSuccessDialog(cleanupResult, gameName);
+        ShowCleanupSuccessDialog(cleanupResult, gameName, parentForm);
         return true;
     }
 
@@ -290,18 +291,20 @@ public static class AutoCleanupSystem
         return result;
     }
 
-    private static void ShowCleanupSuccessDialog(CleanupResult result, string gameName)
+    private static void ShowCleanupSuccessDialog(CleanupResult result, string gameName, Form parentForm)
     {
         var successForm = new Form
         {
             Text = "Cleanup Complete!",
             Size = new Size(500, 400),
-            StartPosition = FormStartPosition.CenterScreen,
+            StartPosition = FormStartPosition.CenterParent,
             BackColor = Color.FromArgb(30, 30, 30),
             ForeColor = Color.White,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
-            MinimizeBox = false
+            MinimizeBox = false,
+            Owner = parentForm, // Set owner for proper z-order
+            TopMost = parentForm.TopMost // Match parent's TopMost state
         };
 
         var lblTitle = new Label
@@ -371,21 +374,23 @@ public static class AutoCleanupSystem
         };
 
         successForm.Controls.AddRange(lblTitle, lblSummary, txtDetails, btnOk);
-        successForm.ShowDialog();
+        successForm.ShowDialog(parentForm);
     }
 
-    private static void ShowCleanupErrorDialog(CleanupResult result)
+    private static void ShowCleanupErrorDialog(CleanupResult result, Form parentForm)
     {
         var errorForm = new Form
         {
             Text = "Cleanup Failed",
             Size = new Size(500, 350),
-            StartPosition = FormStartPosition.CenterScreen,
+            StartPosition = FormStartPosition.CenterParent,
             BackColor = Color.FromArgb(30, 30, 30),
             ForeColor = Color.White,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
-            MinimizeBox = false
+            MinimizeBox = false,
+            Owner = parentForm, // Set owner for proper z-order
+            TopMost = parentForm.TopMost // Match parent's TopMost state
         };
 
         var lblTitle = new Label
@@ -432,10 +437,11 @@ public static class AutoCleanupSystem
         };
 
         errorForm.Controls.AddRange(lblTitle, lblMessage, txtErrors, btnOk);
-        errorForm.ShowDialog();
+        errorForm.ShowDialog(parentForm);
     }
 
     // Quick check if we can auto-clean
+    // TODO: Implement
     public static bool CanAutoClean(string gamePath)
     {
         // We can auto-clean if we find our backup files

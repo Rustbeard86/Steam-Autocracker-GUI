@@ -4,7 +4,6 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using APPID.Dialogs;
 using APPID.Models;
 using APPID.Properties;
@@ -93,6 +92,8 @@ public partial class EnhancedShareWindow : Form
         SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
 
         InitializeComponent(); // Use the Designer.cs file instead!
+        StartPosition = FormStartPosition.CenterParent;
+        Owner = parent;
 
         // Setup custom painting for settings button with proper icon scaling
         Image settingsIcon = null;
@@ -1137,7 +1138,6 @@ public partial class EnhancedShareWindow : Form
                 }
                 catch (Exception ex)
                 {
-
                     // Remove overlay
                     Controls.Remove(overlay);
                     overlay.Dispose();
@@ -1248,7 +1248,6 @@ public partial class EnhancedShareWindow : Form
             var progressForm = new RgbProgressWindow(gameName, cracked ? "Cracked" : "Clean");
             progressForm.TopMost = TopMost;
             progressForm.Show(this);
-            progressForm.CenterOverParent(this);
             progressForm.UpdateStatus($"Compressing with {format.ToUpper()} level {level}..." +
                                       (usePassword ? " (Password protected)" : ""));
 
@@ -1950,7 +1949,6 @@ public partial class EnhancedShareWindow : Form
             progressWindow.TopMost = TopMost;
             progressWindow.LblStatus.Text = "Starting upload...";
             progressWindow.Show(this);
-            progressWindow.CenterOverParent(this);
             progressWindow.BringToFront();
             Application.DoEvents(); // Allow UI to update
 
