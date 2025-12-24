@@ -5,7 +5,6 @@ namespace APPID.Utilities.Network;
 
 /// <summary>
 ///     Provides shared HttpClient instances with proper configuration.
-///     Replaces obsolete ServicePointManager and WebClient usage.
 /// </summary>
 public static class HttpClientFactory
 {

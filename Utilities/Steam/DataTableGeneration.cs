@@ -73,7 +73,6 @@ public class DataTableGeneration
                     {
                         try
                         {
-                            // Use HttpClientFactory instead of obsolete ServicePointManager
                             using var client = HttpClientFactory.CreateClient(true);
                             client.Timeout = TimeSpan.FromSeconds(60);
                             string freshContent =
@@ -100,7 +99,6 @@ public class DataTableGeneration
         // No cache or failed to load, fetch from backend
         try
         {
-            // Use HttpClientFactory instead of obsolete ServicePointManager
             using var httpClient = HttpClientFactory.CreateClient(true);
             httpClient.Timeout = TimeSpan.FromSeconds(60);
             string content =
