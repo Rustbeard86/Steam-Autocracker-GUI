@@ -89,7 +89,10 @@ internal static class DependencySetupService
                         Directory.Delete(sevenZipDir, true);
                     }
                 }
-                catch { }
+                catch
+                {
+                    // ignored
+                }
             }
         }
 
@@ -150,7 +153,10 @@ internal static class DependencySetupService
 
             // Clean up
             try { File.Delete(tempArchive); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             // Verify extraction - check for x64 version first, fallback to root
             string x64Exe = Path.Combine(sevenZipDir, "x64", "7za.exe");
@@ -286,25 +292,21 @@ internal static class DependencySetupService
             Directory.CreateDirectory(goldbergDir);
             CopyDirectory(releaseDir, goldbergDir);
 
-            // Also copy lobby_connect to _bin root for easy access
-            string[] lobbyPaths =
-            [
-                Path.Combine(goldbergDir, "tools", "lobby_connect", "lobby_connect_x64.exe"),
-                Path.Combine(goldbergDir, "tools", "lobby_connect", "lobby_connect_x32.exe")
-            ];
-
-            foreach (string lobbyPath in lobbyPaths.Where(File.Exists))
-            {
-                string destPath = Path.Combine(BinPath, Path.GetFileName(lobbyPath));
-                File.Copy(lobbyPath, destPath, true);
-            }
+            // DON'T copy lobby_connect to _bin root - consume from Goldberg/tools/lobby_connect directly
+            LogHelper.Log("[SETUP] Goldberg extracted to _bin/Goldberg (tools remain in subdirectories)");
 
             // Clean up
             try { File.Delete(tempFile); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             try { Directory.Delete(tempDir, true); }
-            catch { }
+            catch
+            {
+                // ignored
+            }
 
             // Update version file
             await File.WriteAllTextAsync(versionFile, latestVersion);

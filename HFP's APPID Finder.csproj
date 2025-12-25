@@ -92,4 +92,20 @@
     </Compile>
   </ItemGroup>
 
+  <!-- Custom Clean Target: Delete entire bin folder -->
+  <Target Name="CustomCleanBin" BeforeTargets="Clean">
+    <Message Text="[CUSTOM CLEAN] Removing entire bin folder and all contents..." Importance="high" />
+    <ItemGroup>
+      <BinFolderContents Include="$(BaseOutputPath)**\*.*" />
+      <BinSubDirs Include="$([System.IO.Directory]::GetDirectories('$(BaseOutputPath)', '*', System.IO.SearchOption.AllDirectories))" />
+    </ItemGroup>
+    <!-- Delete all files first -->
+    <Delete Files="@(BinFolderContents)" ContinueOnError="true" />
+    <!-- Delete all subdirectories -->
+    <RemoveDir Directories="@(BinSubDirs)" ContinueOnError="true" />
+    <!-- Delete the bin folder itself -->
+    <RemoveDir Directories="$(BaseOutputPath)" ContinueOnError="true" />
+    <Message Text="[CUSTOM CLEAN] bin folder deleted successfully!" Importance="high" />
+  </Target>
+
 </Project>

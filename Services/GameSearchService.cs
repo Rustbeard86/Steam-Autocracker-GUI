@@ -8,7 +8,9 @@ namespace APPID.Services;
 /// </summary>
 public class GameSearchService : IGameSearchService
 {
-    private static readonly Regex CamelCaseRegex = new(@"([A-Z])", RegexOptions.Compiled);
+    private static readonly Regex CamelCaseRegex =
+        new(@"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", RegexOptions.Compiled);
+
     private static readonly Regex SpecialCharsRegex = new(@"[^a-zA-Z0-9._0-]+", RegexOptions.Compiled);
     private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
@@ -25,6 +27,12 @@ public class GameSearchService : IGameSearchService
         if (TryExactMatch(searchText, dataTable, view, out var exactResult))
         {
             return exactResult;
+        }
+
+        // Level 1.5: CamelCase split exact match (e.g., "RSDragonwilds" -> "RS Dragonwilds")
+        if (TryCamelCaseSplitMatch(searchText, dataTable, view, out var camelCaseResult))
+        {
+            return camelCaseResult;
         }
 
         // Level 2: Soundtrack/DLC filtering (prefer base games)
@@ -85,6 +93,44 @@ public class GameSearchService : IGameSearchService
         if (exactMatches.Any())
         {
             string exactName = exactMatches.First().Field<string>("Name");
+            view.RowFilter = $"Name = '{EscapeSingleQuotes(exactName)}'";
+
+            result = new SearchResult
+            {
+                MatchCount = 1,
+                Quality = SearchMatchQuality.ExactMatch,
+                AppliedFilter = view.RowFilter,
+                HasExactMatch = true
+            };
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryCamelCaseSplitMatch(string searchText, DataTable dataTable, DataView view, out SearchResult result)
+    {
+        result = null;
+
+        if (searchText.Length <= 3 || !HasCamelCasePattern(searchText))
+        {
+            return false;
+        }
+
+        string splitSearch = SplitCamelCase(searchText);
+
+        if (splitSearch == searchText)
+        {
+            return false;
+        }
+
+        var camelCaseMatches = dataTable.AsEnumerable()
+            .Where(row => string.Equals(row.Field<string>("Name"), splitSearch, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (camelCaseMatches.Any())
+        {
+            string exactName = camelCaseMatches.First().Field<string>("Name");
             view.RowFilter = $"Name = '{EscapeSingleQuotes(exactName)}'";
 
             result = new SearchResult
@@ -276,7 +322,37 @@ public class GameSearchService : IGameSearchService
 
     private static string SplitCamelCase(string input)
     {
-        return CamelCaseRegex.Replace(input, " $1").Trim();
+        return CamelCaseRegex.Replace(input, " ").Trim();
+    }
+
+    private static bool HasCamelCasePattern(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        bool hasLower = false;
+        bool hasUpper = false;
+
+        foreach (char c in text)
+        {
+            if (char.IsLower(c))
+            {
+                hasLower = true;
+            }
+            else if (char.IsUpper(c))
+            {
+                hasUpper = true;
+            }
+
+            if (hasLower && hasUpper)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string EscapeSingleQuotes(string text)

@@ -1102,8 +1102,8 @@ public partial class SteamAppId : Form
                     try
                     {
                         string sourceEmulatorDll = Goldy
-                            ? $"{BinPath}\\Goldberg\\steam_api64.dll"
-                            : $"{BinPath}\\ALI213\\steam_api64.dll";
+                            ? Path.Combine(BinPath, "Goldberg", "regular", "x64", "steam_api64.dll")
+                            : Path.Combine(BinPath, "ALI213", "steam_api64.dll");
 
                         // Check if current file is already the emulator DLL
                         if (AreFilesIdentical(file, sourceEmulatorDll))
@@ -1183,8 +1183,8 @@ public partial class SteamAppId : Form
                     try
                     {
                         string sourceEmulatorDll = Goldy
-                            ? $"{BinPath}\\Goldberg\\steam_api.dll"
-                            : $"{BinPath}\\ALI213\\steam_api.dll";
+                            ? Path.Combine(BinPath, "Goldberg", "regular", "x32", "steam_api.dll")
+                            : Path.Combine(BinPath, "ALI213", "steam_api.dll");
 
                         // Check if current file is already the emulator DLL
                         string emulatorName = Goldy ? "Goldberg" : "ALI213";
@@ -1348,25 +1348,17 @@ public partial class SteamAppId : Form
 
                         File.WriteAllText($"{parentdir}\\steam_settings\\custom_broadcasts.txt", broadcastContent);
 
-                        // Copy lobby_connect tool to game directory for easy access
+                        // Use lobby_connect directly from Goldberg/tools/lobby_connect (no copying)
                         string lobbyConnectSource = "";
-                        // Check in _bin folder first (where updater puts them)
-                        if (File.Exists($"{BinPath}\\lobby_connect_x64.exe"))
+                        string lobbyConnectDir = Path.Combine(BinPath, "Goldberg", "tools", "lobby_connect");
+
+                        if (File.Exists(Path.Combine(lobbyConnectDir, "lobby_connect_x64.exe")))
                         {
-                            lobbyConnectSource = $"{BinPath}\\lobby_connect_x64.exe";
+                            lobbyConnectSource = Path.Combine(lobbyConnectDir, "lobby_connect_x64.exe");
                         }
-                        else if (File.Exists($"{BinPath}\\lobby_connect_x32.exe"))
+                        else if (File.Exists(Path.Combine(lobbyConnectDir, "lobby_connect_x32.exe")))
                         {
-                            lobbyConnectSource = $"{BinPath}\\lobby_connect_x32.exe";
-                        }
-                        // Fallback to _bin\\Goldberg for backward compatibility
-                        else if (File.Exists($"{BinPath}\\Goldberg\\lobby_connect_x64.exe"))
-                        {
-                            lobbyConnectSource = $"{BinPath}\\Goldberg\\lobby_connect_x64.exe";
-                        }
-                        else if (File.Exists($"{BinPath}\\Goldberg\\lobby_connect_x32.exe"))
-                        {
-                            lobbyConnectSource = $"{BinPath}\\Goldberg\\lobby_connect_x32.exe";
+                            lobbyConnectSource = Path.Combine(lobbyConnectDir, "lobby_connect_x32.exe");
                         }
 
                         if (!string.IsNullOrEmpty(lobbyConnectSource))
@@ -1535,12 +1527,12 @@ oLink3.Save";
                     // Generate interfaces file if the tool exists (required for gbe_fork)
                     // Try different possible locations and names for the generate_interfaces tool
                     string generateInterfacesPath = "";
+                    string goldbergToolsDir = Path.Combine(BinPath, "Goldberg", "tools", "generate_interfaces");
                     string[] possiblePaths =
                     [
-                        $"{BinPath}\\Goldberg\\generate_interfaces_x64.exe",
-                        $"{BinPath}\\Goldberg\\generate_interfaces_x32.exe",
-                        $"{BinPath}\\generate_interfaces_x64.exe", $"{BinPath}\\generate_interfaces_x32.exe",
-                        $"{BinPath}\\Goldberg\\generate_interfaces_file.exe", $"{BinPath}\\generate_interfaces.exe"
+                        Path.Combine(goldbergToolsDir, "generate_interfaces_x64.exe"),
+                        Path.Combine(goldbergToolsDir, "generate_interfaces_x32.exe"),
+                        Path.Combine(BinPath, "Goldberg", "generate_interfaces_file.exe")
                     ];
 
                     foreach (string path in possiblePaths)

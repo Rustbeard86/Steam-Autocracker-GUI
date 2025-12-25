@@ -88,15 +88,23 @@ public sealed class CompressionService(string binPath) : ICompressionService
         }
     }
 
-    private static string? FindSevenZip()
+    private string? FindSevenZip()
     {
-        string[] possiblePaths =
+        // PRIORITY 1: Check downloaded version in _bin folder (from GitHub)
+        string downloadedPath = Path.Combine(_binPath, "7z", "7za.exe");
+        if (File.Exists(downloadedPath))
+        {
+            return downloadedPath;
+        }
+
+        // PRIORITY 2: Fallback to system-installed 7-Zip
+        string[] systemPaths =
         [
             @"C:\Program Files\7-Zip\7z.exe",
             @"C:\Program Files (x86)\7-Zip\7z.exe"
         ];
 
-        return possiblePaths.FirstOrDefault(File.Exists);
+        return systemPaths.FirstOrDefault(File.Exists);
     }
 
     private static string GetCompressionSwitch(string level) => level.ToLower() switch
