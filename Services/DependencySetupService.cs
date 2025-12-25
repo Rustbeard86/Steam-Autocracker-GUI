@@ -27,6 +27,10 @@ internal static class DependencySetupService
 
             // Now that 7-Zip is available, check Goldberg
             await EnsureGoldbergAsync(statusCallback);
+
+            // All done - reset status after short delay
+            await Task.Delay(2000);
+            statusCallback?.Invoke("Click folder & select game's parent directory.");
         }
         catch (Exception ex)
         {
@@ -43,13 +47,54 @@ internal static class DependencySetupService
     {
         string sevenZipExe = Path.Combine(BinPath, "7z", "7za.exe");
 
+        // Check if 7-Zip exists AND is actually usable (not a broken SFX installer)
         if (File.Exists(sevenZipExe))
         {
-            return; // Already have 7-Zip
+            // Quick validation - try to run it with --help
+            try
+            {
+                var testPsi = new ProcessStartInfo
+                {
+                    FileName = sevenZipExe,
+                    Arguments = "--help",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                using var testProcess = Process.Start(testPsi);
+                if (testProcess != null)
+                {
+                    await testProcess.WaitForExitAsync();
+
+                    // If it ran successfully without elevation error, it's good
+                    if (testProcess.ExitCode == 0 || testProcess.ExitCode == 1) // 0 or 1 are both valid for --help
+                    {
+                        return; // Working 7-Zip found
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // If validation fails (elevation error, etc.), delete and re-download
+                LogHelper.Log($"[SETUP] Existing 7za.exe failed validation: {ex.Message}");
+                try
+                {
+                    File.Delete(sevenZipExe);
+                    // Also delete the directory to clean up
+                    string sevenZipDir = Path.GetDirectoryName(sevenZipExe)!;
+                    if (Directory.Exists(sevenZipDir))
+                    {
+                        Directory.Delete(sevenZipDir, true);
+                    }
+                }
+                catch { }
+            }
         }
 
         statusCallback?.Invoke("Downloading 7-Zip (one-time setup)...");
-        LogHelper.Log("[SETUP] 7-Zip not found, downloading from GitHub...");
+        LogHelper.Log("[SETUP] 7-Zip not found or invalid, downloading from GitHub...");
 
         try
         {
