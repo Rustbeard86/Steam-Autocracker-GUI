@@ -12,7 +12,6 @@ public class GameSearchService : IGameSearchService
         new(@"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", RegexOptions.Compiled);
 
     private static readonly Regex SpecialCharsRegex = new(@"[^a-zA-Z0-9._0-]+", RegexOptions.Compiled);
-    private static readonly Regex WhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
 
     public SearchResult PerformSearch(string searchText, DataTable dataTable)
     {

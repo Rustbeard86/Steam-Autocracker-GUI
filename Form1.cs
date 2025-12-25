@@ -1610,10 +1610,12 @@ oLink3.Save";
 
                         var parser = new SteamAchievementParser(httpClient, parserConfig);
 
-                        bool achievementSuccess = await parser.GenerateAchievementsFileAsync(baseConfig,
+                        bool achievementSuccess = await parser.GenerateAchievementsFileAsync(
+                            baseConfig,
                             null,
                             CurrentAppId,
-                            parentdir
+                            parentdir,
+                            Tit  // ← ADD THIS: Pass status callback to parser
                         );
 
                         if (achievementSuccess)

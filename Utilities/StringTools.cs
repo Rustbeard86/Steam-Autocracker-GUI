@@ -5,6 +5,8 @@ namespace APPID.Utilities;
 /// </summary>
 internal static class StringTools
 {
+    private static readonly Regex UrlParamRegex = new(@"([?&][^=&]+=[^&]*)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     /// <summary>
     ///     Removes everything after the first occurrence of a substring, keeping the substring.
     /// </summary>
@@ -189,7 +191,8 @@ internal static class StringTools
         {
             // Match patterns like: ?key=VALUE or &key=VALUE
             string pattern = $@"([?&]{Regex.Escape(param)}=)[^&]*";
-            result = Regex.Replace(result, pattern, "$1***", RegexOptions.IgnoreCase);
+            var regex = new Regex(pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            result = regex.Replace(result, "$1***");
         }
 
         return result;

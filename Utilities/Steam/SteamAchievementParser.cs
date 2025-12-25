@@ -45,9 +45,10 @@ namespace APPID.Utilities.Steam
                 /// <param name="apiKey">Your Steam Web API Key (Optional).</param>
                 /// <param name="appId">The Steam AppID of the game.</param>
                 /// <param name="outputDirectory">The root folder where steam_settings should be created/updated.</param>
+                /// <param name="statusCallback">Optional callback for status updates to UI</param>
                 /// <returns>True if successful, False otherwise.</returns>
                 public async Task<bool> GenerateAchievementsFileAsync(string baseUrl, string apiKey, string appId,
-                    string outputDirectory)
+                    string outputDirectory, Action<string, Color>? statusCallback = null)
                 {
                     string settingsDir = Path.Combine(outputDirectory, "steam_settings");
                     string imagesDir = Path.Combine(settingsDir, "achievement_images");
@@ -59,7 +60,7 @@ namespace APPID.Utilities.Steam
                         LogHelper.Log($"[ACHIEVEMENTS] Using base URL: {baseUrl}");
                         LogHelper.Log($"[ACHIEVEMENTS] Output directory: {outputDirectory}");
 
-                        var achievements = await FetchSteamSchema(baseUrl, appId, apiKey);
+                        var achievements = await FetchSteamSchema(baseUrl, appId, apiKey, statusCallback);
 
                         if (achievements is { Count: 0 })
                         {
@@ -132,7 +133,7 @@ namespace APPID.Utilities.Steam
                 }
 
                 private async Task<List<SteamAchievementDef>?> FetchSteamSchema(string baseUrl, string appId,
-                    string apiKey)
+                    string apiKey, Action<string, Color>? statusCallback = null)
                 {
                     try
                     {
@@ -179,6 +180,16 @@ namespace APPID.Utilities.Steam
                             catch
                             {
                                 // ignored
+                            }
+
+                            // Update UI with user-friendly error message
+                            if (response.StatusCode == System.Net.HttpStatusCode.GatewayTimeout || 
+                                response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable ||
+                                response.StatusCode == System.Net.HttpStatusCode.BadGateway)
+                            {
+                                statusCallback?.Invoke(
+                                    "Achievement API temporarily unavailable - try again later", 
+                                    Color.Orange);
                             }
 
                             return null;

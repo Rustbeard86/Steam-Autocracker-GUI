@@ -6,6 +6,8 @@ namespace APPID.Utilities.Steam;
 
 public class DataTableGeneration
 {
+    private static readonly Regex SpecialCharsRegex = new(@"[^a-zA-Z0-9._0 -]+", RegexOptions.Compiled);
+
     public static DataTable DataTable;
     public static DataTable Dt;
 
@@ -22,7 +24,7 @@ public class DataTableGeneration
     public static string RemoveSpecialCharacters(string str)
     {
         str = str.Replace(":", " -").Replace("'", "").Replace("&", "and");
-        return Regex.Replace(str, "[^a-zA-Z0-9._0 -]+", "", RegexOptions.Compiled);
+        return SpecialCharsRegex.Replace(str, "");
     }
 
     private static void LogError(string message)

@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using APPID.Properties;
 using APPID.Utilities.UI;
+using System.Text.RegularExpressions;
 
 namespace APPID;
 
@@ -12,6 +13,11 @@ public partial class CompressionSettingsForm : Form
 {
     private const int WmNclbuttondown = 0xA1;
     private const int Htcaption = 0x2;
+    
+    private static readonly Regex BandwidthParseRegex = 
+        new(@"^(\d+(?:\.\d+)?)\s*(kb|kbit|kbps|mb|mbit|mbps|gb|gbit|gbps)?$", 
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    
     private readonly TextBox _bandwidthTextBox;
     private readonly ComboBox _bandwidthUnitCombo;
     private Panel _sliderPanel;
@@ -507,33 +513,31 @@ public partial class CompressionSettingsForm : Form
         try
         {
             string saved = Settings.Default.UploadBandwidthLimit ?? "";
-            ParseBandwidthLimit(saved); // Initialize the static property
+            ParseBandwidthLimit(saved);
 
             if (string.IsNullOrWhiteSpace(saved))
             {
                 _bandwidthTextBox.Text = "";
-                _bandwidthUnitCombo.SelectedIndex = 1; // Mbps default
+                _bandwidthUnitCombo.SelectedIndex = 1;
                 return;
             }
 
-            // Parse the saved value to extract number and unit
-            var match = Regex.Match(saved.Trim().ToLower(),
-                @"^(\d+(?:\.\d+)?)\s*(kb|kbit|kbps|mb|mbit|mbps|gb|gbit|gbps)?$");
+            var match = BandwidthParseRegex.Match(saved.Trim().ToLower());
             if (match.Success)
             {
                 _bandwidthTextBox.Text = match.Groups[1].Value;
                 string unit = match.Groups[2].Value;
                 if (unit.StartsWith("k"))
                 {
-                    _bandwidthUnitCombo.SelectedIndex = 0; // Kbps
+                    _bandwidthUnitCombo.SelectedIndex = 0;
                 }
                 else if (unit.StartsWith("g"))
                 {
-                    _bandwidthUnitCombo.SelectedIndex = 2; // Gbps
+                    _bandwidthUnitCombo.SelectedIndex = 2;
                 }
                 else
                 {
-                    _bandwidthUnitCombo.SelectedIndex = 1; // Mbps (default)
+                    _bandwidthUnitCombo.SelectedIndex = 1;
                 }
             }
         }
@@ -575,8 +579,7 @@ public partial class CompressionSettingsForm : Form
 
         input = input.Trim().ToLower();
 
-        // Extract number and unit
-        var match = Regex.Match(input, @"^(\d+(?:\.\d+)?)\s*(mb|mbit|gb|gbit|kb|kbit|mbps|gbps|kbps)?$");
+        var match = BandwidthParseRegex.Match(input);
         if (!match.Success)
         {
             UploadBandwidthLimitBytesPerSecond = 0;
@@ -598,7 +601,7 @@ public partial class CompressionSettingsForm : Form
             case "mb":
             case "mbit":
             case "mbps":
-            case "": // Default to Mbit if no unit
+            case "":
                 bitsPerSecond = value * 1000 * 1000;
                 break;
             case "gb":
@@ -607,11 +610,10 @@ public partial class CompressionSettingsForm : Form
                 bitsPerSecond = value * 1000 * 1000 * 1000;
                 break;
             default:
-                bitsPerSecond = value * 1000 * 1000; // Default to Mbit
+                bitsPerSecond = value * 1000 * 1000;
                 break;
         }
 
-        // Convert bits to bytes (divide by 8)
         UploadBandwidthLimitBytesPerSecond = (long)(bitsPerSecond / 8);
         return UploadBandwidthLimitBytesPerSecond;
     }
