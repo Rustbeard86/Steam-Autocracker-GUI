@@ -9,20 +9,22 @@ namespace APPID.Services;
 public sealed class GameFolderService(IFileSystemService fileSystem, IGameDetectionService gameDetection)
     : IGameFolderService
 {
-    private readonly IFileSystemService _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
-    private readonly IGameDetectionService _gameDetection = gameDetection ?? throw new ArgumentNullException(nameof(gameDetection));
-
     // Common subfolder patterns that indicate we're in a subdirectory, not the game root
     private static readonly string[] SubfolderPatterns =
     [
-        "_Data",           // Unity: Game_Data
-        "_Binaries",       // UE: GameName_Binaries
-        "Binaries",        // UE binaries folder
-        "Content",         // UE content folder
-        "Engine",          // UE engine folder  
-        "bin",             // Common bin folder
-        "data"             // Common data folder
+        "_Data", // Unity: Game_Data
+        "_Binaries", // UE: GameName_Binaries
+        "Binaries", // UE binaries folder
+        "Content", // UE content folder
+        "Engine", // UE engine folder  
+        "bin", // Common bin folder
+        "data" // Common data folder
     ];
+
+    private readonly IFileSystemService _fileSystem = fileSystem ?? throw new ArgumentNullException(nameof(fileSystem));
+
+    private readonly IGameDetectionService _gameDetection =
+        gameDetection ?? throw new ArgumentNullException(nameof(gameDetection));
 
     public string GetGameName(string folderPath)
     {

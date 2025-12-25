@@ -203,7 +203,7 @@ public class AppIdSearchDialog : Form
             }
             else
             {
-                SafeMessageBox.Show(this,"Please select a game from the results or enter an AppID manually.",
+                SafeMessageBox.Show(this, "Please select a game from the results or enter an AppID manually.",
                     "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         };

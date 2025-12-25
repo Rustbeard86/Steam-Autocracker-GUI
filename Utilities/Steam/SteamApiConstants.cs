@@ -20,7 +20,9 @@ public static class SteamApiConstants
     // === Web API Endpoints ===
     public const string GetSchemaForGameEndpoint = "/ISteamUserStats/GetSchemaForGame/v2/";
     public const string GetPlayerAchievementsEndpoint = "/ISteamUserStats/GetPlayerAchievements/v1/";
-    public const string GetGlobalAchievementPercentagesEndpoint = "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/";
+
+    public const string GetGlobalAchievementPercentagesEndpoint =
+        "/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/";
 
     // === Query Parameters ===
     public const string ParamAppId = "appid";
@@ -33,6 +35,25 @@ public static class SteamApiConstants
     // === Default Values ===
     public const string DefaultLanguage = "en";
     public const string DefaultCountryCode = "us";
+
+    // === App Types ===
+    public const string AppTypeGame = "game";
+    public const string AppTypeDlc = "dlc";
+    public const string AppTypeDemo = "demo";
+    public const string AppTypeMod = "mod";
+    public const string AppTypeVideo = "video";
+
+    // === Rate Limiting ===
+    public const int RateLimitDelayMs = 100; // Delay between API calls to avoid throttling
+    public const int MaxRetriesOnRateLimit = 3;
+
+    // === Timeouts ===
+    public const int DefaultTimeoutSeconds = 30;
+    public const int LongOperationTimeoutSeconds = 60;
+
+    // === Cache Settings ===
+    public const int CacheDurationMinutes = 5; // Memory cache TTL for API responses
+    public const int PersistentCacheDurationDays = 7; // Disk cache TTL
 
     // === Filter Keywords (for excluding non-game content) ===
     public static readonly string[] ExcludedContentKeywords =
@@ -54,25 +75,6 @@ public static class SteamApiConstants
         "ost"
     ];
 
-    // === App Types ===
-    public const string AppTypeGame = "game";
-    public const string AppTypeDlc = "dlc";
-    public const string AppTypeDemo = "demo";
-    public const string AppTypeMod = "mod";
-    public const string AppTypeVideo = "video";
-
-    // === Rate Limiting ===
-    public const int RateLimitDelayMs = 100; // Delay between API calls to avoid throttling
-    public const int MaxRetriesOnRateLimit = 3;
-
-    // === Timeouts ===
-    public const int DefaultTimeoutSeconds = 30;
-    public const int LongOperationTimeoutSeconds = 60;
-
-    // === Cache Settings ===
-    public const int CacheDurationMinutes = 5; // Memory cache TTL for API responses
-    public const int PersistentCacheDurationDays = 7; // Disk cache TTL
-
     /// <summary>
     ///     Builds the full URL for app details API
     /// </summary>
@@ -84,7 +86,8 @@ public static class SteamApiConstants
     {
         string cc = countryCode ?? DefaultCountryCode;
         string lang = language ?? DefaultLanguage;
-        return $"{SteamStoreBaseUrl}{AppDetailsEndpoint}?{ParamAppIds}={appId}&{ParamCountryCode}={cc}&{ParamLanguage}={lang}";
+        return
+            $"{SteamStoreBaseUrl}{AppDetailsEndpoint}?{ParamAppIds}={appId}&{ParamCountryCode}={cc}&{ParamLanguage}={lang}";
     }
 
     /// <summary>
@@ -99,7 +102,8 @@ public static class SteamApiConstants
         string cc = countryCode ?? DefaultCountryCode;
         string lang = language ?? DefaultLanguage;
         string encodedTerm = Uri.EscapeDataString(searchTerm);
-        return $"{SteamStoreBaseUrl}{StoreSearchEndpoint}?{ParamTerm}={encodedTerm}&{ParamCountryCode}={cc}&{ParamLanguage}={lang}";
+        return
+            $"{SteamStoreBaseUrl}{StoreSearchEndpoint}?{ParamTerm}={encodedTerm}&{ParamCountryCode}={cc}&{ParamLanguage}={lang}";
     }
 
     /// <summary>

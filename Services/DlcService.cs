@@ -12,12 +12,13 @@ public sealed class DlcService : IDlcService
     public async Task FetchDlcInfoAsync(string appId, string outputFolder, Action<string, Color>? statusCallback = null)
     {
         // Use HttpClientFactory instead of creating new HttpClient directly
-        using var httpClient = HttpClientFactory.CreateClient(bypassCertificateValidation: true, timeout: TimeSpan.FromSeconds(30));
+        using var httpClient = HttpClientFactory.CreateClient(true, TimeSpan.FromSeconds(30));
 
         try
         {
             // Get app details from Steam Store API
-            var response = await httpClient.GetStringAsync($"https://store.steampowered.com/api/appdetails?appids={appId}");
+            var response =
+                await httpClient.GetStringAsync($"https://store.steampowered.com/api/appdetails?appids={appId}");
             var json = JObject.Parse(response);
 
             var appData = json[appId]?["data"];
@@ -42,7 +43,9 @@ public sealed class DlcService : IDlcService
             {
                 try
                 {
-                    var dlcResponse = await httpClient.GetStringAsync($"https://store.steampowered.com/api/appdetails?appids={dlcId}");
+                    var dlcResponse =
+                        await httpClient.GetStringAsync(
+                            $"https://store.steampowered.com/api/appdetails?appids={dlcId}");
                     var dlcJson = JObject.Parse(dlcResponse);
 
                     var dlcData = dlcJson[dlcId.ToString()]?["data"];

@@ -493,9 +493,17 @@ public partial class SteamAppId : Form
         if (check)
         {
             Tit("Checking for updates", Color.LightSkyBlue);
-            await Updater.CheckGitHubNewerVersion("atom0s", "Steamless");
-            await Updater.UpdateGoldBergAsync();
-            await Task.Delay(1500);
+            // Download/update dependencies in background
+            _ = Task.Run(async () =>
+            {
+                await DependencySetupService.EnsureDependenciesAsync(msg =>
+                {
+                    if (IsHandleCreated)
+                    {
+                        Invoke(() => Tit(msg, Color.Cyan));
+                    }
+                });
+            });
             Tit("Click folder && select game's parent directory.", Color.Cyan);
         }
 

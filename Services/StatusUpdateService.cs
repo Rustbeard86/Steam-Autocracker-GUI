@@ -1,37 +1,34 @@
-using System.Drawing;
-using System.Windows.Forms;
-
 namespace APPID.Services;
 
 /// <summary>
-/// Service for updating status messages in the UI
+///     Service for updating status messages in the UI
 /// </summary>
 public interface IStatusUpdateService
 {
     /// <summary>
-    /// Updates the main status label with a message and color
+    ///     Updates the main status label with a message and color
     /// </summary>
     void UpdateStatus(string message, Color color);
 
     /// <summary>
-    /// Updates the current directory/game text
+    ///     Updates the current directory/game text
     /// </summary>
     void UpdateCurrentText(string message);
 
     /// <summary>
-    /// Enables or disables status updates (useful for batch operations)
+    ///     Enables or disables status updates (useful for batch operations)
     /// </summary>
     void SetSuppressUpdates(bool suppress);
 }
 
 /// <summary>
-/// Implementation of IStatusUpdateService that updates Form1 labels
+///     Implementation of IStatusUpdateService that updates Form1 labels
 /// </summary>
 public class StatusUpdateService : IStatusUpdateService
 {
+    private readonly Label _currentDirLabel;
     private readonly Form _form;
     private readonly Label _statusLabel;
-    private readonly Label _currentDirLabel;
     private bool _suppressUpdates;
 
     public StatusUpdateService(Form form, Label statusLabel, Label currentDirLabel)

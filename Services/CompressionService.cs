@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Text.RegularExpressions;
 using APPID.Services.Interfaces;
 
 namespace APPID.Services;

@@ -107,7 +107,9 @@ public sealed class CrackingService(string binPath) : ICrackingService
         try
         {
             string emulatorName = useGoldberg ? "Goldberg" : "ALI213";
-            string sourceDll = Path.Combine(_binPath, emulatorName, dllName);
+            string sourceDll = useGoldberg
+                ? Path.Combine(_binPath, "Goldberg", "regular", dllName.Contains("64") ? "x64" : "x32", dllName)
+                : Path.Combine(_binPath, "ALI213", dllName);
 
             if (!File.Exists(sourceDll))
             {

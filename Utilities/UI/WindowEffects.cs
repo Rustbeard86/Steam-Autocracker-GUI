@@ -9,7 +9,7 @@ namespace APPID.Utilities.UI;
 public static class WindowEffects
 {
     // === Constants for DWM (Desktop Window Manager) ===
-    
+
     /// <summary>
     ///     DWM attribute for window corner preference (Windows 11).
     /// </summary>
@@ -50,6 +50,69 @@ public static class WindowEffects
     public static extern int SetWindowCompositionAttribute(
         IntPtr hwnd,
         ref WindowCompositionAttribData data);
+
+    // === Helper Methods ===
+
+    /// <summary>
+    ///     Applies rounded corners to a window (Windows 11 only).
+    /// </summary>
+    /// <param name="handle">Window handle.</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    public static bool ApplyRoundedCorners(IntPtr handle)
+    {
+        try
+        {
+            int preference = DWMWCP_ROUND;
+            int result = DwmSetWindowAttribute(handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
+            return result == 0; // 0 indicates success
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    ///     Applies acrylic blur effect to a window.
+    /// </summary>
+    /// <param name="handle">Window handle.</param>
+    /// <param name="opacity">Opacity level (0-255).</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    public static bool ApplyAcrylicEffect(IntPtr handle, byte opacity = 230)
+    {
+        try
+        {
+            var accent = new AccentPolicy
+            {
+                AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND,
+                GradientColor = (opacity << 24) | 0x000000 // ARGB: opacity + black
+            };
+
+            int accentStructSize = Marshal.SizeOf(accent);
+            IntPtr accentPtr = Marshal.AllocHGlobal(accentStructSize);
+
+            try
+            {
+                Marshal.StructureToPtr(accent, accentPtr, false);
+
+                var data = new WindowCompositionAttribData
+                {
+                    Attribute = WCA_ACCENT_POLICY, Data = accentPtr, SizeOfData = accentStructSize
+                };
+
+                int result = SetWindowCompositionAttribute(handle, ref data);
+                return result != 0; // Non-zero indicates success
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(accentPtr);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     // === Structures ===
 
@@ -100,70 +163,5 @@ public static class WindowEffects
         ///     Animation ID.
         /// </summary>
         public int AnimationId;
-    }
-
-    // === Helper Methods ===
-
-    /// <summary>
-    ///     Applies rounded corners to a window (Windows 11 only).
-    /// </summary>
-    /// <param name="handle">Window handle.</param>
-    /// <returns>True if successful, false otherwise.</returns>
-    public static bool ApplyRoundedCorners(IntPtr handle)
-    {
-        try
-        {
-            int preference = DWMWCP_ROUND;
-            int result = DwmSetWindowAttribute(handle, DWMWA_WINDOW_CORNER_PREFERENCE, ref preference, sizeof(int));
-            return result == 0; // 0 indicates success
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    ///     Applies acrylic blur effect to a window.
-    /// </summary>
-    /// <param name="handle">Window handle.</param>
-    /// <param name="opacity">Opacity level (0-255).</param>
-    /// <returns>True if successful, false otherwise.</returns>
-    public static bool ApplyAcrylicEffect(IntPtr handle, byte opacity = 230)
-    {
-        try
-        {
-            var accent = new AccentPolicy
-            {
-                AccentState = ACCENT_ENABLE_ACRYLICBLURBEHIND,
-                GradientColor = (opacity << 24) | 0x000000 // ARGB: opacity + black
-            };
-
-            int accentStructSize = Marshal.SizeOf(accent);
-            IntPtr accentPtr = Marshal.AllocHGlobal(accentStructSize);
-
-            try
-            {
-                Marshal.StructureToPtr(accent, accentPtr, false);
-
-                var data = new WindowCompositionAttribData
-                {
-                    Attribute = WCA_ACCENT_POLICY,
-                    Data = accentPtr,
-                    SizeOfData = accentStructSize
-                };
-
-                int result = SetWindowCompositionAttribute(handle, ref data);
-                return result != 0; // Non-zero indicates success
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(accentPtr);
-            }
-        }
-        catch
-        {
-            return false;
-        }
     }
 }

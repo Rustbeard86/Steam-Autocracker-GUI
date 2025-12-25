@@ -3,7 +3,6 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using APPID.Properties;
 using APPID.Utilities.UI;
 

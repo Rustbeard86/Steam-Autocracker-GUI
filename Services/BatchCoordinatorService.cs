@@ -14,8 +14,8 @@ public sealed class BatchCoordinatorService : IBatchCoordinatorService
 
     public BatchCoordinatorService(IBatchProcessingService batchProcessingService)
     {
-        _batchProcessingService = batchProcessingService ?? 
-            throw new ArgumentNullException(nameof(batchProcessingService));
+        _batchProcessingService = batchProcessingService ??
+                                  throw new ArgumentNullException(nameof(batchProcessingService));
     }
 
     /// <summary>
@@ -58,7 +58,7 @@ public sealed class BatchCoordinatorService : IBatchCoordinatorService
             // Update batch form
             batchForm.UpdateTitleProgress(p.OverallPercentage);
             batchForm.UpdateProgressWithEta(p.OverallPercentage, p.EstimatedSecondsRemaining);
-            
+
             // Update batch indicator
             batchIndicatorUpdateCallback?.Invoke(p.OverallPercentage);
 
@@ -133,8 +133,8 @@ public sealed class BatchCoordinatorService : IBatchCoordinatorService
                     depotLines.Add($"{depot.Key} [Manifest {depot.Value.manifest}]");
                 }
 
-                string depotsText = depotLines.Count > 0 
-                    ? string.Join("\n", depotLines) 
+                string depotsText = depotLines.Count > 0
+                    ? string.Join("\n", depotLines)
                     : "No depot info";
 
                 // Full phpBB format for cs.rin.ru
@@ -161,9 +161,9 @@ public sealed class BatchCoordinatorService : IBatchCoordinatorService
     /// </summary>
     private static void ShowFailureDialog(List<(string gameName, string reason)> failures)
     {
-        var failureMessages = string.Join("\n", 
+        var failureMessages = string.Join("\n",
             failures.Take(10).Select(f => $"- {f.gameName}: {f.reason}"));
-        
+
         if (failures.Count > 10)
         {
             failureMessages += $"\n... and {failures.Count - 10} more";

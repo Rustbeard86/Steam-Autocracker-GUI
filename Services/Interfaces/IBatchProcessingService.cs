@@ -3,12 +3,12 @@ using APPID.Models;
 namespace APPID.Services.Interfaces;
 
 /// <summary>
-/// Service for coordinating batch processing operations
+///     Service for coordinating batch processing operations
 /// </summary>
 public interface IBatchProcessingService
 {
     /// <summary>
-    /// Process multiple games with crack, compression, and upload
+    ///     Process multiple games with crack, compression, and upload
     /// </summary>
     Task<BatchProcessingResult> ProcessBatchGamesAsync(
         List<BatchGameItem> games,

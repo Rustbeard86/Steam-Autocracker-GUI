@@ -1,21 +1,18 @@
-using System.Drawing;
-using System.Windows.Forms;
-
 namespace APPID.Utilities.UI;
 
 /// <summary>
-/// Helper for managing batch processing UI elements
+///     Helper for managing batch processing UI elements
 /// </summary>
 public class BatchUiHelper
 {
-    private readonly Form _form;
     private readonly Label _countLabel;
-    private readonly Label _suffixLabel;
+    private readonly Form _form;
     private readonly Label _prefixLabel;
     private readonly Button _processButton;
     private readonly Button _settingsButton;
+    private readonly Label _suffixLabel;
 
-    public BatchUiHelper(Form form, Label countLabel, Label suffixLabel, Label prefixLabel, 
+    public BatchUiHelper(Form form, Label countLabel, Label suffixLabel, Label prefixLabel,
         Button processButton, Button settingsButton)
     {
         _form = form ?? throw new ArgumentNullException(nameof(form));
@@ -27,7 +24,7 @@ public class BatchUiHelper
     }
 
     /// <summary>
-    /// Updates the UI to reflect the current selection count
+    ///     Updates the UI to reflect the current selection count
     /// </summary>
     /// <param name="selectedCount">Number of selected items</param>
     public void UpdateSelectedCount(int selectedCount)
@@ -57,13 +54,14 @@ public class BatchUiHelper
     }
 
     /// <summary>
-    /// Animates a button with a blink effect
+    ///     Animates a button with a blink effect
     /// </summary>
     /// <param name="button">The button to blink</param>
     /// <param name="blinkColor">Color to use for blink effect</param>
     /// <param name="blinkCount">Number of times to blink</param>
     /// <param name="blinkDurationMs">Duration of each blink in milliseconds</param>
-    public static async Task BlinkButtonAsync(Button button, Color blinkColor, int blinkCount = 3, int blinkDurationMs = 150)
+    public static async Task BlinkButtonAsync(Button button, Color blinkColor, int blinkCount = 3,
+        int blinkDurationMs = 150)
     {
         var originalBg = button.BackColor;
 

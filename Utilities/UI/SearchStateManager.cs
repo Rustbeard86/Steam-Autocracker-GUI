@@ -1,40 +1,23 @@
-using System.Drawing;
-using System.Windows.Forms;
 using Timer = System.Windows.Forms.Timer;
 
 namespace APPID.Utilities.UI;
 
 /// <summary>
-/// Manages search UI state transitions and visibility for game search workflow.
+///     Manages search UI state transitions and visibility for game search workflow.
 /// </summary>
 public class SearchStateManager
 {
-    private readonly TextBox _searchTextBox;
+    private readonly Label _instructionLabel;
     private readonly Panel _mainPanel;
     private readonly Button _manualEntryButton;
-    private readonly Label _instructionLabel;
+    private readonly TextBox _searchTextBox;
     private readonly PictureBox _startCrackPic;
-    
-    private bool _isFirstClickAfterSelection;
-    private bool _isInitialFolderSearch;
-
-    public bool IsFirstClickAfterSelection 
-    { 
-        get => _isFirstClickAfterSelection;
-        set => _isFirstClickAfterSelection = value;
-    }
-
-    public bool IsInitialFolderSearch 
-    { 
-        get => _isInitialFolderSearch;
-        set => _isInitialFolderSearch = value;
-    }
 
     public SearchStateManager(
-        TextBox searchBox, 
-        Panel mainPanel, 
-        Button manualEntry, 
-        Label instruction, 
+        TextBox searchBox,
+        Panel mainPanel,
+        Button manualEntry,
+        Label instruction,
         PictureBox startCrack)
     {
         _searchTextBox = searchBox ?? throw new ArgumentNullException(nameof(searchBox));
@@ -44,8 +27,12 @@ public class SearchStateManager
         _startCrackPic = startCrack ?? throw new ArgumentNullException(nameof(startCrack));
     }
 
+    public bool IsFirstClickAfterSelection { get; set; }
+
+    public bool IsInitialFolderSearch { get; set; }
+
     /// <summary>
-    /// Shows the search UI (hides main panel, shows search controls).
+    ///     Shows the search UI (hides main panel, shows search controls).
     /// </summary>
     public void ShowSearchUI()
     {
@@ -57,7 +44,7 @@ public class SearchStateManager
     }
 
     /// <summary>
-    /// Shows the main panel (hides search controls).
+    ///     Shows the main panel (hides search controls).
     /// </summary>
     public void ShowMainPanel()
     {
@@ -68,7 +55,7 @@ public class SearchStateManager
     }
 
     /// <summary>
-    /// Hides the instruction label and stops its timer.
+    ///     Hides the instruction label and stops its timer.
     /// </summary>
     public void HideInstructionLabel(Timer timer)
     {
@@ -77,34 +64,34 @@ public class SearchStateManager
     }
 
     /// <summary>
-    /// Resets search state for a new game selection.
+    ///     Resets search state for a new game selection.
     /// </summary>
     public void ResetForNewSelection()
     {
         _searchTextBox.Clear();
-        _isFirstClickAfterSelection = false;
-        _isInitialFolderSearch = false;
+        IsFirstClickAfterSelection = false;
+        IsInitialFolderSearch = false;
     }
 
     /// <summary>
-    /// Prepares for initial folder search (sets flags and clears text).
+    ///     Prepares for initial folder search (sets flags and clears text).
     /// </summary>
     public void PrepareInitialFolderSearch(string folderName)
     {
-        _isInitialFolderSearch = true;
-        _isFirstClickAfterSelection = true;
+        IsInitialFolderSearch = true;
+        IsFirstClickAfterSelection = true;
         _searchTextBox.Text = folderName;
     }
 
     /// <summary>
-    /// Handles the first click on search textbox after selection.
+    ///     Handles the first click on search textbox after selection.
     /// </summary>
     public void HandleFirstClick()
     {
-        if (_isFirstClickAfterSelection)
+        if (IsFirstClickAfterSelection)
         {
             _searchTextBox.Clear();
-            _isFirstClickAfterSelection = false;
+            IsFirstClickAfterSelection = false;
         }
     }
 }

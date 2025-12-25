@@ -1,15 +1,12 @@
-using System.Drawing;
-using System.Windows.Forms;
-
 namespace APPID.Utilities.UI;
 
 /// <summary>
-/// Handles window dragging functionality for borderless forms.
+///     Handles window dragging functionality for borderless forms.
 /// </summary>
 public class WindowDragHandler
 {
-    private Point _mouseDownPoint = Point.Empty;
     private readonly Form _form;
+    private Point _mouseDownPoint = Point.Empty;
 
     public WindowDragHandler(Form form)
     {
@@ -17,7 +14,7 @@ public class WindowDragHandler
     }
 
     /// <summary>
-    /// Attaches drag handlers to the specified control.
+    ///     Attaches drag handlers to the specified control.
     /// </summary>
     /// <param name="control">The control to make draggable (typically title bar or main panel).</param>
     public void AttachToControl(Control control)
@@ -33,7 +30,7 @@ public class WindowDragHandler
     }
 
     /// <summary>
-    /// Detaches drag handlers from the specified control.
+    ///     Detaches drag handlers from the specified control.
     /// </summary>
     public void DetachFromControl(Control control)
     {

@@ -1,11 +1,10 @@
 using System.Data;
-using System.Text.RegularExpressions;
 using APPID.Services.Interfaces;
 
 namespace APPID.Services;
 
 /// <summary>
-/// Implements progressive game search with multiple fallback strategies.
+///     Implements progressive game search with multiple fallback strategies.
 /// </summary>
 public class GameSearchService : IGameSearchService
 {
@@ -60,6 +59,7 @@ public class GameSearchService : IGameSearchService
             {
                 return SearchMatchQuality.ExactMatch;
             }
+
             return SearchMatchQuality.SingleMatch;
         }
 
@@ -120,14 +120,14 @@ public class GameSearchService : IGameSearchService
 
         // Filter out soundtracks, DLC, demos, etc.
         var baseGameMatches = partialMatches.Where(row =>
-        {
-            string name = row.Field<string>("Name")?.ToLower() ?? "";
-            return !name.Contains("soundtrack") && !name.Contains("dlc") &&
-                   !name.Contains("season pass") && !name.Contains("expansion") &&
-                   !name.Contains("demo") && !name.Contains("beta");
-        })
-        .OrderBy(row => row.Field<string>("Name")?.Length ?? int.MaxValue)
-        .ToList();
+            {
+                string name = row.Field<string>("Name")?.ToLower() ?? "";
+                return !name.Contains("soundtrack") && !name.Contains("dlc") &&
+                       !name.Contains("season pass") && !name.Contains("expansion") &&
+                       !name.Contains("demo") && !name.Contains("beta");
+            })
+            .OrderBy(row => row.Field<string>("Name")?.Length ?? int.MaxValue)
+            .ToList();
 
         if (baseGameMatches.Any())
         {
@@ -266,12 +266,7 @@ public class GameSearchService : IGameSearchService
             _ => SearchMatchQuality.MultipleMatches
         };
 
-        return new SearchResult
-        {
-            MatchCount = view.Count,
-            Quality = quality,
-            AppliedFilter = view.RowFilter
-        };
+        return new SearchResult { MatchCount = view.Count, Quality = quality, AppliedFilter = view.RowFilter };
     }
 
     private static string CleanSearchText(string text)

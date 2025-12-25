@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using APPID.Services.Interfaces;
 
 namespace APPID.Services;

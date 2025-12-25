@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using APPID.Services.Interfaces;
 using APPID.Utilities.Steam;
 
@@ -22,7 +21,7 @@ public sealed class ManifestParsingService(IFileSystemService fileSystem) : IMan
             }
 
             var content = _fileSystem.ReadAllTextAsync(manifestPath).GetAwaiter().GetResult();
-            
+
             // Use centralized ACF parser
             var manifest = AcfFileParser.ParseFlat(content);
 

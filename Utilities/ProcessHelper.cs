@@ -1,14 +1,12 @@
-using System.Diagnostics;
-
 namespace APPID.Utilities;
 
 /// <summary>
-/// Helper class for launching external processes, URLs, and files
+///     Helper class for launching external processes, URLs, and files
 /// </summary>
 public static class ProcessHelper
 {
     /// <summary>
-    /// Opens a URL in the default browser
+    ///     Opens a URL in the default browser
     /// </summary>
     /// <param name="url">The URL to open</param>
     /// <returns>True if successful, false otherwise</returns>
@@ -16,11 +14,7 @@ public static class ProcessHelper
     {
         try
         {
-            var psi = new ProcessStartInfo
-            {
-                FileName = url,
-                UseShellExecute = true
-            };
+            var psi = new ProcessStartInfo { FileName = url, UseShellExecute = true };
             Process.Start(psi);
             return true;
         }
@@ -32,7 +26,7 @@ public static class ProcessHelper
     }
 
     /// <summary>
-    /// Opens a file or directory in Explorer
+    ///     Opens a file or directory in Explorer
     /// </summary>
     /// <param name="path">The path to open</param>
     /// <param name="selectFile">If true, selects the file in Explorer instead of opening the folder</param>
@@ -53,6 +47,7 @@ public static class ProcessHelper
             {
                 return false;
             }
+
             return true;
         }
         catch (Exception ex)
@@ -63,23 +58,21 @@ public static class ProcessHelper
     }
 
     /// <summary>
-    /// Launches an executable with optional arguments
+    ///     Launches an executable with optional arguments
     /// </summary>
     /// <param name="exePath">Path to the executable</param>
     /// <param name="arguments">Command line arguments</param>
     /// <param name="workingDirectory">Working directory for the process</param>
     /// <param name="createNoWindow">Whether to create a console window</param>
     /// <returns>The started Process, or null if failed</returns>
-    public static Process? LaunchExecutable(string exePath, string arguments = "", string workingDirectory = "", bool createNoWindow = true)
+    public static Process? LaunchExecutable(string exePath, string arguments = "", string workingDirectory = "",
+        bool createNoWindow = true)
     {
         try
         {
             var psi = new ProcessStartInfo
             {
-                FileName = exePath,
-                Arguments = arguments,
-                UseShellExecute = false,
-                CreateNoWindow = createNoWindow
+                FileName = exePath, Arguments = arguments, UseShellExecute = false, CreateNoWindow = createNoWindow
             };
 
             if (!string.IsNullOrEmpty(workingDirectory))

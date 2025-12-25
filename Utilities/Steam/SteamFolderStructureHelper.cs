@@ -113,8 +113,7 @@ public static class SteamFolderStructureHelper
         // Default Steam installation paths
         var defaultPaths = new[]
         {
-            @"C:\Program Files (x86)\Steam",
-            @"C:\Program Files\Steam",
+            @"C:\Program Files (x86)\Steam", @"C:\Program Files\Steam",
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Steam"),
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Steam")
         };
@@ -161,9 +160,9 @@ public static class SteamFolderStructureHelper
             string content = File.ReadAllText(vdfPath);
 
             // Look for path entries: "path" "C:\\SteamLibrary"
-            var matches = System.Text.RegularExpressions.Regex.Matches(content, @"""path""\s+""([^""]*)""");
+            var matches = Regex.Matches(content, @"""path""\s+""([^""]*)""");
 
-            foreach (System.Text.RegularExpressions.Match match in matches)
+            foreach (Match match in matches)
             {
                 if (match.Groups.Count > 1)
                 {

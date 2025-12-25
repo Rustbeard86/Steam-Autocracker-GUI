@@ -1,25 +1,22 @@
-using System.Drawing;
-using System.Windows.Forms;
-
 namespace APPID.Utilities.UI;
 
 /// <summary>
-/// Manages the visibility, positioning, and state of crack-related buttons
-/// (Zip Dir, Open Dir, Upload).
+///     Manages the visibility, positioning, and state of crack-related buttons
+///     (Zip Dir, Open Dir, Upload).
 /// </summary>
 public class CrackButtonManager
 {
-    private readonly Button _zipButton;
-    private readonly Button _openDirButton;
-    private readonly Button _uploadButton;
     private readonly Label _currentDirLabel;
     private readonly Panel _mainPanel;
+    private readonly Button _openDirButton;
+    private readonly Button _uploadButton;
+    private readonly Button _zipButton;
 
     public CrackButtonManager(
-        Button zipButton, 
-        Button openDirButton, 
-        Button uploadButton, 
-        Label currentDirLabel, 
+        Button zipButton,
+        Button openDirButton,
+        Button uploadButton,
+        Label currentDirLabel,
         Panel mainPanel)
     {
         _zipButton = zipButton ?? throw new ArgumentNullException(nameof(zipButton));
@@ -30,15 +27,15 @@ public class CrackButtonManager
     }
 
     /// <summary>
-    /// Shows crack buttons centered below the current directory label.
+    ///     Shows crack buttons centered below the current directory label.
     /// </summary>
     /// <param name="showZip">Whether to show the Zip button alongside Open Dir.</param>
     public void ShowCrackButtons(bool showZip = true)
     {
         int gap = 10;
         int buttonY = _currentDirLabel.Bottom + 6;
-        int totalWidth = showZip 
-            ? _zipButton.Width + gap + _openDirButton.Width 
+        int totalWidth = showZip
+            ? _zipButton.Width + gap + _openDirButton.Width
             : _openDirButton.Width;
         int startX = (_mainPanel.ClientSize.Width - totalWidth) / 2;
 
@@ -65,7 +62,7 @@ public class CrackButtonManager
     }
 
     /// <summary>
-    /// Hides all crack-related buttons.
+    ///     Hides all crack-related buttons.
     /// </summary>
     public void HideCrackButtons()
     {
@@ -75,7 +72,7 @@ public class CrackButtonManager
     }
 
     /// <summary>
-    /// Shows the Upload button positioned exactly where the Zip button is.
+    ///     Shows the Upload button positioned exactly where the Zip button is.
     /// </summary>
     public void ShowUploadButton()
     {
@@ -89,7 +86,7 @@ public class CrackButtonManager
     }
 
     /// <summary>
-    /// Sets the Zip button text and associated zip path tag.
+    ///     Sets the Zip button text and associated zip path tag.
     /// </summary>
     public void SetZipButtonState(string text, string zipPath = null)
     {
@@ -99,7 +96,7 @@ public class CrackButtonManager
     }
 
     /// <summary>
-    /// Sets the Zip button to "Cancel" state with orange glow.
+    ///     Sets the Zip button to "Cancel" state with orange glow.
     /// </summary>
     public void SetCancelState()
     {
@@ -110,7 +107,7 @@ public class CrackButtonManager
     }
 
     /// <summary>
-    /// Resets the Zip button appearance to default styling.
+    ///     Resets the Zip button appearance to default styling.
     /// </summary>
     public void ResetButtonAppearance()
     {
@@ -121,7 +118,7 @@ public class CrackButtonManager
 }
 
 /// <summary>
-/// Extension methods for WinForms controls to simplify null-safe operations.
+///     Extension methods for WinForms controls to simplify null-safe operations.
 /// </summary>
 internal static class ControlExtensions
 {

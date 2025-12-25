@@ -47,20 +47,6 @@ public sealed class SteamCacheManager : ISteamCacheManager
     private readonly ConcurrentDictionary<string, CacheEntry> _cache = new();
     private readonly TimeSpan _defaultTtl;
 
-    private sealed class CacheEntry
-    {
-        public object Value { get; }
-        public DateTime ExpiresAt { get; }
-
-        public CacheEntry(object value, TimeSpan ttl)
-        {
-            Value = value;
-            ExpiresAt = DateTime.UtcNow.Add(ttl);
-        }
-
-        public bool IsExpired => DateTime.UtcNow > ExpiresAt;
-    }
-
     public SteamCacheManager(TimeSpan? defaultTtl = null)
     {
         _defaultTtl = defaultTtl ?? TimeSpan.FromMinutes(5);
@@ -172,5 +158,19 @@ public sealed class SteamCacheManager : ISteamCacheManager
                 Debug.WriteLine($"[CACHE] Cleanup error: {ex.Message}");
             }
         }
+    }
+
+    private sealed class CacheEntry
+    {
+        public CacheEntry(object value, TimeSpan ttl)
+        {
+            Value = value;
+            ExpiresAt = DateTime.UtcNow.Add(ttl);
+        }
+
+        public object Value { get; }
+        public DateTime ExpiresAt { get; }
+
+        public bool IsExpired => DateTime.UtcNow > ExpiresAt;
     }
 }

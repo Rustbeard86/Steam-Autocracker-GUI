@@ -15,7 +15,7 @@ public interface IUploadService
     Task<string?> UploadFileAsync(string filePath, string gameName, Action<int>? progressCallback = null);
 
     /// <summary>
-    /// Uploads a file to 1fichier with detailed progress reporting
+    ///     Uploads a file to 1fichier with detailed progress reporting
     /// </summary>
     /// <param name="filePath">Path to file to upload</param>
     /// <param name="progress">Progress callback (bytesTransferred, totalBytes, speed in bytes/sec)</param>

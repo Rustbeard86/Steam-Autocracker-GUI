@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using APPID.Services.Interfaces;
 
@@ -152,7 +151,8 @@ public sealed class UrlConversionService : IUrlConversionService
 
         double sizeGb = fileSizeBytes / (1024.0 * 1024.0 * 1024.0);
         LogHelper.Log($"[CONVERT] Starting conversion for {oneFichierUrl}");
-        LogHelper.Log($"[CONVERT] File size: {sizeGb:F2} GB, Initial wait: {initialWaitSeconds}s, Max retries: {maxRetries}");
+        LogHelper.Log(
+            $"[CONVERT] File size: {sizeGb:F2} GB, Initial wait: {initialWaitSeconds}s, Max retries: {maxRetries}");
 
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
@@ -180,9 +180,10 @@ public sealed class UrlConversionService : IUrlConversionService
 
                 if (response.IsSuccessStatusCode)
                 {
-                    var responseJson = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    var responseJson =
+                        await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                     using var doc = JsonDocument.Parse(responseJson);
-                    
+
                     if (doc.RootElement.TryGetProperty("link", out var linkProp))
                     {
                         string? pydriveUrl = linkProp.GetString();
@@ -193,7 +194,7 @@ public sealed class UrlConversionService : IUrlConversionService
                 else
                 {
                     var errorBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-                    
+
                     // Check if it's a "still processing" error - keep retrying
                     if (errorBody.Contains("LINK_DOWN") || errorBody.Contains("wait"))
                     {

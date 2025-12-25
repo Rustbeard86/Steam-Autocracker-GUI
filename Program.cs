@@ -10,7 +10,7 @@ internal static class Program
     {
         ExceptionHandler.ConfigureGlobalHandlers();
 
-        BootstrapService.EnsureBinFilesAvailable();
+        // Extract bundled ALI213 files
         ResourceExtractor.ExtractBinFiles();
 
         if (!SingleInstanceManager.EnsureSingleInstance())
@@ -48,17 +48,17 @@ internal static class Program
         try
         {
             string crashInfo = $"""
-                =================================
-                SACGUI CRASH REPORT
-                {DateTime.Now:yyyy-MM-dd HH:mm:ss}
-                =================================
-                Version: {Application.ProductVersion}
-                OS: {Environment.OSVersion}
-                .NET: {Environment.Version}
+                                =================================
+                                SACGUI CRASH REPORT
+                                {DateTime.Now:yyyy-MM-dd HH:mm:ss}
+                                =================================
+                                Version: {Application.ProductVersion}
+                                OS: {Environment.OSVersion}
+                                .NET: {Environment.Version}
 
-                Exception:
-                {ex?.ToString() ?? "Unknown exception"}
-                """;
+                                Exception:
+                                {ex?.ToString() ?? "Unknown exception"}
+                                """;
 
             string crashFile = Path.Combine(AppContext.BaseDirectory, "crash.log");
             File.WriteAllText(crashFile, crashInfo);

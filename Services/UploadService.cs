@@ -1,6 +1,5 @@
 using System.Net.Http.Headers;
 using APPID.Services.Interfaces;
-using APPID.Utilities.Steam;
 
 namespace APPID.Services;
 
@@ -97,10 +96,11 @@ public sealed class UploadService : IUploadService
             DateTime lastUpdate = DateTime.Now;
             double smoothedSpeed = 0;
 
-            LogHelper.Log($"[UPLOAD] Starting 1fichier upload: {Path.GetFileName(filePath)} ({totalBytes / BytesToMb:F2} MB)");
+            LogHelper.Log(
+                $"[UPLOAD] Starting 1fichier upload: {Path.GetFileName(filePath)} ({totalBytes / BytesToMb:F2} MB)");
 
             using var uploader = new OneFichierUploader();
-            
+
             var uploadProgress = new Progress<double>(percentComplete =>
             {
                 long currentBytes = (long)(percentComplete * totalBytes);
@@ -110,12 +110,12 @@ public sealed class UploadService : IUploadService
                 if (timeDelta > 0.1 && bytesDelta > 0)
                 {
                     double currentSpeed = bytesDelta / timeDelta;
-                    smoothedSpeed = smoothedSpeed > 0 
-                        ? smoothedSpeed * 0.7 + currentSpeed * 0.3 
+                    smoothedSpeed = smoothedSpeed > 0
+                        ? smoothedSpeed * 0.7 + currentSpeed * 0.3
                         : currentSpeed;
 
                     progress?.Report((currentBytes, totalBytes, smoothedSpeed));
-                    
+
                     bytesTransferred = currentBytes;
                     lastUpdate = DateTime.Now;
                 }

@@ -7,7 +7,8 @@ namespace APPID.Services;
 /// </summary>
 public sealed class DialogService : IDialogService
 {
-    public bool ShowStyledConfirmation(Form parent, string title, string message, string path, string yesText, string noText)
+    public bool ShowStyledConfirmation(Form parent, string title, string message, string path, string yesText,
+        string noText)
     {
         bool result = false;
 
@@ -53,9 +54,7 @@ public sealed class DialogService : IDialogService
         // Path display with dark background
         var pathPanel = new Panel
         {
-            BackColor = Color.FromArgb(15, 18, 25),
-            Size = new Size(470, 45),
-            Location = new Point(15, 110)
+            BackColor = Color.FromArgb(15, 18, 25), Size = new Size(470, 45), Location = new Point(15, 110)
         };
 
         var pathLabel = new Label
