@@ -8,8 +8,13 @@ namespace APPID.Services;
 /// </summary>
 public class GameSearchService : IGameSearchService
 {
+    // Updated regex to properly split CamelCase with better handling of consecutive capitals:
+    // - "wordWord" → "word Word" (lowercase followed by uppercase)
+    // - "WORDWord" → "WORD Word" (multiple uppercase followed by capital+word)  
+    // - "RSDragonwilds" → "RS Dragonwilds" (consecutive caps before capital+lowercase)
+    // The third pattern ensures we split BEFORE the last capital in a sequence of capitals
     private static readonly Regex CamelCaseRegex =
-        new(@"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", RegexOptions.Compiled);
+        new(@"(?<=[a-z])(?=[A-Z])|(?<=\w)(?=[A-Z][a-z])", RegexOptions.Compiled);
 
     private static readonly Regex SpecialCharsRegex = new(@"[^a-zA-Z0-9._0-]+", RegexOptions.Compiled);
 
@@ -123,6 +128,7 @@ public class GameSearchService : IGameSearchService
             return false;
         }
 
+        // Try exact match first with the split version
         var camelCaseMatches = dataTable.AsEnumerable()
             .Where(row => string.Equals(row.Field<string>("Name"), splitSearch, StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -140,6 +146,82 @@ public class GameSearchService : IGameSearchService
                 HasExactMatch = true
             };
             return true;
+        }
+
+        // Try partial word matching - e.g., "RS Dragonwilds" should match "RuneScape Dragonwilds"
+        // Split the camelCase result into words and search for games containing all those words
+        var searchWords = splitSearch.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(w => w.Length > 1) // Skip single letters unless it's the only word
+            .ToList();
+
+        if (searchWords.Count > 0)
+        {
+            // Build filter that requires all words to be present
+            string wordFilter = string.Join(" AND ",
+                searchWords.Select(word => $"Name LIKE '%{EscapeSingleQuotes(word)}%'"));
+
+            try
+            {
+                view.RowFilter = wordFilter;
+                if (view.Count > 0)
+                {
+                    // Prefer games that start with the first word
+                    var firstWord = searchWords[0];
+                    var bestMatch = dataTable.AsEnumerable()
+                        .Where(row =>
+                            row.Field<string>("Name")?.Contains(firstWord, StringComparison.OrdinalIgnoreCase) == true)
+                        .OrderBy(row =>
+                        {
+                            string name = row.Field<string>("Name") ?? "";
+                            // Prioritize names that start with the first word
+                            if (name.StartsWith(firstWord, StringComparison.OrdinalIgnoreCase))
+                            {
+                                return 0;
+                            }
+
+                            // Then names where first word appears after a space (start of a word)
+                            if (name.Contains($" {firstWord}", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return 1;
+                            }
+
+                            return 2;
+                        })
+                        .ThenBy(row => row.Field<string>("Name")?.Length ?? int.MaxValue)
+                        .FirstOrDefault();
+
+                    if (bestMatch != null)
+                    {
+                        string bestMatchName = bestMatch.Field<string>("Name");
+                        view.RowFilter = $"Name = '{EscapeSingleQuotes(bestMatchName)}'";
+
+                        result = new SearchResult
+                        {
+                            MatchCount = 1,
+                            Quality = SearchMatchQuality.ExactMatch,
+                            AppliedFilter = view.RowFilter,
+                            HasExactMatch = true
+                        };
+                        return true;
+                    }
+
+                    // If no best match found but we have results, return them
+                    result = new SearchResult
+                    {
+                        MatchCount = view.Count,
+                        Quality = view.Count == 1
+                            ? SearchMatchQuality.SingleMatch
+                            : SearchMatchQuality.MultipleMatches,
+                        AppliedFilter = view.RowFilter,
+                        HasExactMatch = false
+                    };
+                    return true;
+                }
+            }
+            catch
+            {
+                // If filter fails, continue with default search
+            }
         }
 
         return false;
