@@ -6,19 +6,18 @@ namespace APPID.Services;
 /// <summary>
 ///     Implements progressive game search with multiple fallback strategies.
 /// </summary>
-public class GameSearchService : IGameSearchService
+public partial class GameSearchService : IGameSearchService
 {
     // Updated regex to properly split CamelCase with better handling of consecutive capitals:
     // - "wordWord" → "word Word" (lowercase followed by uppercase)
     // - "WORDWord" → "WORD Word" (multiple uppercase followed by capital+word)  
-    // - "RSDragonwilds" → "RS Dragonwilds" (consecutive caps before capital+lowercase)
     // The third pattern ensures we split BEFORE the last capital in a sequence of capitals
     private static readonly Regex CamelCaseRegex =
-        new(@"(?<=[a-z])(?=[A-Z])|(?<=\w)(?=[A-Z][a-z])", RegexOptions.Compiled);
+        GenCamelCaseRegex();
 
-    private static readonly Regex SpecialCharsRegex = new(@"[^a-zA-Z0-9._0-]+", RegexOptions.Compiled);
+    private static readonly Regex SpecialCharsRegex = GenSpecialCharsRegex();
 
-    public SearchResult PerformSearch(string searchText, DataTable dataTable)
+    public SearchResult PerformSearch(string searchText, DataTable? dataTable)
     {
         if (string.IsNullOrWhiteSpace(searchText) || dataTable == null)
         {
@@ -33,7 +32,7 @@ public class GameSearchService : IGameSearchService
             return exactResult;
         }
 
-        // Level 1.5: CamelCase split exact match (e.g., "RSDragonwilds" -> "RS Dragonwilds")
+        // Level 1.5: CamelCase split exact match
         if (TryCamelCaseSplitMatch(searchText, dataTable, view, out var camelCaseResult))
         {
             return camelCaseResult;
@@ -78,6 +77,24 @@ public class GameSearchService : IGameSearchService
         return SearchMatchQuality.MultipleMatches;
     }
 
+    public string NormalizeGameNameForSearch(string rawGameName)
+    {
+        if (string.IsNullOrWhiteSpace(rawGameName))
+        {
+            return rawGameName;
+        }
+
+        if (HasCamelCasePattern(rawGameName))
+        {
+            string split = SplitCamelCase(rawGameName);
+            // Now clean the split result
+            return CleanSearchText(split);
+        }
+
+        // If no CamelCase detected, just clean it
+        return CleanSearchText(rawGameName);
+    }
+
     #region Private Helper Methods
 
     private bool TryExactMatch(string searchText, DataTable dataTable, DataView view, out SearchResult result)
@@ -94,7 +111,7 @@ public class GameSearchService : IGameSearchService
             .Where(row => string.Equals(row.Field<string>("Name"), searchText, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (exactMatches.Any())
+        if (exactMatches.Count != 0)
         {
             string exactName = exactMatches.First().Field<string>("Name");
             view.RowFilter = $"Name = '{EscapeSingleQuotes(exactName)}'";
@@ -133,7 +150,7 @@ public class GameSearchService : IGameSearchService
             .Where(row => string.Equals(row.Field<string>("Name"), splitSearch, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (camelCaseMatches.Any())
+        if (camelCaseMatches.Count != 0)
         {
             string exactName = camelCaseMatches.First().Field<string>("Name");
             view.RowFilter = $"Name = '{EscapeSingleQuotes(exactName)}'";
@@ -240,7 +257,7 @@ public class GameSearchService : IGameSearchService
             .Where(row => row.Field<string>("Name")?.Contains(searchText, StringComparison.OrdinalIgnoreCase) == true)
             .ToList();
 
-        if (!partialMatches.Any())
+        if (partialMatches.Count == 0)
         {
             return false;
         }
@@ -256,7 +273,7 @@ public class GameSearchService : IGameSearchService
             .OrderBy(row => row.Field<string>("Name")?.Length ?? int.MaxValue)
             .ToList();
 
-        if (baseGameMatches.Any())
+        if (baseGameMatches.Count != 0)
         {
             string baseGameName = baseGameMatches.First().Field<string>("Name");
             view.RowFilter = $"Name = '{EscapeSingleQuotes(baseGameName)}'";
@@ -286,7 +303,7 @@ public class GameSearchService : IGameSearchService
                 StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        if (normalizedMatches.Any())
+        if (normalizedMatches.Count != 0)
         {
             string exactName = normalizedMatches.First().Field<string>("Name");
             view.RowFilter = $"Name = '{EscapeSingleQuotes(exactName)}'";
@@ -440,6 +457,12 @@ public class GameSearchService : IGameSearchService
     {
         return text?.Replace("'", "''") ?? string.Empty;
     }
+
+    [GeneratedRegex(@"[^a-zA-Z0-9._0-]+", RegexOptions.Compiled)]
+    private static partial Regex GenSpecialCharsRegex();
+
+    [GeneratedRegex(@"(?<=[a-z])(?=[A-Z])|(?<=\w)(?=[A-Z][a-z])", RegexOptions.Compiled)]
+    private static partial Regex GenCamelCaseRegex();
 
     #endregion
 }

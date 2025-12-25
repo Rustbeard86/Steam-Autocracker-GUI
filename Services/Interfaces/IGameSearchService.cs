@@ -19,6 +19,13 @@ public interface IGameSearchService
     ///     Determines if a search result represents an exact match suitable for auto-selection.
     /// </summary>
     SearchMatchQuality GetMatchQuality(int resultCount, string searchText, DataTable filteredData);
+
+    /// <summary>
+    ///     Normalizes a game folder name for search by applying CamelCase splitting and cleaning.
+    /// </summary>
+    /// <param name="rawGameName">The raw folder name extracted from the game directory.</param>
+    /// <returns>A normalized, search-friendly game name.</returns>
+    string NormalizeGameNameForSearch(string rawGameName);
 }
 
 /// <summary>

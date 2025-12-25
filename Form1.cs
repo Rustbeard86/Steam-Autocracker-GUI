@@ -41,11 +41,13 @@ public partial class SteamAppId : Form
         _dialogService = new DialogService();
         _gameDetection = new GameDetectionService(_fileSystem);
         _manifestParsing = new ManifestParsingService(_fileSystem);
-        _gameDetection = new GameDetectionService(_fileSystem);
         _gameFolderService = new GameFolderService(_fileSystem, _gameDetection);
         _steamlessService = new SteamlessService();
+        _gameSearch = new GameSearchService();
 
-        // === STEP 2: Initialize Batch Processing Service (Before Coordinator) ===
+        _gameSelection = new GameSelectionService(_gameFolderService, _manifestParsing, _gameSearch);
+
+        // === STEP 2: Initialize Batch Processing Service ===
         IBatchProcessingService batchProcessingService = new BatchProcessingService(
             new CrackingService(BinPath),
             new CompressionService(BinPath),
@@ -54,15 +56,10 @@ public partial class SteamAppId : Form
             _fileSystem
         );
 
-        // === STEP 3: Initialize Batch Coordinator (After Batch Processing) ===
+        // === STEP 3: Initialize Batch Coordinator ===
         _batchCoordinator = new BatchCoordinatorService(batchProcessingService);
 
-        // === STEP 4: Load Critical Settings (Before InitializeComponent) ===
-        // === STEP 4: Configure Network Security ===
-        // The HttpClientFactory already handles SSL bypass internally via CreateClient(bypassCertificateValidation: true)
-        // Remove this line entirely - network security is handled per-request via HttpClientFactory.Insecure
-
-        // === STEP 5: Load Critical Settings (Before InitializeComponent) ===
+        // === STEP 4-5: Load Settings ===
         AutoCrackEnabled = _settings.AutoCrack;
         Debug.WriteLine($"[CONSTRUCTOR] Loaded autoCrackEnabled = {AutoCrackEnabled} from Settings");
 
@@ -75,7 +72,6 @@ public partial class SteamAppId : Form
 
         // === STEP 7: Initialize Remaining Services (Require UI Components) ===
         _statusService = new StatusUpdateService(this, StatusLabel, currDIrText);
-        _gameSearch = new GameSearchService();
 
         // === STEP 8: Initialize Timers (After UI components exist) ===
         InitializeTimers();
@@ -1615,7 +1611,7 @@ oLink3.Save";
                             null,
                             CurrentAppId,
                             parentdir,
-                            Tit  // ← ADD THIS: Pass status callback to parser
+                            Tit // ← ADD THIS: Pass status callback to parser
                         );
 
                         if (achievementSuccess)
@@ -1711,167 +1707,16 @@ oLink3.Save";
 
             if (folderSelectDialog.Show(Handle))
             {
-                string selectedPath = folderSelectDialog.FileName;
-
-                // Auto-correct to game root if subfolder was selected
-                _gameDir = _gameFolderService.FindGameRootFolder(selectedPath);
-
-                // Show feedback if we auto-corrected
-                if (_gameDir != selectedPath)
-                {
-                    string selectedName = Path.GetFileName(selectedPath);
-                    string correctedName = Path.GetFileName(_gameDir);
-                    Tit($"Detected subfolder '{selectedName}' → corrected to game root: {correctedName}", Color.Yellow);
-                    await Task.Delay(2000);
-                }
-
-                // Now extract the game name using the service
-                _gameDirName = _gameFolderService.GetGameName(_gameDir);
-
-                // Hide crack buttons when starting new game selection
-                _crackButtonManager.HideCrackButtons();
-
-                // Always remember parent folder for next time
-                try
-                {
-                    var parent = Directory.GetParent(_gameDir);
-                    if (parent != null)
-                    {
-                        _settings.LastDir = parent.FullName;
-                        AppSettings.Default.Save();
-                    }
-                }
-                catch { }
-
-                // Check if this is a folder containing multiple games (batch mode)
-                var gamesInFolder = DetectGamesInFolder(_gameDir);
-                if (gamesInFolder.Count > 1)
-                {
-                    // Multiple games detected - batch folder
-                    _settings.LastDir = _gameDir;
-                    AppSettings.Default.Save();
-                    ShowBatchGameSelection(gamesInFolder);
-                    return;
-                }
-
-                if (gamesInFolder.Count == 1)
-                {
-                    // Contains exactly one game subfolder - use that
-                    _gameDir = gamesInFolder[0];
-                    _gameDirName = _gameFolderService.GetGameName(_gameDir);
-                }
-                else if (!IsGameFolder(_gameDir))
-                {
-                    // Not a game folder, not a batch folder - check if they selected something weird
-                    try
-                    {
-                        var steamApiFiles = Directory.GetFiles(_gameDir, "steam_api*.dll", SearchOption.AllDirectories)
-                            .Where(f => !f.EndsWith(".bak", StringComparison.OrdinalIgnoreCase)).ToList();
-
-                        if (steamApiFiles.Count > 2)
-                        {
-                            // Has steam_api DLLs but we couldn't detect game structure - might be root drive
-                            bool continueAnyway = ShowStyledConfirmation(
-                                "Unusual Folder Structure",
-                                $"Found {steamApiFiles.Count} steam_api DLLs but couldn't detect game folders.\n" +
-                                $"Did you accidentally select a root drive or system folder?",
-                                _gameDir,
-                                "Continue anyway",
-                                "Cancel");
-
-                            if (!continueAnyway)
-                            {
-                                return;
-                            }
-                        }
-                    }
-                    catch { }
-                }
-
-                // Hide OpenDir and ZipToShare when new directory selected
-                OpenDir.Visible = false;
-                OpenDir.SendToBack();
-                ZipToShare.Visible = false;
-                _parentOfSelection = Directory.GetParent(_gameDir)?.FullName;
-                _gameDirName = _gameFolderService.GetGameName(_gameDir);
-
-                // Try to get AppID from Steam manifest files
-                var manifestInfo = _manifestParsing.GetAppIdFromManifest(_gameDir);
-                if (manifestInfo.HasValue)
-                {
-                    // We found the AppID from manifest!
-                    CurrentAppId = manifestInfo.Value.appId;
-                    string manifestGameName = manifestInfo.Value.gameName;
-                    long sizeOnDisk = manifestInfo.Value.sizeOnDisk;
-
-                    Debug.WriteLine("[MANIFEST] Auto-detected from Steam manifest:");
-                    Debug.WriteLine($"[MANIFEST] AppID: {CurrentAppId}");
-                    Debug.WriteLine($"[MANIFEST] Game: {manifestGameName}");
-                    Debug.WriteLine($"[MANIFEST] Size: {sizeOnDisk / (1024 * 1024)} MB");
-
-                    // Skip the search UI entirely - we already have the AppID!
-                    // Just show main panel - it will cover all the search UI elements
-                    searchTextBox.Enabled = false;
-                    mainPanel.Visible = true;
-                    resinstruccZip.Visible = true;
-                    _resinstruccZipTimer.Stop();
-                    _resinstruccZipTimer.Start();
-                    startCrackPic.Visible = true;
-
-                    // Skip the search entirely
-                    IsFirstClickAfterSelection = false;
-                    IsInitialFolderSearch = false;
-
-                    // Auto-crack if enabled
-                    if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
-                    {
-                        Debug.WriteLine("[MANIFEST] Auto-crack enabled, starting crack...");
-                        Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Auto-cracking...",
-                            Color.Yellow);
-                        // Trigger crack just like clicking the button
-                        startCrackPic_Click(null, null);
-                    }
-                    else
-                    {
-                        // Update the title with game info
-                        Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Ready to crack!",
-                            Color.LightGreen);
-                    }
-                }
-                else
-                {
-                    // No manifest found, proceed with normal search flow
-                    btnManualEntry.Visible = true;
-                    resinstruccZip.Visible = true;
-                    _resinstruccZipTimer.Stop();
-                    _resinstruccZipTimer.Start(); // Start 30 second timer
-                    mainPanel.Visible = false; // Hide mainPanel so dataGridView is visible
-                    searchTextBox.Enabled = true; // Enable search when AppID panel shows
-
-                    startCrackPic.Visible = true;
-                    Tit("Please select the correct game from the list!! (if list empty do manual search!)",
-                        Color.LightSkyBlue);
-
-                    // Trigger the search
-                    IsFirstClickAfterSelection = true; // Set before changing text
-                    IsInitialFolderSearch = true; // This is the initial search from folder
-                    searchTextBox.Text = _gameDirName;
-                }
-
-                // Stop label5 timer when game dir is selected
-                _label5Timer.Stop();
-                label5.Visible = false;
-                _settings.LastDir = _parentOfSelection;
-                AppSettings.Default.Save();
+                await HandleGameFolderSelection(folderSelectDialog.FileName);
             }
             else
             {
                 SafeMessageBox.ShowWarning(this, "You must select a folder to continue...");
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // TODO: Handle exceptions.
+            Debug.WriteLine($"[FOLDER_SELECTION] Error: {ex.Message}");
         }
     }
 
@@ -1995,13 +1840,13 @@ oLink3.Save";
         drgdropText.Visible = false;
     }
 
-    private void mainPanel_DragDrop(object sender, DragEventArgs e)
+    private async void mainPanel_DragDrop(object sender, DragEventArgs e)
     {
         string[] drops = (string[])e.Data.GetData(DataFormats.FileDrop);
         foreach (string d in drops)
         {
             FileAttributes attr = File.GetAttributes(d);
-            //detect whether its a directory or file
+
             if ((attr & FileAttributes.Directory) == FileAttributes.Directory)
             {
                 // Check if it's a root drive - reject it
@@ -2014,90 +1859,10 @@ oLink3.Save";
                     continue;
                 }
 
-                //DIR
-                _gameDir = d;
-
-                // Hide OpenDir and ZipToShare when new directory selected
-                OpenDir.Visible = false;
-                ZipToShare.Visible = false;
-                _parentOfSelection = Directory.GetParent(_gameDir)?.FullName;
-                _gameDirName = _gameFolderService.GetGameName(_gameDir);
-
-                // Try to get AppID from Steam manifest files
-                var manifestInfo = _manifestParsing.GetAppIdFromManifest(_gameDir);
-                if (manifestInfo.HasValue)
-                {
-                    // We found the AppID from manifest!
-                    CurrentAppId = manifestInfo.Value.appId;
-                    string manifestGameName = manifestInfo.Value.gameName;
-                    long sizeOnDisk = manifestInfo.Value.sizeOnDisk;
-
-                    Debug.WriteLine("[MANIFEST] Auto-detected from Steam manifest:");
-                    Debug.WriteLine($"[MANIFEST] AppID: {CurrentAppId}");
-                    Debug.WriteLine($"[MANIFEST] Game: {manifestGameName}");
-                    Debug.WriteLine($"[MANIFEST] Size: {sizeOnDisk / (1024 * 1024)} MB");
-
-                    // Skip the search UI entirely - we already have the AppID!
-                    // Just show main panel - it will cover all the search UI elements
-                    searchTextBox.Enabled = false;
-                    mainPanel.Visible = true;
-                    resinstruccZip.Visible = true;
-                    _resinstruccZipTimer.Stop();
-                    _resinstruccZipTimer.Start();
-                    startCrackPic.Visible = true;
-
-                    // Skip the search entirely
-                    IsInitialFolderSearch = false;
-                    IsFirstClickAfterSelection = false;
-
-                    // Auto-crack if enabled
-                    if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
-                    {
-                        Debug.WriteLine("[MANIFEST] Auto-crack enabled, starting crack...");
-                        Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Auto-cracking...",
-                            Color.Yellow);
-                        // Trigger crack just like clicking the button
-                        startCrackPic_Click(null, null);
-                    }
-                    else
-                    {
-                        // Update the title with game info
-                        Tit($"✅ Auto-detected: {manifestGameName} (AppID: {CurrentAppId}) - Ready to crack!",
-                            Color.LightGreen);
-                    }
-                }
-                else
-                {
-                    // No manifest found, proceed with normal search flow
-                    mainPanel.Visible = false; // Hide mainPanel so dataGridView is visible
-                    searchTextBox.Enabled = true; // Enable search when AppID panel shows
-                    btnManualEntry.Visible = true;
-                    resinstruccZip.Visible = true; // Show this too!
-                    _resinstruccZipTimer.Stop();
-                    _resinstruccZipTimer.Start(); // Start 30 second timer
-                    startCrackPic.Visible = true;
-                    Tit("Please select the correct game from the list!! (if list empty do manual search!)",
-                        Color.LightSkyBlue);
-
-                    // Trigger the search
-                    IsInitialFolderSearch = true; // This is the initial search
-                    searchTextBox.Text = _gameDirName;
-                    IsFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
-                }
-
-                // Stop label5 timer when game dir is selected
-                _label5Timer.Stop();
-                label5.Visible = false;
-
-                IsInitialFolderSearch = true; // This is the initial search
-                searchTextBox.Text = _gameDirName;
-                IsFirstClickAfterSelection = true; // Set AFTER changing text to avoid race condition
-                _settings.LastDir = _parentOfSelection;
-                AppSettings.Default.Save();
+                await HandleGameFolderSelection(d);
             }
             else
             {
-                //FILE - reject all files
                 Tit("Please drag and drop a FOLDER, not a file!", Color.LightSkyBlue);
                 SafeMessageBox.ShowWarning(this, "Drag and drop a game folder, not individual files!");
             }
@@ -3569,6 +3334,116 @@ oLink3.Save";
         Hide();
     }
 
+    private async Task HandleGameFolderSelection(string selectedPath)
+    {
+        // Hide crack buttons when starting new game selection
+        _crackButtonManager.HideCrackButtons();
+        OpenDir.Visible = false;
+        OpenDir.SendToBack();
+        ZipToShare.Visible = false;
+
+        // Process the folder using the service
+        var result = _gameSelection.ProcessGameFolder(selectedPath);
+
+        // Show feedback if auto-corrected
+        if (result.WasAutoCorrected)
+        {
+            string selectedName = Path.GetFileName(selectedPath);
+            string correctedName = Path.GetFileName(result.GameDirectory);
+            Tit($"Detected subfolder '{selectedName}' → corrected to game root: {correctedName}", Color.Yellow);
+            await Task.Delay(2000);
+        }
+
+        // Update form state
+        _gameDir = result.GameDirectory;
+        _gameDirName = result.GameDirectoryName;
+        _parentOfSelection = Directory.GetParent(_gameDir)?.FullName;
+
+        // Save last directory
+        try
+        {
+            _settings.LastDir = _parentOfSelection;
+            AppSettings.Default.Save();
+        }
+        catch { }
+
+        // Stop label5 timer
+        _label5Timer.Stop();
+        label5.Visible = false;
+
+        // Handle based on flow type
+        switch (result.FlowType)
+        {
+            case GameSelectionFlowType.ManifestAutoDetect:
+                await HandleManifestAutoDetect(result);
+                break;
+
+            case GameSelectionFlowType.ManualSearch:
+                HandleManualSearch(result);
+                break;
+
+            case GameSelectionFlowType.BatchFolder:
+                // Handle batch mode (not yet implemented in service)
+                break;
+        }
+    }
+
+    private async Task HandleManifestAutoDetect(GameSelectionResult result)
+    {
+        CurrentAppId = result.AppId;
+
+        Debug.WriteLine("[MANIFEST] Auto-detected from Steam manifest:");
+        Debug.WriteLine($"[MANIFEST] AppID: {result.AppId}");
+        Debug.WriteLine($"[MANIFEST] Game: {result.ManifestGameName}");
+        Debug.WriteLine($"[MANIFEST] Size: {result.SizeOnDisk / (1024 * 1024)} MB");
+
+        // Skip search UI entirely
+        searchTextBox.Enabled = false;
+        mainPanel.Visible = true;
+        resinstruccZip.Visible = true;
+        _resinstruccZipTimer.Stop();
+        _resinstruccZipTimer.Start();
+        startCrackPic.Visible = true;
+
+        // Clear search flags
+        IsFirstClickAfterSelection = false;
+        IsInitialFolderSearch = false;
+
+        // Auto-crack if enabled
+        if (AutoCrackEnabled && !string.IsNullOrEmpty(_gameDir))
+        {
+            Debug.WriteLine("[MANIFEST] Auto-crack enabled, starting crack...");
+            Tit($"✅ Auto-detected: {result.ManifestGameName} (AppID: {result.AppId}) - Auto-cracking...",
+                Color.Yellow);
+            startCrackPic_Click(null, null);
+        }
+        else
+        {
+            Tit($"✅ Auto-detected: {result.ManifestGameName} (AppID: {result.AppId}) - Ready to crack!",
+                Color.LightGreen);
+        }
+    }
+
+    private void HandleManualSearch(GameSelectionResult result)
+    {
+        // Show search UI
+        btnManualEntry.Visible = true;
+        resinstruccZip.Visible = true;
+        _resinstruccZipTimer.Stop();
+        _resinstruccZipTimer.Start();
+        mainPanel.Visible = false;
+        searchTextBox.Enabled = true;
+        startCrackPic.Visible = true;
+
+        Tit("Please select the correct game from the list!! (if list empty do manual search!)",
+            Color.LightSkyBlue);
+
+        // Trigger search with normalized text
+        IsFirstClickAfterSelection = true;
+        IsInitialFolderSearch = true;
+        searchTextBox.Text = result.NormalizedSearchText;
+    }
+
     private async Task ProcessBatchGames(
         List<BatchGameItem> games,
         string compressionFormat,
@@ -3625,6 +3500,7 @@ oLink3.Save";
     private readonly IDialogService _dialogService;
     private readonly IGameFolderService _gameFolderService;
     private readonly ISteamlessService _steamlessService;
+    private readonly IGameSelectionService _gameSelection;
 
     // === Batch Processing Components ===
     private BatchGameSelectionForm _activeBatchForm;
