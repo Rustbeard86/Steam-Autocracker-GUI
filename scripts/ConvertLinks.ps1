@@ -1,15 +1,18 @@
 # Paste your links in the format: [url=LINK]GameName[/url]
 # One per line. Run: .\ConvertLinks.ps1
+# 
+# Example input format:
+# [url=https://example.com/share/ABC123]Game Name 1[/url]
+# [url=https://example.com/share/DEF456]Game Name 2[/url]
+# [url=https://example.com/share/GHI789]Game Name 3[/url]
 
 param(
     [string]$InputFile = "",
     [string]$SteamPaths = "C:\Program Files (x86)\Steam;G:\SteamLibrary"
 )
 
+# Default empty - provide your own links or use -InputFile parameter
 $links = @'
-[url=https://example.com/share/ABC123]Game Name 1[/url]
-[url=https://example.com/share/DEF456]Game Name 2[/url]
-[url=https://example.com/share/GHI789]Game Name 3[/url]
 '@
 
 # If input file provided, use that instead
@@ -86,8 +89,11 @@ foreach ($match in [regex]::Matches($links, $linkPattern)) {
 
     $depotsText = if ($depots.Count -gt 0) { $depots -join "`n" } else { "No depot info" }
 
+    # Note: Platform is hardcoded as Win64. For precise detection, use GenerateRinFormat.ps1 with game path.
+    $platform = "Win64"
+
     $formatted = @"
-[url=$url][color=white][b]$matchedName [Win64] [Branch: Public] (Clean Steam Files)[/b][/color][/url]
+[url=$url][color=white][b]$matchedName [$platform] [Branch: Public] (Clean Steam Files)[/b][/color][/url]
 [size=85][color=white][b]Version:[/b] [i]$versionDate[/i][/color][/size]
 
 [spoiler="[color=white]Depots & Manifests[/color]"][code=text]$depotsText[/code][/spoiler][color=white][b]Uploaded version:[/b] [i]$versionDate[/i][/color]

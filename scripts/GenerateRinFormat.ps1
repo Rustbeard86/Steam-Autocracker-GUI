@@ -46,7 +46,7 @@ foreach ($acf in $acfFiles) {
             }
 
             # Detect platform by checking for .exe files
-            $platform = "Win64"  # Default
+            $platform = "Win64"  # Assumed if detection fails
             try {
                 $exeFiles = Get-ChildItem -Path $GamePath -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 5
                 foreach ($exe in $exeFiles) {
