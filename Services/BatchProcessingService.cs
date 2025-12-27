@@ -127,7 +127,12 @@ public sealed class BatchProcessingService(
                     string extension = settings.CompressionFormat.Equals("7z", StringComparison.OrdinalIgnoreCase)
                         ? ".7z"
                         : ".zip";
-                    string outputPath = Path.Combine(parentDir, game.Name + extension);
+                    
+                    // Format: [SACGUI] GameName - Clean/Cracked (Build 12345).7z
+                    string crackStatus = game.ShouldCrack ? "Cracked" : "Clean";
+                    string buildSuffix = !string.IsNullOrEmpty(game.BuildId) ? $" (Build {game.BuildId})" : "";
+                    string outputPath = Path.Combine(parentDir, $"[SACGUI] {game.Name} - {crackStatus}{buildSuffix}{extension}");
+                    
                     archivePaths[game.Path] = outputPath;
 
                     bool compressResult = await _compressionService.CompressAsync(

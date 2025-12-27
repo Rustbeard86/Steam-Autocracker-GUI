@@ -15,6 +15,9 @@
     <OutputPath>bin\$(Configuration)\SACGUI\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
+    <!-- Enable building on non-Windows systems -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
     <!-- Suppress platform compatibility warnings (this is Windows-only) -->
     <NoWarn>$(NoWarn);CA1416;CS1591</NoWarn>
 
