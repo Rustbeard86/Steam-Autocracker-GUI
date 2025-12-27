@@ -137,9 +137,12 @@ public sealed class BatchCoordinatorService : IBatchCoordinatorService
                     ? string.Join("\n", depotLines)
                     : "No depot info";
 
+                // Determine crack status
+                string crackStatus = gameItem.ShouldCrack ? "Cracked" : "Clean Steam Files";
+                
                 // Full phpBB format for cs.rin.ru
                 string formattedLink =
-                    $"[url={upload.FinalUrl}][color=white][b]{gameItem.Name} [{gameItem.Platform}] [Branch: {gameItem.Branch}] (Clean Steam Files)[/b][/color][/url]\n" +
+                    $"[url={upload.FinalUrl}][color=white][b]{gameItem.Name} [{gameItem.Platform}] [Branch: {gameItem.Branch}] ({crackStatus})[/b][/color][/url]\n" +
                     $"[size=85][color=white][b]Version:[/b] [i]{versionDate}[/i][/color][/size]\n\n" +
                     $"[spoiler=\"[color=white]Depots & Manifests[/color]\"][code=text]{depotsText}[/code][/spoiler]" +
                     $"[color=white][b]Uploaded version:[/b] [i]{versionDate}[/i][/color]";

@@ -4,6 +4,7 @@ using APPID.Models;
 using APPID.Properties;
 using APPID.Services;
 using APPID.Services.Interfaces;
+using APPID.Utilities.Steam;
 using APPID.Utilities.UI;
 using Timer = System.Windows.Forms.Timer;
 
@@ -999,7 +1000,7 @@ public class BatchGameSelectionForm : Form
 
                 if (crack || zip || upload)
                 {
-                    SelectedGames.Add(new BatchGameItem
+                    var item = new BatchGameItem
                     {
                         Name = Path.GetFileName(_gamePaths[i]),
                         Path = _gamePaths[i],
@@ -1007,7 +1008,30 @@ public class BatchGameSelectionForm : Form
                         ShouldCrack = crack,
                         ShouldZip = zip,
                         ShouldUpload = upload
-                    });
+                    };
+
+                    // Get full manifest info for cs.rin.ru format
+                    try
+                    {
+                        var manifestInfo = SteamManifestParser.GetFullManifestInfo(_gamePaths[i]);
+                        if (manifestInfo.HasValue)
+                        {
+                            // Use proper game name from manifest
+                            item.Name = manifestInfo.Value.gameName;
+                            item.BuildId = manifestInfo.Value.buildId;
+                            item.LastUpdated = manifestInfo.Value.lastUpdated;
+                            item.InstalledDepots = manifestInfo.Value.depots;
+                        }
+
+                        // Detect platform (Win64/Win32)
+                        item.Platform = SteamManifestParser.DetectGamePlatform(_gamePaths[i]);
+                    }
+                    catch
+                    {
+                        // If manifest parsing fails, continue with basic info
+                    }
+
+                    SelectedGames.Add(item);
                 }
             }
 
