@@ -45,6 +45,31 @@ foreach ($acf in $acfFiles) {
                 }
             }
 
+            # Detect platform by checking for .exe files
+            $platform = "Win64"  # Default
+            try {
+                $exeFiles = Get-ChildItem -Path $GamePath -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 5
+                foreach ($exe in $exeFiles) {
+                    $bytes = [System.IO.File]::ReadAllBytes($exe.FullName)
+                    if ($bytes.Length -gt 0x3C + 4) {
+                        # Check PE header to determine architecture
+                        $peOffset = [BitConverter]::ToInt32($bytes, 0x3C)
+                        if ($peOffset -lt $bytes.Length - 6) {
+                            $machineType = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
+                            if ($machineType -eq 0x8664) {
+                                $platform = "Win64"
+                                break
+                            } elseif ($machineType -eq 0x014C) {
+                                $platform = "Win32"
+                                break
+                            }
+                        }
+                    }
+                }
+            } catch {
+                # Keep default Win64 if detection fails
+            }
+
             # Format date
             $versionDate = "Unknown"
             if ($lastUpdated -gt 0) {
@@ -58,7 +83,7 @@ foreach ($acf in $acfFiles) {
             Write-Host ""
             Write-Host "=== COPY THIS ===" -ForegroundColor Cyan
             Write-Host ""
-            Write-Host "[url=$UploadUrl][color=white][b]$gameName [Win64] [Branch: Public] (Clean Steam Files)[/b][/color][/url]"
+            Write-Host "[url=$UploadUrl][color=white][b]$gameName [$platform] [Branch: Public] (Clean Steam Files)[/b][/color][/url]"
             Write-Host "[size=85][color=white][b]Version:[/b] [i]$versionDate[/i][/color][/size]"
             Write-Host ""
             Write-Host "[spoiler=`"[color=white]Depots & Manifests[/color]`"][code=text]$depotsText[/code][/spoiler][color=white][b]Uploaded version:[/b] [i]$versionDate[/i][/color]"

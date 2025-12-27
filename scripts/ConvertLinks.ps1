@@ -7,17 +7,9 @@ param(
 )
 
 $links = @'
-[url=https://pydrive.harryeffingpotter.com/s/ame4UKgM]Duck Game[/url]
-[url=https://pydrive.harryeffingpotter.com/s/d4dmTfdt]Terraria[/url]
-[url=https://pydrive.harryeffingpotter.com/s/9Majrc71]PEAK[/url]
-[url=https://pydrive.harryeffingpotter.com/s/C4sE1MRp]Crab Champions[/url]
-[url=https://pydrive.harryeffingpotter.com/s/8taS69VQ]Hollow Knight Silksong[/url]
-[url=https://pydrive.harryeffingpotter.com/s/7wF62SV9]Valheim[/url]
-[url=https://pydrive.harryeffingpotter.com/s/xa6LPe8F]Lethal Company[/url]
-[url=https://pydrive.harryeffingpotter.com/s/8bgsSgXi]Barony[/url]
-[url=https://pydrive.harryeffingpotter.com/s/LghSSBL5]Davigo[/url]
-[url=https://pydrive.harryeffingpotter.com/s/6xhRuRzO]Golf It![/url]
-[url=https://1fichier.com/?s92pkacbt9327xoa5prz]Palworld[/url]
+[url=https://example.com/share/ABC123]Game Name 1[/url]
+[url=https://example.com/share/DEF456]Game Name 2[/url]
+[url=https://example.com/share/GHI789]Game Name 3[/url]
 '@
 
 # If input file provided, use that instead
